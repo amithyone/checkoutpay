@@ -229,8 +229,8 @@
                     <div>
                         <h4 class="text-base font-semibold text-gray-900">Permanent business pay-in account</h4>
                         <p class="text-xs text-gray-600 mt-1">
-                            We create the account with your <strong>registered business name</strong> and CAC <strong>RC or BN</strong> number
-                            (so the account title is the company, not a personal name). Also provide business contact phone/email and signatory date of birth.
+                            We create your <strong>permanent</strong> pay-in account with your registered business name and CAC RC/BN
+                            (so that account title is the company). Checkout payment-request temp account names are controlled by Checkout admin (usually Checkout Now Ltd) — not by this form.
                         </p>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">

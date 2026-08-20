@@ -297,6 +297,55 @@
         </div>
     </div>
 
+    <!-- MevonPay temp VA: platform RC vs business own CAC -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6" id="temp-va-cac-source">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-900">
+                    <i class="fas fa-hashtag mr-2 text-indigo-600"></i> Temp account number name (MevonPay)
+                </h3>
+                <p class="text-sm text-gray-600 mt-1 max-w-2xl">
+                    Controls which CAC is sent to MevonPay <code class="text-xs bg-gray-100 px-1 rounded">create_tem_va</code> for checkout account numbers.
+                    <strong>Checkout Now Ltd</strong> (default) uses the platform RC so account names stay Checkout Now Ltd.
+                    <strong>Business own CAC</strong> uses this business’s RC/BN so the account name matches their registered company.
+                </p>
+                <p class="text-xs text-gray-500 mt-2">
+                    CAC on file:
+                    <span class="font-mono text-gray-800">{{ $business->cac_registration_number ?: 'none — required before enabling business own CAC' }}</span>
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3 shrink-0">
+                @if($business->use_own_cac_for_temp_va)
+                    <span class="px-3 py-1 text-sm font-medium bg-indigo-100 text-indigo-800 rounded-full">Business own CAC</span>
+                    <form action="{{ route('admin.businesses.toggle-own-cac-for-temp-va', $business) }}" method="POST" class="inline">
+                        @csrf
+                        <button type="submit" class="px-4 py-2 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 text-sm"
+                            onclick="return confirm('Switch back to Checkout Now Ltd platform RC for temp account numbers?')">
+                            Use Checkout Now Ltd
+                        </button>
+                    </form>
+                @else
+                    <span class="px-3 py-1 text-sm font-medium bg-gray-100 text-gray-700 rounded-full">Checkout Now Ltd</span>
+                    <form action="{{ route('admin.businesses.toggle-own-cac-for-temp-va', $business) }}" method="POST" class="inline">
+                        @csrf
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm"
+                            @if(! filled($business->cac_registration_number))
+                                onclick="return confirm('This business has no CAC RC/BN on file yet. Enable anyway? Temp VA requests will fail until CAC is saved.')"
+                            @else
+                                onclick="return confirm('Use this business’s CAC ({{ $business->cac_registration_number }}) for MevonPay temp account numbers? Account names will show their company name.')"
+                            @endif
+                        >
+                            Use business own CAC
+                        </button>
+                    </form>
+                @endif
+                <a href="{{ route('admin.businesses.edit', $business) }}#temp-va-cac-source" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm">
+                    <i class="fas fa-edit mr-1"></i> Edit on form
+                </a>
+            </div>
+        </div>
+    </div>
+
     <!-- WhatsApp wallet merchant API (X-API-Key) -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6" id="whatsapp-wallet-merchant-api">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

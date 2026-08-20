@@ -5,6 +5,7 @@ namespace App\Services\Whatsapp;
 use App\Models\WhatsappSession;
 use App\Models\WhatsappWallet;
 use App\Services\MevonPay\PrivateAccountProvisionService;
+use App\Support\WhatsappWalletKycInputGuard;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -217,6 +218,17 @@ class WhatsappWalletUpgradeFlowHandler
 
             return;
         }
+        if ($cacErr = WhatsappWalletKycInputGuard::cacError($cac)) {
+            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'cac',
+                'reason' => 'generic_or_invalid',
+            ]);
+            $this->client->sendText($instance, $phone, $cacErr);
+
+            return;
+        }
 
         $ctx['cac'] = $cac;
         $ctx['step'] = 'fname';
@@ -387,6 +399,17 @@ class WhatsappWalletUpgradeFlowHandler
 
             return;
         }
+        if ($bvnErr = WhatsappWalletKycInputGuard::bvnOrNinError($digits, 'BVN')) {
+            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'bvn',
+                'reason' => 'generic_or_fake',
+            ]);
+            $this->client->sendText($instance, $phone, $bvnErr);
+
+            return;
+        }
 
         $ctx['bvn'] = $digits;
         $ctx['step'] = 'email';
@@ -409,6 +432,18 @@ class WhatsappWalletUpgradeFlowHandler
                 'value' => $email,
             ]);
             $this->client->sendText($instance, $phone, 'Send a valid email address.');
+
+            return;
+        }
+        if ($emailErr = WhatsappWalletKycInputGuard::emailError($email)) {
+            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'email',
+                'reason' => 'domain_not_allowed',
+                'value' => $email,
+            ]);
+            $this->client->sendText($instance, $phone, $emailErr);
 
             return;
         }

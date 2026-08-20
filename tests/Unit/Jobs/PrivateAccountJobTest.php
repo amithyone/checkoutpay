@@ -116,7 +116,7 @@ class PrivateAccountJobTest extends TestCase
     {
         $business = Business::query()->create([
             'name' => 'Acme Ltd',
-            'email' => 'acme-'.uniqid().'@example.com',
+            'email' => 'acme-'.uniqid().'@gmail.com',
             'password' => Hash::make('password'),
             'phone' => '08012345678',
             'cac_registration_number' => 'RC123456',
@@ -159,7 +159,7 @@ class PrivateAccountJobTest extends TestCase
     {
         $business = Business::query()->create([
             'name' => 'Existing Co',
-            'email' => 'existing-'.uniqid().'@example.com',
+            'email' => 'existing-'.uniqid().'@gmail.com',
             'password' => Hash::make('password'),
             'rubies_business_account_number' => '9999999999',
         ]);
@@ -187,7 +187,7 @@ class PrivateAccountJobTest extends TestCase
             'kyc_fname' => 'Ada',
             'kyc_lname' => 'Lovelace',
             'kyc_dob' => '1990-05-15',
-            'kyc_email' => 'ada@example.com',
+            'kyc_email' => 'ada@gmail.com',
             'kyc_bvn' => '12345678901',
             'kyc_gender' => 'female',
         ]);
@@ -240,7 +240,7 @@ class PrivateAccountJobTest extends TestCase
             'fname' => 'Chidi',
             'lname' => 'Okoro',
             'dob' => '1992-03-10',
-            'email' => 'chidi@example.com',
+            'email' => 'chidi@gmail.com',
             'gender' => 'male',
             'bvn' => '22334455667',
         ]);
@@ -264,7 +264,7 @@ class PrivateAccountJobTest extends TestCase
             'kyc_fname' => 'Ada',
             'kyc_lname' => 'Okonkwo',
             'kyc_dob' => '1991-08-20',
-            'kyc_email' => 'ada@example.com',
+            'kyc_email' => 'ada@gmail.com',
             'kyc_bvn' => '11223344556',
             'kyc_gender' => 'female',
             'rubies_account_type' => 'personal',
@@ -295,7 +295,7 @@ class PrivateAccountJobTest extends TestCase
             'kyc_fname' => 'Tunde',
             'kyc_lname' => 'Balogun',
             'kyc_dob' => '1989-04-12',
-            'kyc_email' => 'tunde@example.com',
+            'kyc_email' => 'tunde@gmail.com',
             'kyc_bvn' => '55667788990',
             'kyc_gender' => 'male',
             'private_account_provision_status' => PrivateAccountProvisionService::STATUS_QUEUED,
@@ -321,7 +321,7 @@ class PrivateAccountJobTest extends TestCase
             'kyc_fname' => 'Ngozi',
             'kyc_lname' => 'Eze',
             'kyc_dob' => '1988-11-22',
-            'kyc_email' => 'ngozi@example.com',
+            'kyc_email' => 'ngozi@gmail.com',
             'kyc_bvn' => '99887766554',
             'kyc_gender' => 'female',
             'kyc_verified_at' => now(),

@@ -47,7 +47,6 @@ class PaymentController extends Controller
                 'fname' => $request->fname,
                 'lname' => $request->lname,
                 'bvn' => $request->bvn,
-                'registration_number' => $request->registration_number,
                 'webhook_url' => $webhookUrlInput,
                 'service' => $request->service,
                 'transaction_id' => $request->transaction_id,

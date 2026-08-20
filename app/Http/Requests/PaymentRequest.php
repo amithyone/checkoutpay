@@ -30,7 +30,6 @@ class PaymentRequest extends FormRequest
             'lname' => ['nullable', 'string', 'max:100'],
             'bank' => ['nullable', 'string', 'max:255'],
             'bvn' => ['nullable', 'string', 'max:30'],
-            'registration_number' => ['nullable', 'string', 'max:60'],
             // Optional: omit or leave empty to use webhook saved on Business Website / business (see withValidator).
             'webhook_url' => ['nullable', 'string', 'max:500'],
             'service' => ['nullable', 'string', 'max:255'], // Accept service field
@@ -191,12 +190,6 @@ class PaymentRequest extends FormRequest
         if ($this->has('bvn') && $this->bvn) {
             $this->merge([
                 'bvn' => trim($this->bvn),
-            ]);
-        }
-
-        if ($this->has('registration_number') && $this->registration_number) {
-            $this->merge([
-                'registration_number' => trim($this->registration_number),
             ]);
         }
         

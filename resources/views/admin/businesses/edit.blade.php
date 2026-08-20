@@ -80,7 +80,7 @@
                     </label>
                 </div>
 
-                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2">
+                <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-2" id="temp-va-cac-source">
                     <label class="flex items-start gap-2 cursor-pointer">
                         <input type="checkbox" name="use_own_cac_for_temp_va" value="1" {{ old('use_own_cac_for_temp_va', $business->use_own_cac_for_temp_va) ? 'checked' : '' }} class="mt-1">
                         <span class="text-sm text-gray-800">

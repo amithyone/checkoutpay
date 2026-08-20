@@ -231,12 +231,6 @@
                                                     <td class="px-4 py-3 text-gray-700">BVN (if collected)</td>
                                                 </tr>
                                                 <tr>
-                                                    <td class="px-4 py-3 font-mono text-gray-900">registration_number</td>
-                                                    <td class="px-4 py-3 text-gray-700">string</td>
-                                                    <td class="px-4 py-3 text-gray-700">No</td>
-                                                    <td class="px-4 py-3 text-gray-700">Registration number (if applicable)</td>
-                                                </tr>
-                                                <tr>
                                                     <td class="px-4 py-3 font-mono text-gray-900">payment_method</td>
                                                     <td class="px-4 py-3 text-gray-700">string</td>
                                                     <td class="px-4 py-3 text-gray-700">No</td>

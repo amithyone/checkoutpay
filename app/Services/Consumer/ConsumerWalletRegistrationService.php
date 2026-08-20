@@ -5,6 +5,7 @@ namespace App\Services\Consumer;
 use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
 use App\Services\Whatsapp\PhoneNormalizer;
+use App\Support\WhatsappWalletKycInputGuard;
 use Illuminate\Support\Facades\DB;
 
 class ConsumerWalletRegistrationService
@@ -24,6 +25,9 @@ class ConsumerWalletRegistrationService
         if ($e164 === null) {
             return ['ok' => false, 'message' => 'Invalid mobile number for a supported country.'];
         }
+        if ($phoneErr = WhatsappWalletKycInputGuard::phoneError($e164)) {
+            return ['ok' => false, 'message' => $phoneErr];
+        }
 
         $fname = trim((string) ($profile['fname'] ?? ''));
         $lname = trim((string) ($profile['lname'] ?? ''));
@@ -35,8 +39,8 @@ class ConsumerWalletRegistrationService
         if (strlen($lname) < 2) {
             return ['ok' => false, 'message' => 'Enter your last name.'];
         }
-        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return ['ok' => false, 'message' => 'Enter a valid email address.'];
+        if ($emailErr = WhatsappWalletKycInputGuard::emailError($email)) {
+            return ['ok' => false, 'message' => $emailErr];
         }
 
         $bvn = $this->digitsOrNull($profile['bvn'] ?? null, 11);
@@ -46,6 +50,12 @@ class ConsumerWalletRegistrationService
         }
         if ($nin !== null && strlen($nin) !== 11) {
             return ['ok' => false, 'message' => 'NIN must be 11 digits when provided.'];
+        }
+        if ($bvn !== null && ($bvnErr = WhatsappWalletKycInputGuard::bvnOrNinError($bvn, 'BVN'))) {
+            return ['ok' => false, 'message' => $bvnErr];
+        }
+        if ($nin !== null && ($ninErr = WhatsappWalletKycInputGuard::bvnOrNinError($nin, 'NIN'))) {
+            return ['ok' => false, 'message' => $ninErr];
         }
 
         $dob = trim((string) ($profile['dob'] ?? ''));

@@ -78,6 +78,42 @@ return [
         'tier1_temp_va_lname' => (string) env('WHATSAPP_WALLET_TIER1_TEMP_VA_LNAME', 'User'),
         /** Hours until an unused Tier 1 top-up VA stops accepting webhook matches. */
         'tier1_temp_va_ttl_hours' => (int) env('WHATSAPP_WALLET_TIER1_TEMP_VA_TTL_HOURS', 48),
+        /**
+         * Wallet KYC / signup emails must use one of these popular consumer domains
+         * (comma-separated via WHATSAPP_WALLET_ALLOWED_EMAIL_DOMAINS to override).
+         */
+        'allowed_email_domains' => array_values(array_filter(array_map(
+            'strtolower',
+            array_map('trim', explode(',', (string) env(
+                'WHATSAPP_WALLET_ALLOWED_EMAIL_DOMAINS',
+                implode(',', [
+                    'gmail.com',
+                    'googlemail.com',
+                    'yahoo.com',
+                    'yahoo.co.uk',
+                    'yahoo.co.in',
+                    'ymail.com',
+                    'rocketmail.com',
+                    'hotmail.com',
+                    'hotmail.co.uk',
+                    'outlook.com',
+                    'outlook.co.uk',
+                    'live.com',
+                    'live.co.uk',
+                    'msn.com',
+                    'icloud.com',
+                    'me.com',
+                    'mac.com',
+                    'aol.com',
+                    'protonmail.com',
+                    'proton.me',
+                    'zoho.com',
+                    'zohomail.com',
+                    'gmx.com',
+                    'mail.com',
+                ])
+            )))
+        ))),
         /** Banks per page in *Transfer → bank* numbered picker (reply 1–N, MORE/PREV). */
         'bank_picker_page_size' => max(4, min(12, (int) env('WHATSAPP_WALLET_BANK_PICKER_PAGE_SIZE', 8))),
         /** Secure web link + cache TTL for confirming transfers (wallet PIN on web only). Tier 2 may enable email OTP via *7* SETTINGS (default off). */

@@ -104,13 +104,15 @@ class BusinessController extends Controller
             'broadcast_pay_at_shop_enabled' => 'boolean',
         ]);
         $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
-        $validated['use_own_cac_for_temp_va'] = $request->has('use_own_cac_for_temp_va');
+        $useOwnCac = $request->has('use_own_cac_for_temp_va');
+        unset($validated['use_own_cac_for_temp_va']);
         $validated['whatsapp_wallet_api_enabled'] = $request->has('whatsapp_wallet_api_enabled');
         $validated['payout_api_enabled'] = $request->has('payout_api_enabled');
         $validated['card_payments_enabled'] = $request->has('card_payments_enabled');
         $validated['broadcast_pay_at_shop_enabled'] = $request->has('broadcast_pay_at_shop_enabled');
 
         $business = Business::create($validated);
+        $business->forceFill(['use_own_cac_for_temp_va' => $useOwnCac])->saveQuietly();
         app(\App\Services\BusinessMevonExternalDefaultService::class)
             ->syncFromFlag($business, (bool) $validated['uses_external_account_numbers']);
         app(BusinessWebsiteSyncService::class)->syncFromBusinessRecord($business, true);
@@ -179,7 +181,8 @@ class BusinessController extends Controller
             'broadcast_pay_at_shop_enabled' => 'boolean',
         ]);
         $validated['uses_external_account_numbers'] = $request->has('uses_external_account_numbers');
-        $validated['use_own_cac_for_temp_va'] = $request->has('use_own_cac_for_temp_va');
+        $useOwnCac = $request->has('use_own_cac_for_temp_va');
+        unset($validated['use_own_cac_for_temp_va']);
         $validated['whatsapp_wallet_api_enabled'] = $request->has('whatsapp_wallet_api_enabled');
         $validated['payout_api_enabled'] = $request->has('payout_api_enabled');
         $validated['card_payments_enabled'] = $request->has('card_payments_enabled');
@@ -191,6 +194,7 @@ class BusinessController extends Controller
         }
 
         $business->update($validated);
+        $business->forceFill(['use_own_cac_for_temp_va' => $useOwnCac])->saveQuietly();
         app(\App\Services\BusinessMevonExternalDefaultService::class)
             ->syncFromFlag($business, (bool) $validated['uses_external_account_numbers']);
         app(BusinessWebsiteSyncService::class)->syncFromBusinessRecord($business->fresh(), true);
@@ -381,6 +385,22 @@ class BusinessController extends Controller
             : 'WhatsApp wallet merchant API is now disabled for this business.';
 
         return redirect()->route('admin.businesses.show', $business)->with('success', $msg);
+    }
+
+    public function toggleOwnCacForTempVa(Business $business): RedirectResponse
+    {
+        $enabling = ! (bool) $business->use_own_cac_for_temp_va;
+        $business->forceFill([
+            'use_own_cac_for_temp_va' => $enabling,
+        ])->saveQuietly();
+
+        $msg = $enabling
+            ? 'Temp account numbers will use this business’s own CAC RC/BN (account name = their company).'
+            : 'Temp account numbers will use Checkout Now Ltd platform RC again.';
+
+        return redirect()->route('admin.businesses.show', $business)
+            ->withFragment('temp-va-cac-source')
+            ->with('success', $msg);
     }
 
     public function togglePayoutApi(Business $business): RedirectResponse

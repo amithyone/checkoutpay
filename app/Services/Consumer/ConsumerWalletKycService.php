@@ -4,6 +4,7 @@ namespace App\Services\Consumer;
 
 use App\Models\WhatsappWallet;
 use App\Support\Imunify360Ops;
+use App\Support\WhatsappWalletKycInputGuard;
 use App\Services\MevonPay\PrivateAccountProvisionService;
 use App\Services\Whatsapp\PhoneNormalizer;
 use App\Services\Whatsapp\WhatsappWalletCountryResolver;
@@ -109,6 +110,10 @@ class ConsumerWalletKycService
         $bvn = preg_replace('/\D+/', '', (string) ($input['bvn'] ?? '')) ?? '';
         $nin = preg_replace('/\D+/', '', (string) ($input['nin'] ?? '')) ?? '';
 
+        if ($emailErr = WhatsappWalletKycInputGuard::emailError($email)) {
+            return ['ok' => false, 'message' => $emailErr];
+        }
+
         $apiPhone = PhoneNormalizer::e164DigitsToNgLocal11((string) $wallet->phone_e164);
         if ($apiPhone === null) {
             return ['ok' => false, 'message' => 'Could not read wallet phone number.'];
@@ -123,6 +128,12 @@ class ConsumerWalletKycService
         $useNin = ! $useBvn && strlen($nin) === 11;
         if (! $useBvn && ! $useNin) {
             return ['ok' => false, 'message' => 'BVN or NIN (11 digits) is required.'];
+        }
+        if ($useBvn && ($bvnErr = WhatsappWalletKycInputGuard::bvnOrNinError($bvn, 'BVN'))) {
+            return ['ok' => false, 'message' => $bvnErr];
+        }
+        if ($useNin && ($ninErr = WhatsappWalletKycInputGuard::bvnOrNinError($nin, 'NIN'))) {
+            return ['ok' => false, 'message' => $ninErr];
         }
 
         $payload = [
@@ -182,6 +193,16 @@ class ConsumerWalletKycService
         $bvn = preg_replace('/\D+/', '', (string) ($input['bvn'] ?? '')) ?? '';
         $fname = trim((string) ($input['fname'] ?? $wallet->kyc_fname ?? ''));
         $lname = trim((string) ($input['lname'] ?? $wallet->kyc_lname ?? ''));
+
+        if ($emailErr = WhatsappWalletKycInputGuard::emailError($email)) {
+            return ['ok' => false, 'message' => $emailErr];
+        }
+        if ($cacErr = WhatsappWalletKycInputGuard::cacError($cac)) {
+            return ['ok' => false, 'message' => $cacErr];
+        }
+        if ($bvnErr = WhatsappWalletKycInputGuard::bvnOrNinError($bvn, 'BVN')) {
+            return ['ok' => false, 'message' => $bvnErr];
+        }
 
         $result = $this->provision->dispatchPersonalBusinessIfReady($wallet, [
             'cac' => $cac,

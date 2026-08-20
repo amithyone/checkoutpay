@@ -6,6 +6,7 @@ use App\Models\Setting;
 use App\Models\WhatsappWallet;
 use App\Services\SmileId\SmileIdBasicKycClient;
 use App\Services\Whatsapp\PhoneNormalizer;
+use App\Support\WhatsappWalletKycInputGuard;
 
 /**
  * Kenya Tier 2 via Smile ID Basic KYC (National ID).
@@ -73,6 +74,9 @@ final class KenyaKycVerificationService
         }
         if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return ['ok' => false, 'message' => 'Enter a valid email address.'];
+        }
+        if ($emailErr = WhatsappWalletKycInputGuard::emailError($email)) {
+            return ['ok' => false, 'message' => $emailErr];
         }
         if (! in_array($gender, ['male', 'female'], true)) {
             return ['ok' => false, 'message' => 'Gender is required (male or female).'];

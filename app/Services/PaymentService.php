@@ -105,10 +105,9 @@ class PaymentService
 
             try {
                 if ($vaMode === 'temp') {
-                    // New Mevon create_tem_va: rc_number + business_type + bank_type.
-                    // Default RC = platform (Checkout Now Ltd); optional admin flag uses business CAC.
-                    $overrideRc = trim((string) ($data['registration_number'] ?? $data['rc_number'] ?? ''));
-                    $resolved = $business->resolveMevonTempVaRegistration($overrideRc !== '' ? $overrideRc : null);
+                    // create_tem_va RC is admin-controlled only (platform vs business CAC flag).
+                    // Merchants cannot override via payment-request registration_number/rc_number.
+                    $resolved = $business->resolveMevonTempVaRegistration();
 
                     $va = $this->mevonPayVirtualAccountService->createTempVa(
                         $resolved['rc_number'],

@@ -8,6 +8,7 @@ use App\Models\Business;
 use App\Models\BusinessVerification;
 use App\Models\WhatsappWallet;
 use App\Services\Admin\BusinessKycMevonVerificationService;
+use App\Support\WhatsappWalletKycInputGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -243,6 +244,8 @@ final class PrivateAccountProvisionService
 
         if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $missing[] = 'Valid email is required.';
+        } elseif ($emailErr = WhatsappWalletKycInputGuard::emailError($email)) {
+            $missing[] = $emailErr;
         }
 
         if (! in_array($gender, ['male', 'female'], true)) {
@@ -253,6 +256,10 @@ final class PrivateAccountProvisionService
         $useNin = ! $useBvn && strlen($nin) === 11;
         if (! $useBvn && ! $useNin) {
             $missing[] = 'BVN or NIN (11 digits) is required.';
+        } elseif ($useBvn && ($bvnErr = WhatsappWalletKycInputGuard::bvnOrNinError($bvn, 'BVN'))) {
+            $missing[] = $bvnErr;
+        } elseif ($useNin && ($ninErr = WhatsappWalletKycInputGuard::bvnOrNinError($nin, 'NIN'))) {
+            $missing[] = $ninErr;
         }
 
         $status = (string) ($wallet->private_account_provision_status ?? '');
@@ -406,6 +413,8 @@ final class PrivateAccountProvisionService
         $missing = [];
         if ($cac === '' || strlen($cac) < 3) {
             $missing[] = 'CAC / registration number is required.';
+        } elseif ($cacErr = WhatsappWalletKycInputGuard::cacError($cac)) {
+            $missing[] = $cacErr;
         }
         if ($fname === '' || $lname === '') {
             $missing[] = 'Signatory first and last name are required.';
@@ -415,9 +424,13 @@ final class PrivateAccountProvisionService
         }
         if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $missing[] = 'Valid email is required.';
+        } elseif ($emailErr = WhatsappWalletKycInputGuard::emailError($email)) {
+            $missing[] = $emailErr;
         }
         if (strlen($bvn) !== 11) {
             $missing[] = 'Signatory BVN (11 digits) is required.';
+        } elseif ($bvnErr = WhatsappWalletKycInputGuard::bvnOrNinError($bvn, 'BVN')) {
+            $missing[] = $bvnErr;
         }
         if ($businessName === '') {
             $missing[] = 'Business name is required.';

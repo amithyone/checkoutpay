@@ -29,7 +29,6 @@ class Business extends Authenticatable implements CanResetPasswordContract
         'api_key',
         'webhook_url',
         'uses_external_account_numbers',
-        'use_own_cac_for_temp_va',
         'whatsapp_wallet_api_enabled',
         'payout_api_enabled',
         'withdrawal_debit_source',
@@ -642,22 +641,14 @@ class Business extends Authenticatable implements CanResetPasswordContract
     /**
      * RC/BN + business_type for Mevon create_tem_va.
      *
-     * Default: platform RC (Checkout Now Ltd) from MEVONPAY_TEMP_VA_REGISTRATION_NUMBER.
-     * When use_own_cac_for_temp_va is on: this business's cac_registration_number.
+     * Admin-only: default platform RC (Checkout Now Ltd). When admin enables
+     * use_own_cac_for_temp_va, uses this business's cac_registration_number.
+     * Merchants / payment-request cannot override.
      *
      * @return array{rc_number: string, business_type: string, source: string}
      */
-    public function resolveMevonTempVaRegistration(?string $overrideRc = null): array
+    public function resolveMevonTempVaRegistration(): array
     {
-        $override = self::normalizeCacRegistrationNumber((string) ($overrideRc ?? ''));
-        if ($override !== '') {
-            return [
-                'rc_number' => $override,
-                'business_type' => self::inferCacBusinessType($override),
-                'source' => 'request_override',
-            ];
-        }
-
         if ($this->use_own_cac_for_temp_va) {
             $own = self::normalizeCacRegistrationNumber((string) ($this->cac_registration_number ?? ''));
             if ($own === '') {
