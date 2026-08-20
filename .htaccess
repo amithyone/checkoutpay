@@ -6,3 +6,8 @@
 
 # Prevent directory listing
 Options -Indexes
+
+# Deny direct access to secrets if docroot is ever mis-set to app root
+<FilesMatch "(?i)^\.(env|error)">
+    Require all denied
+</FilesMatch>

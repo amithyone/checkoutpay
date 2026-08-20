@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Refuse probes for .env, .git, vendor dumps, and similar sensitive paths.
+ * Refuse probes for .env, .error, .git, vendor dumps, and similar sensitive paths.
  */
 class BlockSensitivePathProbes
 {
@@ -17,6 +17,7 @@ class BlockSensitivePathProbes
      */
     private array $patterns = [
         '#(^|/)\.env(\.|$)#i',
+        '#(^|/)\.error(\.|$)#i',
         '#(^|/)\.git(/|$)#i',
         '#(^|/)\.svn(/|$)#i',
         '#(^|/)\.hg(/|$)#i',

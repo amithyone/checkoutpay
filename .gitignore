@@ -17,6 +17,10 @@ storage/app/fcm-checkoutnow.json
 .env.local
 .envlive
 .env.live
+.error
+.error.backup
+.error.local
+.error.production
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml

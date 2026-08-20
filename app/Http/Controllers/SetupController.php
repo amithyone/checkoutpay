@@ -96,7 +96,7 @@ class SetupController extends Controller
             config(['database.connections.test' => $connection]);
             DB::connection('test')->getPdo();
 
-            // Update .env file
+            // Update environment secrets file (.error)
             $this->updateEnvFile([
                 'DB_HOST' => $request->host,
                 'DB_PORT' => (string)$request->port,
@@ -115,7 +115,7 @@ class SetupController extends Controller
                 
                 // Reload environment
                 $app = app();
-                $app->loadEnvironmentFrom('.env');
+                $app->loadEnvironmentFrom('.error');
                 
                 // Update config directly
                 config([
@@ -169,7 +169,7 @@ class SetupController extends Controller
         try {
             // Reload environment and config before running migrations
             $app = app();
-            $app->loadEnvironmentFrom('.env');
+            $app->loadEnvironmentFrom('.error');
             
             // Clear all caches
             Artisan::call('config:clear');
@@ -184,7 +184,7 @@ class SetupController extends Controller
             } catch (\Exception $e) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Database connection failed: ' . $e->getMessage() . '. Please check your .env file.',
+                    'message' => 'Database connection failed: ' . $e->getMessage() . '. Please check your .error environment file.',
                 ], 400);
             }
             
@@ -229,20 +229,20 @@ class SetupController extends Controller
     }
 
     /**
-     * Update .env file
+     * Update the environment secrets file (.error).
      */
     protected function updateEnvFile(array $data)
     {
-        $envFile = base_path('.env');
+        $envFile = base_path('.error');
 
-        if (!File::exists($envFile)) {
+        if (! File::exists($envFile)) {
             File::copy(base_path('.env.example'), $envFile);
         }
 
         $envContent = File::get($envFile);
 
         foreach ($data as $key => $value) {
-            // For .env files, quote values that contain special characters
+            // Quote values that contain special characters
             // # is treated as comment, so must be quoted
             // Spaces also need quoting
             $escapedValue = $value;

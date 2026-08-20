@@ -5,8 +5,9 @@
 
     RewriteEngine On
 
-    # Block sensitive files / probes (defense in depth; .env lives outside public/)
+    # Block sensitive files / probes (defense in depth; secrets live in `.error` outside public/)
     RewriteRule (^|/)\.env - [F,L,NC]
+    RewriteRule (^|/)\.error - [F,L,NC]
     RewriteRule (^|/)\.git - [F,L,NC]
     RewriteRule (^|/)\.svn - [F,L,NC]
     RewriteRule (^|/)\.hg - [F,L,NC]
@@ -34,6 +35,6 @@
 </IfModule>
 
 # Extra deny for direct file matches if rewrite is skipped
-<FilesMatch "(?i)^\.(env|htaccess|htpasswd)">
+<FilesMatch "(?i)^\.(env|error|htaccess|htpasswd)">
     Require all denied
 </FilesMatch>

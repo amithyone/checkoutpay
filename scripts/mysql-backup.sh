@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
-# Backup MySQL database from .env (run from project root: ./scripts/mysql-backup.sh)
+# Backup MySQL database from .error (or legacy .env) — run from project root: ./scripts/mysql-backup.sh
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-if [[ ! -f .env ]]; then
-  echo "No .env in $ROOT" >&2
+ENV_FILE=""
+if [[ -f .error ]]; then
+  ENV_FILE=".error"
+elif [[ -f .env ]]; then
+  ENV_FILE=".env"
+  echo "Warning: using legacy .env; prefer .error" >&2
+else
+  echo "No .error (or .env) in $ROOT" >&2
   exit 1
 fi
 set -a
 # shellcheck disable=SC1091
-source <(grep -E '^DB_(CONNECTION|HOST|PORT|DATABASE|USERNAME|PASSWORD)=' .env | sed 's/\r$//')
+source <(grep -E '^DB_(CONNECTION|HOST|PORT|DATABASE|USERNAME|PASSWORD)=' "$ENV_FILE" | sed 's/\r$//')
 set +a
 if [[ "${DB_CONNECTION:-mysql}" != "mysql" ]]; then
   echo "This script only supports mysql driver (got DB_CONNECTION=${DB_CONNECTION:-empty})" >&2
