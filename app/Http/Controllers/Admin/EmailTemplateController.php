@@ -170,6 +170,14 @@ class EmailTemplateController extends Controller
             'use_custom' => 'nullable|boolean',
         ]);
 
+        if (\App\Services\EmailTemplateRenderer::containsForbiddenSyntax($validated['content'])) {
+            return back()
+                ->withInput()
+                ->withErrors([
+                    'content' => 'Template content may not include Blade directives, PHP, or dangerous functions. Use HTML and {{ $variable }} placeholders only.',
+                ]);
+        }
+
         // Save custom template
         Setting::set(
             "email_template_{$template}_subject",

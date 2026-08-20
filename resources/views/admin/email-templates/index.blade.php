@@ -74,8 +74,8 @@
             <div class="text-sm text-blue-800">
                 <p class="font-semibold mb-1">About Email Templates</p>
                 <p class="text-blue-700">
-                    You can customize email templates using Blade syntax. Available variables will be shown in the editor.
-                    Templates support HTML and CSS styling. Changes take effect immediately after saving.
+                    You can customize email templates with HTML and <code class="bg-blue-100 px-1 rounded">{{ '{{ $variable }}' }}</code> placeholders only.
+                    Blade/PHP is not allowed. Available variables are shown in the editor. Changes take effect immediately after saving.
                 </p>
             </div>
         </div>

@@ -23,23 +23,6 @@ class WalletInactiveReminderCronController extends Controller
 
     private function run(Request $request, ConsumerWalletInactiveReminderService $reminders, string $slot): JsonResponse
     {
-        $requiredToken = env('CRON_EMAIL_FETCH_TOKEN');
-        if ($requiredToken) {
-            $providedToken = $request->query('token') ?? $request->header('X-Cron-Token');
-            if ($providedToken !== $requiredToken) {
-                Log::warning('Unauthorized cron access attempt (wallet inactive reminders)', [
-                    'ip' => $request->ip(),
-                    'slot' => $slot,
-                ]);
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized: Invalid or missing token',
-                    'timestamp' => now()->toDateTimeString(),
-                ], 401);
-            }
-        }
-
         $start = microtime(true);
         try {
             $stats = $reminders->sendForSlot($slot);

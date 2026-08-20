@@ -18,6 +18,10 @@
     RewriteRule ^phpunit\.xml - [F,L,NC]
     RewriteRule ^vendor/ - [F,L,NC]
     RewriteRule ^storage/logs/ - [F,L,NC]
+    # Block direct execution of any PHP except the Laravel front controller
+    RewriteCond %{REQUEST_URI} !^/index\.php$ [NC]
+    RewriteCond %{REQUEST_URI} !^/index\.php/ [NC]
+    RewriteRule \.php$ - [F,L,NC]
 
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .

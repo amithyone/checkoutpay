@@ -26,23 +26,6 @@ class PeerLoanCronController extends Controller
 
     private function runCollect(Request $request, BusinessPeerLoanService $loanService, string $cadence): JsonResponse
     {
-        $requiredToken = env('CRON_EMAIL_FETCH_TOKEN');
-        if ($requiredToken) {
-            $providedToken = $request->query('token') ?? $request->header('X-Cron-Token');
-            if ($providedToken !== $requiredToken) {
-                \Illuminate\Support\Facades\Log::warning('Unauthorized cron access attempt (peer loans)', [
-                    'ip' => $request->ip(),
-                    'cadence' => $cadence,
-                ]);
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized: Invalid or missing token',
-                    'timestamp' => now()->toDateTimeString(),
-                ], 401);
-            }
-        }
-
         $start = microtime(true);
         try {
             $count = $loanService->collectDue($cadence);

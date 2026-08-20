@@ -203,15 +203,19 @@ Route::get('/careers', function () {
     return view('careers');
 })->name('careers');
 
-// Setup routes (must be before any middleware that requires database)
-Route::get('/setup', [SetupController::class, 'index'])->name('setup');
-Route::post('/setup/test-database', [SetupController::class, 'testDatabase']);
-Route::post('/setup/save-database', [SetupController::class, 'saveDatabase']);
-Route::post('/setup/complete', [SetupController::class, 'complete']);
+// Setup routes — blocked when APP_SETUP_COMPLETE=true
+Route::middleware('setup.allowed')->group(function () {
+    Route::get('/setup', [SetupController::class, 'index'])->name('setup');
+    Route::post('/setup/test-database', [SetupController::class, 'testDatabase']);
+    Route::post('/setup/save-database', [SetupController::class, 'saveDatabase']);
+    Route::post('/setup/complete', [SetupController::class, 'complete']);
+});
 
-// Standalone email connection test (no auth required)
-Route::get('/test-email', [TestEmailController::class, 'test'])->name('test.email');
-Route::post('/test-email', [TestEmailController::class, 'test']);
+// Standalone email connection test (local only)
+if (app()->environment('local')) {
+    Route::get('/test-email', [TestEmailController::class, 'test'])->name('test.email');
+    Route::post('/test-email', [TestEmailController::class, 'test']);
+}
 
 // Hosted checkout page routes (public)
 Route::get('/pay', [\App\Http\Controllers\CheckoutController::class, 'show'])->name('checkout.show');
@@ -363,7 +367,8 @@ Route::prefix('my-account')->name('user.')->middleware(['auth'])->group(function
     Route::get('/switch-to-business', [\App\Http\Controllers\Account\SwitchToBusinessController::class, '__invoke'])->name('switch-to-business');
 });
 
-// Cron job endpoints (for external cron services)
+// Cron job endpoints (for external cron services) — require CRON_EMAIL_FETCH_TOKEN (fail-closed outside local)
+Route::middleware('cron.token')->group(function () {
 
 // IMAP Email Fetching Cron (requires IMAP to be enabled)
 Route::get('/cron/monitor-emails', function () {
@@ -517,24 +522,6 @@ Route::get('/cron/read-emails-direct', function (\Illuminate\Http\Request $reque
                       $request->query('minimal') === 'true');
 
     try {
-        // Optional security: Check for secret token if configured
-        $requiredToken = env('CRON_EMAIL_FETCH_TOKEN');
-        if ($requiredToken) {
-            $providedToken = $request->query('token') ?? $request->header('X-Cron-Token');
-            if ($providedToken !== $requiredToken) {
-                \Illuminate\Support\Facades\Log::warning('Unauthorized cron access attempt', [
-                    'ip' => $request->ip(),
-                    'user_agent' => $request->userAgent(),
-                ]);
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized: Invalid or missing token',
-                    'timestamp' => now()->toDateTimeString(),
-                ], 401);
-            }
-        }
-
         $startTime = microtime(true);
 
         // Use the same controller method as the admin dashboard button
@@ -728,24 +715,6 @@ Route::get('/cron/fill-sender-names', function () {
 // Optional security: Add ?token=YOUR_SECRET_TOKEN to protect the endpoint
 Route::get('/cron/extract-missing-names', function (\Illuminate\Http\Request $request) {
     try {
-        // Optional security: Check for secret token if configured
-        $requiredToken = env('CRON_EMAIL_FETCH_TOKEN'); // Reuse same token as email fetch
-        if ($requiredToken) {
-            $providedToken = $request->query('token') ?? $request->header('X-Cron-Token');
-            if ($providedToken !== $requiredToken) {
-                \Illuminate\Support\Facades\Log::warning('Unauthorized cron access attempt (Extract Names)', [
-                    'ip' => $request->ip(),
-                    'user_agent' => $request->userAgent(),
-                ]);
-
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Unauthorized: Invalid or missing token',
-                    'timestamp' => now()->toDateTimeString(),
-                ], 401);
-            }
-        }
-
         $startTime = microtime(true);
 
         // Use the same controller method as the admin dashboard button
@@ -1739,3 +1708,5 @@ Route::get('/cron/global-match', function () {
 
     // Helper function removed - now using DescriptionFieldExtractor service instead
 })->name('cron.global-match');
+
+}); // end Route::middleware('cron.token')

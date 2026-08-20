@@ -16,10 +16,9 @@ class SetupController extends Controller
      */
     public function index()
     {
-        // Always show setup page for now (remove redirect check temporarily)
-        // if ($this->isConfigured()) {
-        //     return redirect('/admin');
-        // }
+        if ($this->isConfigured()) {
+            return redirect('/admin');
+        }
 
         return view('setup.index');
     }
@@ -282,6 +281,6 @@ class SetupController extends Controller
      */
     protected function isConfigured()
     {
-        return env('APP_SETUP_COMPLETE', false) === 'true';
+        return (bool) config('checkout.setup_complete', false);
     }
 }

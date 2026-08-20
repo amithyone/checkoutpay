@@ -19,10 +19,6 @@ class KycProvisionCronController extends Controller
 {
     public function process(Request $request, PrivateAccountProvisionService $provision): JsonResponse
     {
-        if ($response = $this->authorizeCron($request)) {
-            return $response;
-        }
-
         $start = microtime(true);
         $queueConnection = (string) config('queue.default', 'sync');
 
@@ -135,28 +131,5 @@ class KycProvisionCronController extends Controller
             'jobs_in_table' => $jobsInTable,
             'mevon_configured' => app(PrivateAccountProvisionService::class)->isConfigured(),
         ];
-    }
-
-    private function authorizeCron(Request $request): ?JsonResponse
-    {
-        $requiredToken = env('CRON_EMAIL_FETCH_TOKEN');
-        if (! $requiredToken) {
-            return null;
-        }
-
-        $providedToken = $request->query('token') ?? $request->header('X-Cron-Token');
-        if ($providedToken !== $requiredToken) {
-            Log::warning('Unauthorized cron access attempt (kyc provision queue)', [
-                'ip' => $request->ip(),
-            ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Unauthorized: Invalid or missing token',
-                'timestamp' => now()->toDateTimeString(),
-            ], 401);
-        }
-
-        return null;
     }
 }

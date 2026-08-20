@@ -60,4 +60,9 @@ return [
     */
     'cron_api_token' => (string) env('CRON_EMAIL_FETCH_TOKEN', ''),
 
+    /*
+    | When true, /setup/* returns 404 (installation finished).
+    */
+    'setup_complete' => filter_var(env('APP_SETUP_COMPLETE', false), FILTER_VALIDATE_BOOLEAN),
+
 ];

@@ -41,7 +41,7 @@
                         class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                         required
                     >
-                    <p class="text-xs text-gray-500 mt-1">You can use variables like {{ '$appName' }} in the subject</p>
+                    <p class="text-xs text-gray-500 mt-1">You can use placeholders like <code class="bg-gray-100 px-1 rounded">{{ '{{ $appName }}' }}</code> in the subject</p>
                 </div>
 
                 <!-- Use Custom Template Checkbox -->
@@ -58,7 +58,7 @@
                         Use Custom Template
                     </label>
                     <p class="text-xs text-gray-500 ml-2">
-                        When enabled, this custom template will be used instead of the default Blade file
+                        When enabled, this custom HTML template is used instead of the default email view
                     </p>
                 </div>
 
@@ -77,7 +77,7 @@
                 <div>
                     <div class="flex items-center justify-between mb-2">
                         <label for="content" class="block text-sm font-medium text-gray-700">
-                            Email Template Content (Blade/HTML) <span class="text-red-500">*</span>
+                            Email Template Content (HTML) <span class="text-red-500">*</span>
                         </label>
                         <div class="flex items-center space-x-2">
                             <button 
@@ -103,7 +103,7 @@
                             oninput="updatePreview()"
                         >{{ old('content', $customContent) }}</textarea>
                         <p class="text-xs text-gray-500 mt-1">
-                            Use Blade syntax and HTML. Include full HTML structure with DOCTYPE, html, head, and body tags.
+                            Use HTML + <code class="bg-gray-100 px-1 rounded">{{ '{{ $variable }}' }}</code> placeholders only. Blade directives and PHP are not allowed.
                         </p>
                     </div>
                     
@@ -111,7 +111,7 @@
                     <div id="preview-view" class="hidden border border-gray-300 rounded-lg bg-white">
                         <div class="bg-gray-50 border-b border-gray-200 px-4 py-2 flex items-center justify-between">
                             <span class="text-xs font-medium text-gray-700">Email Preview</span>
-                            <span class="text-xs text-gray-500">Note: Blade variables will show as placeholders</span>
+                            <span class="text-xs text-gray-500">Note: placeholders are filled with sample values</span>
                         </div>
                         <div class="p-4 overflow-auto" style="max-height: 600px;">
                             <iframe 
@@ -144,8 +144,8 @@
         <div class="text-sm text-gray-700 space-y-2">
             <p>• Include full HTML structure: DOCTYPE, html, head, and body tags</p>
             <p>• Use inline CSS for email compatibility</p>
-            <p>• Access variables using Blade syntax: @{{ $variableName }}</p>
-            <p>• Use the logo from settings: @{{ asset('storage/' . \App\Models\Setting::get('site_logo')) }}</p>
+            <p>• Access variables using placeholders only: <code class="bg-gray-100 px-1 rounded">@{{ $variableName }}</code> or <code class="bg-gray-100 px-1 rounded">@{{ $business->name }}</code></p>
+            <p>• Do not use <code class="bg-gray-100 px-1 rounded">@php</code>, Blade directives, or PHP — they are rejected on save</p>
         </div>
     </div>
 </div>

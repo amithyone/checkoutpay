@@ -33,6 +33,9 @@ class BlockSensitivePathProbes
         '#(^|/)\.aws/#i',
         '#(^|/)id_rsa#i',
         '#(^|/)\.htpasswd$#i',
+        '#(^|/)test_extraction\.php$#i',
+        '#(^|/)test_connection\.php$#i',
+        '#(^|/)x7f3\.php$#i',
     ];
 
     public function handle(Request $request, Closure $next): Response
