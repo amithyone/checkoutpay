@@ -94,10 +94,21 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by('admin-login:'.($request->ip() ?? '0'));
         });
 
+        RateLimiter::for('ops_monitor', function (Request $request) {
+            $key = (string) ($request->header('X-Ops-Key') ?? $request->ip() ?? '0');
+
+            return Limit::perMinute(60)->by('ops-monitor:'.sha1($key));
+        });
+
         $this->routes(function () {
+            Route::middleware(['api', 'ops.monitor', 'throttle:ops_monitor'])
+                ->prefix('ops/v1')
+                ->group(base_path('routes/ops.php'));
+
             Route::middleware('api')
                 ->prefix('api')
                 ->group(base_path('routes/api.php'));
+
 
             // NigTax admin: alternate paths when nginx strips /api before PHP (see routes/tax_admin_fallback.php)
             Route::middleware('api')

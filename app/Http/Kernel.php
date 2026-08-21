@@ -82,7 +82,9 @@ class Kernel extends HttpKernel
         'touch.consumer.app.session' => \App\Http\Middleware\TouchConsumerAppSession::class,
         'touch.rentals.admin.app.session' => \App\Http\Middleware\TouchRentalsAdminAppSession::class,
         'cron.token' => \App\Http\Middleware\VerifyCronToken::class,
+        'ops.monitor' => \App\Http\Middleware\VerifyOpsMonitorKey::class,
         'api.key' => \App\Http\Middleware\AuthenticateApiKey::class,
         'setup.allowed' => \App\Http\Middleware\EnsureSetupNotComplete::class,
     ];
 }
+

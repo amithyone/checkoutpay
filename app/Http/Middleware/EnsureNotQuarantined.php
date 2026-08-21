@@ -30,8 +30,10 @@ class EnsureNotQuarantined
 
         return $path === 'quarantine/status'
             || $path === 'quarantine/unlock'
-            || str_starts_with($path, 'quarantine/');
+            || str_starts_with($path, 'quarantine/')
+            || str_starts_with($path, 'ops/v1');
     }
+
 
     private function quarantineResponse(Request $request): Response
     {

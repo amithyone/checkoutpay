@@ -151,4 +151,26 @@ return [
         'baseline_relative_path' => 'app/quarantine-baseline.json',
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Ops Sentinel monitor (/ops/v1/*)
+    |--------------------------------------------------------------------------
+    |
+    | Separate ops key for the office wall-clock / tray app. Never reuse the
+    | admin password. Empty OPS_MONITOR_KEY disables the endpoints (503).
+    | OPS_HOST_ROLE: primary (Contabo) | relay (Namecheap).
+    |
+    */
+    'ops_monitor' => [
+        'key' => (string) env('OPS_MONITOR_KEY', ''),
+        'host_role' => strtolower(trim((string) env('OPS_HOST_ROLE', 'primary'))) === 'relay'
+            ? 'relay'
+            : 'primary',
+        'allowed_ips' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('OPS_MONITOR_ALLOWED_IPS', ''))
+        ))),
+    ],
+
 ];
+
