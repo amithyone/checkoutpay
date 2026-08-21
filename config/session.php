@@ -21,9 +21,16 @@ return [
     'lottery' => [2, 100],
     'cookie' => env('SESSION_COOKIE', Str::slug(env('APP_NAME', 'laravel'), '_').'_session'),
     'path' => env('SESSION_PATH', '/'),
-    'domain' => env('SESSION_DOMAIN', null),
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    /*
+     * Null SESSION_SECURE_COOKIE used to become false via `$config['secure'] ?? false`
+     * in StartSession — session cookie then lacked Secure while XSRF-TOKEN still had it.
+     * That breaks login on some mobile browsers. Default to Secure when APP_URL is https.
+     */
+    'domain' => env('SESSION_DOMAIN') ?: null,
+    'secure' => ($secureEnv = env('SESSION_SECURE_COOKIE')) === null
+        ? str_starts_with(strtolower((string) env('APP_URL', '')), 'https://')
+        : filter_var($secureEnv, FILTER_VALIDATE_BOOLEAN),
     'http_only' => true,
-    'same_site' => 'lax',
+    'same_site' => env('SESSION_SAME_SITE', 'lax'),
     'partitioned' => false,
 ];

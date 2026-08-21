@@ -2,12 +2,12 @@
 
 namespace App\Exceptions;
 
+use App\Support\AdminPath;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
 use Illuminate\Support\Facades\Log;
-use App\Support\AdminPath;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Throwable;
 
@@ -32,15 +32,17 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             $request = request();
 
-            if ($e instanceof TokenMismatchException) {
+            if ($e instanceof TokenMismatchException
+                || ($e instanceof HttpExceptionInterface && $e->getStatusCode() === 419)) {
                 Log::warning('security.csrf_token_mismatch', [
                     'path' => $request?->path(),
                     'method' => $request?->method(),
                     'ip' => $request?->ip(),
                     'user_id' => optional($request?->user())->id,
                     'business_id' => optional($request?->user('business'))->id,
-                    'session_id' => $request?->session()?->getId(),
+                    'session_id' => $request?->hasSession() ? $request->session()->getId() : null,
                 ]);
+
                 return;
             }
 
@@ -50,8 +52,9 @@ class Handler extends ExceptionHandler
                     'method' => $request?->method(),
                     'ip' => $request?->ip(),
                     'guards' => method_exists($e, 'guards') ? $e->guards() : [],
-                    'session_id' => $request?->session()?->getId(),
+                    'session_id' => $request?->hasSession() ? $request->session()->getId() : null,
                 ]);
+
                 return;
             }
 
@@ -66,45 +69,87 @@ class Handler extends ExceptionHandler
                 ]);
             }
         });
+    }
 
-        $this->renderable(function (TokenMismatchException $e, Request $request) {
-            if ($request->expectsJson()) {
-                return response()->json([
-                    'message' => 'Your session expired. Refresh the page and try again.',
-                    'csrf_token' => csrf_token(),
-                ], 419);
-            }
+    /**
+     * @param  \Illuminate\Http\Request  $request
+     * @return \Symfony\Component\HttpFoundation\Response
+     */
+    public function render($request, Throwable $e)
+    {
+        $response = $this->renderCsrfSoftRecover($request, $e);
+        if ($response !== null) {
+            return $response;
+        }
 
-            if (! $this->shouldSoftRecoverCsrf($request)) {
-                return null;
-            }
+        return parent::render($request, $e);
+    }
 
-            return redirect()
-                ->to($this->csrfRecoverUrl($request))
-                ->withInput($request->except($this->dontFlash))
-                ->with('error', 'Your session refreshed. Please submit the form again.');
-        });
+    /**
+     * Laravel converts TokenMismatchException → HttpException(419) before renderable
+     * callbacks run, so soft-recover must happen in render() itself.
+     *
+     * @return \Symfony\Component\HttpFoundation\Response|null
+     */
+    private function renderCsrfSoftRecover(Request $request, Throwable $e)
+    {
+        $isCsrf = $e instanceof TokenMismatchException
+            || ($e instanceof HttpExceptionInterface && $e->getStatusCode() === 419);
+
+        if (! $isCsrf) {
+            return null;
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Your session expired. Refresh the page and try again.',
+                'csrf_token' => $request->hasSession() ? csrf_token() : null,
+            ], 419);
+        }
+
+        if (! $this->shouldSoftRecoverCsrf($request)) {
+            return null;
+        }
+
+        return redirect()
+            ->to($this->csrfRecoverUrl($request))
+            ->withInput($request->except($this->dontFlash))
+            ->with('error', 'Your session expired or cookies were blocked. Please sign in again.');
     }
 
     private function shouldSoftRecoverCsrf(Request $request): bool
     {
         return AdminPath::requestIsAdminPanel($request)
-            || $request->is('investor', 'investor/*');
+            || $request->is('investor', 'investor/*')
+            || $request->is('dashboard', 'dashboard/*')
+            || $request->is('my-account/login', 'my-account/login/*');
     }
 
     private function csrfRecoverUrl(Request $request): string
     {
+        if (AdminPath::requestIsAdminPanel($request)) {
+            return url(AdminPath::urlPrefix().'/login');
+        }
+
         if ($request->is('investor/access/*') && $request->isMethod('POST')) {
             return $request->url();
         }
 
-        $referer = $request->headers->get('referer');
-        if (is_string($referer) && $referer !== '') {
-            return $referer;
+        if ($request->is('dashboard', 'dashboard/*')) {
+            return route('business.login');
         }
 
-        if (AdminPath::requestIsAdminPanel($request)) {
-            return url(AdminPath::urlPrefix());
+        if ($request->is('my-account/login', 'my-account/login/*')) {
+            return route('account.login');
+        }
+
+        $referer = $request->headers->get('referer');
+        if (is_string($referer) && $referer !== '') {
+            $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
+            $refHost = parse_url($referer, PHP_URL_HOST);
+            if ($appHost && $refHost && strcasecmp((string) $appHost, (string) $refHost) === 0) {
+                return $referer;
+            }
         }
 
         if ($request->is('investor', 'investor/*')) {

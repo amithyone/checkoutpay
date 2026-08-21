@@ -21,8 +21,13 @@
                     {{ \App\Support\SiteBranding::name() }} Admin Panel
                 </p>
             </div>
-            <form class="mt-8 space-y-6 bg-white p-8 rounded-lg shadow-sm border border-gray-200" action="{{ route('admin.login') }}" method="POST">
+            <form class="mt-8 space-y-6 bg-white p-8 rounded-lg shadow-sm border border-gray-200" action="{{ url()->current() }}" method="POST">
                 @csrf
+                @if(session('error'))
+                    <div class="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-lg text-sm">
+                        {{ session('error') }}
+                    </div>
+                @endif
                 @if($errors->any())
                     <div class="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
                         <ul class="list-disc list-inside text-sm">
