@@ -73,11 +73,17 @@ final class LiveSyncTransmitterClient
         ]);
 
         if (! ($result['ok'] ?? false)) {
+            $detail = (string) ($result['message'] ?? 'Probe failed');
+            $status = $result['status'] ?? null;
+            if (is_array($result['body'] ?? null) && isset($result['body']['message'])) {
+                $detail = (string) $result['body']['message'];
+            }
+
             return [
                 'ok' => false,
                 'missing' => [],
                 'present' => [],
-                'message' => (string) ($result['message'] ?? 'Probe failed'),
+                'message' => $status ? "HTTP {$status}: {$detail}" : $detail,
             ];
         }
 

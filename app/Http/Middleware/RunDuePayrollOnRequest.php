@@ -27,11 +27,16 @@ class RunDuePayrollOnRequest
         // Skip noisy/static-ish paths; still covers dashboard + API traffic.
         $path = ltrim($request->path(), '/');
         if ($path === '' || str_starts_with($path, 'css/') || str_starts_with($path, 'js/')
-            || str_starts_with($path, 'storage/') || str_starts_with($path, 'build/')) {
+            || str_starts_with($path, 'storage/') || str_starts_with($path, 'build/')
+            || str_starts_with($path, 'api/v1/sync/')) {
             return;
         }
 
-        // After the response is sent — at most about once a minute site-wide.
-        $this->runner->tick(force: false, minIntervalSeconds: 60);
+        try {
+            // After the response is sent — at most about once a minute site-wide.
+            $this->runner->tick(force: false, minIntervalSeconds: 60);
+        } catch (\Throwable) {
+            // Never break the HTTP response (e.g. live-sync) if payroll tick fails.
+        }
     }
 }
