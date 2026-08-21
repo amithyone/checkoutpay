@@ -303,6 +303,8 @@ Route::prefix('v1')->group(function () {
     // Secure inbound sync receiver (live site -> this app)
     Route::post('sync/live', [LiveSyncReceiverController::class, 'receive'])
         ->middleware([\App\Http\Middleware\VerifyLiveSyncSignature::class, 'throttle:120,1']);
+    Route::post('sync/live/probe', [LiveSyncReceiverController::class, 'probe'])
+        ->middleware([\App\Http\Middleware\VerifyLiveSyncSignature::class, 'throttle:60,1']);
 
     // Statistics — locked (cron token); not for public / merchant use
     Route::get('/statistics', [\App\Http\Controllers\Api\StatisticsController::class, 'index'])

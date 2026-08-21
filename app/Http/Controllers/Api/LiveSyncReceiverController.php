@@ -58,4 +58,82 @@ class LiveSyncReceiverController extends Controller
             'data' => $result,
         ]);
     }
+
+    /**
+     * Lightweight existence check so Namecheap only pushes missing keys.
+     */
+    public function probe(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'entity' => ['required', Rule::in(['payment', 'business', 'renter'])],
+            'keys' => ['required', 'array', 'min:1', 'max:500'],
+            'keys.*' => ['required', 'string', 'max:191'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $entity = (string) $request->input('entity');
+        /** @var list<string> $keys */
+        $keys = array_values(array_unique(array_map(
+            static fn ($k) => trim((string) $k),
+            (array) $request->input('keys', []),
+        )));
+        $keys = array_values(array_filter($keys, static fn ($k) => $k !== ''));
+
+        $present = match ($entity) {
+            'payment' => \App\Models\Payment::query()
+                ->whereIn('transaction_id', $keys)
+                ->pluck('transaction_id')
+                ->map(fn ($v) => (string) $v)
+                ->all(),
+            'business' => \App\Models\Business::query()
+                ->where(function ($q) use ($keys) {
+                    $q->whereIn('business_id', $keys)->orWhereIn('email', $keys);
+                })
+                ->get(['business_id', 'email'])
+                ->flatMap(fn ($b) => array_filter([(string) $b->business_id, strtolower((string) $b->email)]))
+                ->unique()
+                ->values()
+                ->all(),
+            'renter' => \App\Models\Renter::query()
+                ->whereIn('email', array_map('strtolower', $keys))
+                ->pluck('email')
+                ->map(fn ($v) => strtolower((string) $v))
+                ->all(),
+            default => [],
+        };
+
+        $presentSet = [];
+        foreach ($present as $p) {
+            $presentSet[strtolower((string) $p)] = true;
+            $presentSet[(string) $p] = true;
+        }
+
+        $missing = [];
+        $found = [];
+        foreach ($keys as $key) {
+            if (isset($presentSet[$key]) || isset($presentSet[strtolower($key)])) {
+                $found[] = $key;
+            } else {
+                $missing[] = $key;
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Probe complete',
+            'data' => [
+                'entity' => $entity,
+                'checked' => count($keys),
+                'missing' => $missing,
+                'present' => $found,
+            ],
+        ]);
+    }
 }

@@ -65,17 +65,26 @@ php artisan config:clear
 php artisan queue:work --queue=default
 ```
 
-### Catch-up (run on Namecheap)
+### Catch-up (run on Namecheap) — missing only, not the whole DB
+
+Default mode probes Contabo and **only upserts keys Contabo does not have**.  
+Window defaults to last watermark (or last 48h). Cap with `--limit` (default 200).
 
 ```bash
-# recent payments first
-php artisan live-sync:push --entity=payment --since=2026-08-01 --limit=2000 --sync
+# Safe catch-up (missing payments only)
+php artisan live-sync:push --entity=payment --mode=missing --sync
 
-php artisan live-sync:push --entity=business --limit=500 --sync
-php artisan live-sync:push --entity=renter --limit=2000 --sync
+php artisan live-sync:push --entity=business --mode=missing --sync
+php artisan live-sync:push --entity=renter --mode=missing --sync
+
+# Explicit window
+php artisan live-sync:push --entity=payment --mode=missing --since=2026-08-01 --limit=500 --sync
+
+# Re-upsert recent changes (not just missing)
+php artisan live-sync:push --entity=payment --mode=recent --sync
 ```
 
-Ongoing: saving/deleting Payment, Business, or Renter on Namecheap queues a push to Contabo automatically.
+Ongoing: saving/deleting Payment, Business, or Renter on Namecheap queues a **single-row** push automatically (never a full scan).
 
 ## Security (headers)
 
