@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\LiveSync\LiveSyncGenericEngine;
 use App\Services\LiveSyncIngestionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,12 +13,14 @@ use Illuminate\Validation\Rule;
 
 class LiveSyncReceiverController extends Controller
 {
-    public function receive(Request $request, LiveSyncIngestionService $sync): JsonResponse
+    public function receive(Request $request, LiveSyncIngestionService $sync, LiveSyncGenericEngine $engine): JsonResponse
     {
+        $entities = array_keys((array) config('live_sync.entities', []));
+
         $validator = Validator::make($request->all(), [
             'event_id' => ['required', 'string', 'uuid'],
             'source' => ['nullable', 'string', 'max:100'],
-            'entity' => ['required', Rule::in(['payment', 'business', 'renter'])],
+            'entity' => ['required', Rule::in($entities)],
             'operation' => ['required', Rule::in(['upsert', 'delete'])],
             'sent_at' => ['nullable', 'date'],
             'data' => ['required', 'array'],
@@ -62,10 +65,12 @@ class LiveSyncReceiverController extends Controller
     /**
      * Lightweight existence check so Namecheap only pushes missing keys.
      */
-    public function probe(Request $request): JsonResponse
+    public function probe(Request $request, LiveSyncGenericEngine $engine): JsonResponse
     {
+        $entities = array_keys((array) config('live_sync.entities', []));
+
         $validator = Validator::make($request->all(), [
-            'entity' => ['required', Rule::in(['payment', 'business', 'renter'])],
+            'entity' => ['required', Rule::in($entities)],
             'keys' => ['required', 'array', 'min:1', 'max:500'],
             'keys.*' => ['required', 'string', 'max:191'],
         ]);
@@ -86,44 +91,7 @@ class LiveSyncReceiverController extends Controller
         )));
         $keys = array_values(array_filter($keys, static fn ($k) => $k !== ''));
 
-        $present = match ($entity) {
-            'payment' => \App\Models\Payment::query()
-                ->whereIn('transaction_id', $keys)
-                ->pluck('transaction_id')
-                ->map(fn ($v) => (string) $v)
-                ->all(),
-            'business' => \App\Models\Business::query()
-                ->where(function ($q) use ($keys) {
-                    $q->whereIn('business_id', $keys)->orWhereIn('email', $keys);
-                })
-                ->get(['business_id', 'email'])
-                ->flatMap(fn ($b) => array_filter([(string) $b->business_id, strtolower((string) $b->email)]))
-                ->unique()
-                ->values()
-                ->all(),
-            'renter' => \App\Models\Renter::query()
-                ->whereIn('email', array_map('strtolower', $keys))
-                ->pluck('email')
-                ->map(fn ($v) => strtolower((string) $v))
-                ->all(),
-            default => [],
-        };
-
-        $presentSet = [];
-        foreach ($present as $p) {
-            $presentSet[strtolower((string) $p)] = true;
-            $presentSet[(string) $p] = true;
-        }
-
-        $missing = [];
-        $found = [];
-        foreach ($keys as $key) {
-            if (isset($presentSet[$key]) || isset($presentSet[strtolower($key)])) {
-                $found[] = $key;
-            } else {
-                $missing[] = $key;
-            }
-        }
+        $result = $engine->probe($entity, $keys);
 
         return response()->json([
             'success' => true,
@@ -131,8 +99,8 @@ class LiveSyncReceiverController extends Controller
             'data' => [
                 'entity' => $entity,
                 'checked' => count($keys),
-                'missing' => $missing,
-                'present' => $found,
+                'missing' => $result['missing'],
+                'present' => $result['present'],
             ],
         ]);
     }

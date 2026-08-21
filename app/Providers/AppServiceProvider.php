@@ -3,8 +3,6 @@
 namespace App\Providers;
 
 use App\Models\Business;
-use App\Models\Payment;
-use App\Models\Renter;
 use App\Models\WhatsappWalletTransaction;
 use App\Observers\BusinessObserver;
 use App\Observers\LiveSyncOutboundObserver;
@@ -50,9 +48,18 @@ class AppServiceProvider extends ServiceProvider
 
         WhatsappWalletTransaction::observe(WhatsappWalletTransactionReferralObserver::class);
         Business::observe(BusinessObserver::class);
-        Payment::observe(LiveSyncOutboundObserver::class);
-        Business::observe(LiveSyncOutboundObserver::class);
-        Renter::observe(LiveSyncOutboundObserver::class);
+
+        try {
+            $engine = app(\App\Services\LiveSync\LiveSyncGenericEngine::class);
+            foreach ($engine->observableEntities() as $entity) {
+                $class = $engine->modelClass($entity);
+                if (class_exists($class)) {
+                    $class::observe(LiveSyncOutboundObserver::class);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('live_sync.observer_register_failed', ['error' => $e->getMessage()]);
+        }
 
         // Register Telegram notification channel
         $this->app->make(ChannelManager::class)->extend('telegram', function ($app) {

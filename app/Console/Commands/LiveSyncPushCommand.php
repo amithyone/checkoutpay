@@ -2,36 +2,37 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Business;
-use App\Models\Payment;
-use App\Models\Renter;
 use App\Models\Setting;
+use App\Services\LiveSync\LiveSyncGenericEngine;
 use App\Services\LiveSync\LiveSyncOutboundService;
 use App\Services\LiveSync\LiveSyncTransmitterClient;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class LiveSyncPushCommand extends Command
 {
     public const WATERMARK_KEY = 'live_sync_push_watermark';
 
     protected $signature = 'live-sync:push
-        {--entity=payment : payment|business|renter|all}
-        {--mode=missing : missing=only keys Contabo lacks; recent=upsert rows changed since watermark}
+        {--entity=common : Entity name, common (money path), or all}
+        {--mode=missing : missing=only keys Contabo lacks; recent=upsert changed rows}
         {--since= : Override watermark / default lookback (ISO or Y-m-d)}
         {--id= : Push a single primary key id}
-        {--limit=200 : Max candidate rows per entity (never a full-table dump)}
+        {--limit=200 : Max candidate rows per entity}
         {--force-all : Allow scan without a since/watermark window (still capped by --limit)}
         {--dry-run : Count / probe only, do not send upserts}
         {--sync : Send inline (ignore LIVE_SYNC_QUEUE)}';
 
-    protected $description = 'Push only missing (or recently changed) Namecheap rows to Contabo — not the whole DB';
+    protected $description = 'Push common money-path data Namecheap → Contabo (missing-only by default)';
 
-    public function handle(LiveSyncOutboundService $outbound, LiveSyncTransmitterClient $client): int
-    {
+    public function handle(
+        LiveSyncOutboundService $outbound,
+        LiveSyncTransmitterClient $client,
+        LiveSyncGenericEngine $engine,
+    ): int {
         if (! $client->isConfigured() && ! $this->option('dry-run')) {
-            $this->error('Transmitter not configured. On Namecheap set LIVE_SYNC_TRANSMIT_ENABLED=true, LIVE_SYNC_RECEIVER_URL=https://check-outnow.com/api/v1/sync/live, and the same LIVE_SYNC_KEY_ID / LIVE_SYNC_SECRET as Contabo.');
+            $this->error('Transmitter not configured on this host.');
 
             return self::FAILURE;
         }
@@ -43,10 +44,16 @@ class LiveSyncPushCommand extends Command
             return self::FAILURE;
         }
 
-        $entity = strtolower(trim((string) $this->option('entity')));
-        $entities = $entity === 'all' ? ['payment', 'business', 'renter'] : [$entity];
+        $entityOpt = strtolower(trim((string) $this->option('entity')));
+        $entities = match ($entityOpt) {
+            'common', 'all' => $engine->commonEntities(),
+            default => [$entityOpt],
+        };
+
         foreach ($entities as $e) {
-            if (! in_array($e, ['payment', 'business', 'renter'], true)) {
+            try {
+                $engine->entityConfig($e);
+            } catch (\Throwable) {
                 $this->error("Unknown entity: {$e}");
 
                 return self::FAILURE;
@@ -67,7 +74,7 @@ class LiveSyncPushCommand extends Command
         }
 
         if ($since === null && ! $this->option('id') && ! $this->option('force-all')) {
-            $this->error('Refusing full-table sync. Use --since=, rely on watermark, or pass --force-all (still limited).');
+            $this->error('Refusing full-table sync. Use --since=, watermark, or --force-all.');
 
             return self::FAILURE;
         }
@@ -75,7 +82,7 @@ class LiveSyncPushCommand extends Command
         if ($since !== null) {
             $this->info('Window since: '.$since->toDateTimeString().' UTC');
         }
-        $this->info('Mode: '.$mode.' · limit: '.(int) $this->option('limit'));
+        $this->info('Mode: '.$mode.' · entities: '.count($entities).' · limit: '.(int) $this->option('limit'));
 
         $limit = max(1, min(2000, (int) $this->option('limit')));
         $dryRun = (bool) $this->option('dry-run');
@@ -91,36 +98,46 @@ class LiveSyncPushCommand extends Command
 
         foreach ($entities as $e) {
             $this->info("Entity: {$e}");
-            $query = $this->baseQuery($e, $since, $singleId)->limit($limit);
-            $rows = $query->get();
+            /** @var class-string<Model> $class */
+            $class = $engine->modelClass($e);
+            $query = $class::query()->orderBy('id');
+            if ($singleId) {
+                $query->where('id', $singleId);
+            } elseif ($since) {
+                $query->where(function ($q) use ($since) {
+                    $q->where('updated_at', '>=', $since)->orWhere('created_at', '>=', $since);
+                });
+            }
+            $rows = $query->limit($limit)->get();
             $candidates += $rows->count();
 
             if ($rows->isEmpty()) {
-                $this->line('No candidates in window.');
+                $this->line('No candidates.');
 
                 continue;
             }
 
+            // Eager extras for serialize where cheap
+            $rows->loadMissing($this->eagerRelations($e));
+
             if ($mode === 'missing' && ! $singleId) {
                 $keyMap = [];
                 foreach ($rows as $row) {
-                    $key = $this->rowKey($e, $row);
+                    $key = $engine->probeKeyForModel($e, $row);
                     if ($key !== '') {
                         $keyMap[$key] = $row;
                     }
                 }
-                $keys = array_keys($keyMap);
-                $probe = $client->probeMissing($e, $keys);
+                $probe = $client->probeMissing($e, array_keys($keyMap));
                 if (! ($probe['ok'] ?? false)) {
-                    $this->error('Probe failed: '.($probe['message'] ?? 'unknown').' — aborting this entity (no mass push).');
+                    $this->error('Probe failed: '.($probe['message'] ?? 'unknown').' — aborting this entity.');
                     $fail++;
 
                     continue;
                 }
-
                 $missing = $probe['missing'] ?? [];
                 $skippedPresent += count($probe['present'] ?? []);
-                $this->line('Candidates '.$rows->count().' · already on Contabo '.count($probe['present'] ?? []).' · missing '.count($missing));
+                $this->line('Candidates '.$rows->count().' · present '.count($probe['present'] ?? []).' · missing '.count($missing));
 
                 foreach ($missing as $key) {
                     $row = $keyMap[$key] ?? null;
@@ -132,7 +149,7 @@ class LiveSyncPushCommand extends Command
 
                         continue;
                     }
-                    $result = $this->pushRow($outbound, $e, $row);
+                    $result = $outbound->pushNow($e, 'upsert', $engine->serialize($e, $row));
                     if ($result['ok'] ?? false) {
                         $ok++;
                     } else {
@@ -141,14 +158,14 @@ class LiveSyncPushCommand extends Command
                     }
                 }
             } else {
-                $this->line('Candidates '.$rows->count().' (recent upsert mode)');
+                $this->line('Candidates '.$rows->count().' (recent upsert)');
                 foreach ($rows as $row) {
                     if ($dryRun) {
                         $ok++;
 
                         continue;
                     }
-                    $result = $this->pushRow($outbound, $e, $row);
+                    $result = $outbound->pushNow($e, 'upsert', $engine->serialize($e, $row));
                     if ($result['ok'] ?? false) {
                         $ok++;
                     } else {
@@ -178,59 +195,26 @@ class LiveSyncPushCommand extends Command
         $raw = Setting::get(self::WATERMARK_KEY);
         if (is_string($raw) && trim($raw) !== '') {
             try {
-                // Overlap 1 hour so we do not miss edge updates
                 return Carbon::parse($raw)->subHour();
             } catch (\Throwable) {
-                // fall through
             }
         }
 
-        // Safe default: last 48 hours only
         return now()->subHours(48);
     }
 
-    private function baseQuery(string $entity, ?Carbon $since, ?int $singleId): Builder
-    {
-        $query = match ($entity) {
-            'payment' => Payment::query()->orderBy('id'),
-            'business' => Business::query()->orderBy('id'),
-            'renter' => Renter::query()->orderBy('id'),
-            default => Payment::query()->orderBy('id'),
-        };
-
-        if ($singleId) {
-            return $query->where('id', $singleId);
-        }
-
-        if ($since) {
-            $query->where(function ($q) use ($since) {
-                $q->where('updated_at', '>=', $since)->orWhere('created_at', '>=', $since);
-            });
-        }
-
-        return $query;
-    }
-
-    private function rowKey(string $entity, Payment|Business|Renter $row): string
-    {
-        return match ($entity) {
-            'payment' => trim((string) $row->transaction_id),
-            'business' => trim((string) ($row->business_id ?: $row->email)),
-            'renter' => strtolower(trim((string) $row->email)),
-            default => '',
-        };
-    }
-
     /**
-     * @return array{ok: bool, message?: string}
+     * @return list<string>
      */
-    private function pushRow(LiveSyncOutboundService $outbound, string $entity, Payment|Business|Renter $row): array
+    private function eagerRelations(string $entity): array
     {
         return match ($entity) {
-            'payment' => $outbound->pushNow('payment', 'upsert', $outbound->paymentPayload($row)),
-            'business' => $outbound->pushNow('business', 'upsert', $outbound->businessPayload($row)),
-            'renter' => $outbound->pushNow('renter', 'upsert', $outbound->renterPayload($row)),
-            default => ['ok' => false, 'message' => 'Unknown entity'],
+            'whatsapp_wallet' => ['renter', 'linkedBusiness'],
+            'whatsapp_wallet_transaction', 'virtual_card_request', 'wallet_savings_setting', 'wallet_savings_goal', 'wallet_savings_lock' => ['wallet'],
+            'withdrawal_request', 'business_activity_log', 'business_withdrawal_account', 'business_employee', 'business_disbursement_batch', 'business_website' => ['business'],
+            'business_transaction' => ['business', 'payment'],
+            'business_disbursement_item' => ['batch'],
+            default => [],
         };
     }
 }
