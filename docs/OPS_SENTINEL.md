@@ -26,6 +26,7 @@ php artisan route:clear
 export OPS_MONITOR_KEY='your-secret'
 export BASE='https://check-outnow.com'
 
+# REQUIRED: key must be an HTTP header (not only in config UI text unless the app sets the header)
 curl -sS -H "X-Ops-Key: $OPS_MONITOR_KEY" "$BASE/ops/v1/ping" | jq .
 curl -sS -H "X-Ops-Key: $OPS_MONITOR_KEY" "$BASE/ops/v1/security" | jq .
 curl -sS -H "X-Ops-Key: $OPS_MONITOR_KEY" "$BASE/ops/v1/health" | jq .
@@ -34,6 +35,16 @@ curl -sS -H "X-Ops-Key: $OPS_MONITOR_KEY" "$BASE/ops/v1/balances" | jq .
 ```
 
 Bearer form also works: `Authorization: Bearer $OPS_MONITOR_KEY`.
+
+If you get **401**, the JSON body now includes `received_key_len` and `saw_x_ops_key`.  
+`received_key_len: 0` means the Windows app is not sending the header (wrong config field / header name).
+
+### PowerShell one-liner
+
+```powershell
+$k = 'paste-OPS_MONITOR_KEY-here'
+Invoke-RestMethod -Uri 'https://check-outnow.com/ops/v1/ping' -Headers @{ 'X-Ops-Key' = $k }
+```
 
 ## Endpoints
 
