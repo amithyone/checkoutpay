@@ -2,6 +2,7 @@
 
 namespace App\Services\MevonPay;
 
+use App\Models\MevonPayLedgerEntry;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -83,8 +84,26 @@ final class MevonBvnVerifyService
 
         $idNumber = preg_replace('/\D+/', '', (string) ($details['idNumber'] ?? $bvn)) ?? $bvn;
 
+        $reference = (string) ($raw['reference'] ?? '');
+        if ($reference === '') {
+            $reference = 'bvn-'.now()->format('YmdHis').'-'.substr($bvn, -4);
+        }
+
+        try {
+            app(MevonPayLedgerRecorder::class)->recordNgnDrain(
+                MevonPayLedgerEntry::FLOW_IDENTITY_FEE,
+                (float) config('mevonpay_fees.bvn_verify_fee', 30),
+                'id-bvn-'.$reference,
+                MevonPayLedgerEntry::PAYOUT_API_IDENTITY,
+                null,
+                ['kind' => 'bvn', 'bvn_last4' => substr($bvn, -4)],
+            );
+        } catch (\Throwable $e) {
+            Log::warning('mevonpay.bvn_verify.ledger_failed', ['error' => $e->getMessage()]);
+        }
+
         return [
-            'reference' => (string) ($raw['reference'] ?? ''),
+            'reference' => $reference,
             'full_name' => trim((string) ($details['fullName'] ?? '')),
             'dob' => (string) ($details['dob'] ?? $dobYmd),
             'id_number' => strlen($idNumber) === 11 ? $idNumber : $bvn,

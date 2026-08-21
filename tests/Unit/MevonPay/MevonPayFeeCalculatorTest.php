@@ -35,5 +35,22 @@ class MevonPayFeeCalculatorTest extends TestCase
     public function test_net_outbound_impact(): void
     {
         $this->assertSame(-1010.0, $this->calc->netOutboundImpact(1000));
+        $this->assertSame(0.0, $this->calc->netOutboundImpact(1000, false));
+    }
+
+    public function test_inbound_net_impact_is_gross_minus_fee(): void
+    {
+        $this->assertSame(1970.0, $this->calc->netInboundImpact(2000));
+        $this->assertSame(9950.0, $this->calc->netInboundImpact(10000));
+        $breakdown = $this->calc->inboundBreakdown(2000);
+        $this->assertSame(30, $breakdown['inbound_fee']);
+        $this->assertSame(1970.0, $breakdown['net_mevon_impact']);
+    }
+
+    public function test_failed_outbound_breakdown_is_zero(): void
+    {
+        $breakdown = $this->calc->outboundBreakdown(500, false);
+        $this->assertSame(0, $breakdown['outbound_fee']);
+        $this->assertSame(0.0, $breakdown['net_mevon_impact']);
     }
 }

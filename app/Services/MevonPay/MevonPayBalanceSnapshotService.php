@@ -100,6 +100,12 @@ final class MevonPayBalanceSnapshotService
         ];
     }
 
+    /** Drop the short-lived cache so the next forDashboard() hits Mevon live (e.g. after FX). */
+    public function forgetCache(): void
+    {
+        Cache::forget(self::CACHE_KEY);
+    }
+
     /**
      * @return array<string, mixed>
      */

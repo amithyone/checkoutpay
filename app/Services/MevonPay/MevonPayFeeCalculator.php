@@ -21,41 +21,62 @@ final class MevonPayFeeCalculator
         return (int) config('mevonpay_fees.outbound_api_fee', 10);
     }
 
+    /**
+     * Mevon NGN wallet credit for inbound funding: +(gross − inbound_fee).
+     */
     public function netInboundImpact(float $gross): float
     {
-        return round(-1 * $this->inboundFee($gross), 2);
-    }
+        $gross = round(max(0, $gross), 2);
+        $fee = $this->inboundFee($gross);
 
-    public function netOutboundImpact(float $gross, bool $chargeApiFee = true): float
-    {
-        $fee = $chargeApiFee ? $this->outboundApiFee() : 0;
-
-        return round(-1 * ($gross + $fee), 2);
+        return round($gross - $fee, 2);
     }
 
     /**
-    * @return array{inbound_fee: int, net_mevon_impact: float}
-    */
+     * Success/pending: −(gross + outbound API fee). Failed/reversed (chargeApiFee=false): 0.
+     */
+    public function netOutboundImpact(float $gross, bool $chargeApiFee = true): float
+    {
+        if (! $chargeApiFee) {
+            return 0.0;
+        }
+
+        $fee = $this->outboundApiFee();
+
+        return round(-1 * (round(max(0, $gross), 2) + $fee), 2);
+    }
+
+    /**
+     * @return array{inbound_fee: int, net_mevon_impact: float}
+     */
     public function inboundBreakdown(float $gross): array
     {
+        $gross = round(max(0, $gross), 2);
         $fee = $this->inboundFee($gross);
 
         return [
             'inbound_fee' => $fee,
-            'net_mevon_impact' => round(-1 * $fee, 2),
+            'net_mevon_impact' => round($gross - $fee, 2),
         ];
     }
 
     /**
-    * @return array{outbound_fee: int, net_mevon_impact: float}
-    */
+     * @return array{outbound_fee: int, net_mevon_impact: float}
+     */
     public function outboundBreakdown(float $gross, bool $chargeApiFee = true): array
     {
-        $fee = $chargeApiFee ? $this->outboundApiFee() : 0;
+        if (! $chargeApiFee) {
+            return [
+                'outbound_fee' => 0,
+                'net_mevon_impact' => 0.0,
+            ];
+        }
+
+        $fee = $this->outboundApiFee();
 
         return [
             'outbound_fee' => $fee,
-            'net_mevon_impact' => round(-1 * ($gross + $fee), 2),
+            'net_mevon_impact' => round(-1 * (round(max(0, $gross), 2) + $fee), 2),
         ];
     }
 }

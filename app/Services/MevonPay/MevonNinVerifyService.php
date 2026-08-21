@@ -2,6 +2,7 @@
 
 namespace App\Services\MevonPay;
 
+use App\Models\MevonPayLedgerEntry;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
@@ -90,8 +91,22 @@ final class MevonNinVerifyService
 
         $idNumber = preg_replace('/\D+/', '', (string) ($details['idNumber'] ?? $nin)) ?? $nin;
 
+        $outRef = (string) ($raw['reference'] ?? $ref);
+        try {
+            app(MevonPayLedgerRecorder::class)->recordNgnDrain(
+                MevonPayLedgerEntry::FLOW_IDENTITY_FEE,
+                (float) config('mevonpay_fees.nin_verify_fee', 50),
+                'id-nin-'.$outRef,
+                MevonPayLedgerEntry::PAYOUT_API_IDENTITY,
+                null,
+                ['kind' => 'nin', 'nin_last4' => substr($nin, -4)],
+            );
+        } catch (\Throwable $e) {
+            Log::warning('mevonpay.nin_verify.ledger_failed', ['error' => $e->getMessage()]);
+        }
+
         return [
-            'reference' => (string) ($raw['reference'] ?? $ref),
+            'reference' => $outRef,
             'full_name' => trim((string) ($details['fullName'] ?? '')),
             'dob' => (string) ($details['dob'] ?? $dobYmd),
             'id_number' => strlen($idNumber) === 11 ? $idNumber : $nin,

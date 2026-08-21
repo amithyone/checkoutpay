@@ -2,6 +2,7 @@
 
 namespace App\Services\MevonPay;
 
+use App\Models\MevonPayLedgerEntry;
 use Illuminate\Support\Facades\Log;
 
 final class MevonPayUsdAutoFundService
@@ -133,6 +134,7 @@ final class MevonPayUsdAutoFundService
         $convertedUsd = $this->convertedUsdAmount($conversion);
         $fundedNgn = round($ngnEstimate, 2);
 
+        $this->balances->forgetCache();
         $after = $this->balances->forDashboard();
         $usdAfter = ($after['ok'] ?? false) ? ($after['usd_balance'] ?? null) : null;
 
@@ -146,6 +148,7 @@ final class MevonPayUsdAutoFundService
                 if ($second['ok'] ?? false) {
                     $fundedNgn = round($fundedNgn + $topUpNgn, 2);
                     $convertedUsd = round($convertedUsd + $this->convertedUsdAmount($second), 4);
+                    $this->balances->forgetCache();
                     $after = $this->balances->forDashboard();
                     $usdAfter = ($after['ok'] ?? false) ? ($after['usd_balance'] ?? null) : $usdAfter;
                 }
@@ -153,6 +156,8 @@ final class MevonPayUsdAutoFundService
         }
 
         if ($usdAfter !== null && $usdAfter < $requiredUsd) {
+            $this->recordAutoFundLedger($fundedNgn, $convertedUsd, $walletUsd, $usdAfter, $context);
+
             return [
                 'ok' => false,
                 'message' => 'Auto USD top-up completed but balance is still below the required amount.',
@@ -163,6 +168,8 @@ final class MevonPayUsdAutoFundService
                 'usd_balance_after' => $usdAfter,
             ];
         }
+
+        $this->recordAutoFundLedger($fundedNgn, $convertedUsd, $walletUsd, $usdAfter, $context);
 
         Log::info('mevonpay.usd_auto_fund.success', [
             'context' => $context,
@@ -249,6 +256,37 @@ final class MevonPayUsdAutoFundService
         }
 
         return str_contains($haystack, 'not enough') && str_contains($haystack, 'usd');
+    }
+
+    private function recordAutoFundLedger(
+        float $fundedNgn,
+        float $convertedUsd,
+        float $walletUsd,
+        ?float $usdAfter,
+        string $context,
+    ): void {
+        if ($fundedNgn <= 0) {
+            return;
+        }
+
+        try {
+            app(MevonPayLedgerRecorder::class)->recordNgnDrain(
+                MevonPayLedgerEntry::FLOW_FX_NGN_USD,
+                $fundedNgn,
+                'fx-auto-'.now()->format('YmdHis').'-'.substr(sha1($context.$fundedNgn.$walletUsd), 0, 10),
+                MevonPayLedgerEntry::PAYOUT_API_EXCHANGE,
+                null,
+                [
+                    'context' => $context,
+                    'funded_usd' => $convertedUsd,
+                    'usd_before' => $walletUsd,
+                    'usd_after' => $usdAfter,
+                    'source' => 'usd_auto_fund',
+                ],
+            );
+        } catch (\Throwable $e) {
+            Log::warning('mevonpay.usd_auto_fund.ledger_failed', ['error' => $e->getMessage()]);
+        }
     }
 
     private function isEnabled(): bool

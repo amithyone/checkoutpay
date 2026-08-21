@@ -130,7 +130,44 @@ class MevonPayLedgerBackfillCommand extends Command
                 }
             });
 
-        $this->info(($dryRun ? '[dry-run] Would backfill' : 'Backfilled')." inbound: {$inbound}, outbound: {$outbound}");
+        $payroll = 0;
+        \App\Models\BusinessDisbursementItem::query()
+            ->whereNotNull('provider_reference')
+            ->where('provider_reference', '!=', '')
+            ->whereIn('status', ['completed'])
+            ->orderBy('id')
+            ->chunk(200, function ($items) use ($recorder, &$payroll, $dryRun) {
+                foreach ($items as $item) {
+                    $ref = trim((string) $item->provider_reference);
+                    if ($ref === '') {
+                        continue;
+                    }
+                    $amount = (float) $item->amount_ngn;
+                    if ($amount <= 0) {
+                        continue;
+                    }
+                    if ($dryRun) {
+                        $payroll++;
+
+                        continue;
+                    }
+                    if ($recorder->recordOutbound(
+                        MevonPayLedgerEntry::FLOW_BUSINESS_PAYROLL,
+                        $amount,
+                        $ref,
+                        MevonPayLedgerEntry::PAYOUT_API_CREATETRANSFER,
+                        MavonPayTransferService::BUCKET_SUCCESSFUL,
+                        (string) config('services.mevonpay.debit_account_number', ''),
+                        $item,
+                        ['backfilled' => true, 'source' => 'business_payroll'],
+                        $item->processed_at ?? $item->created_at,
+                    )) {
+                        $payroll++;
+                    }
+                }
+            });
+
+        $this->info(($dryRun ? '[dry-run] Would backfill' : 'Backfilled')." inbound: {$inbound}, outbound: {$outbound}, payroll: {$payroll}");
 
         return self::SUCCESS;
     }

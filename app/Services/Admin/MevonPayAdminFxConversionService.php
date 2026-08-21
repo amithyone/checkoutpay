@@ -71,8 +71,27 @@ final class MevonPayAdminFxConversionService
         }
 
         $convertedUsd = $this->extractConvertedAmount($conversion, 'USD');
+        $this->balances->forgetCache();
         $after = $this->balances->forDashboard();
         $this->recordSnapshotAfterTrade('admin_buy_usd');
+
+        try {
+            app(\App\Services\MevonPay\MevonPayLedgerRecorder::class)->recordNgnDrain(
+                \App\Models\MevonPayLedgerEntry::FLOW_FX_NGN_USD,
+                $ngnSpend,
+                'fx-admin-buy-'.now()->format('YmdHis').'-'.substr(sha1((string) $adminId.$ngnSpend.$usdAmount), 0, 10),
+                \App\Models\MevonPayLedgerEntry::PAYOUT_API_EXCHANGE,
+                null,
+                [
+                    'admin_id' => $adminId,
+                    'direction' => 'buy',
+                    'usd_amount' => $convertedUsd > 0 ? $convertedUsd : $usdAmount,
+                    'source' => 'admin_fx',
+                ],
+            );
+        } catch (\Throwable $e) {
+            Log::warning('mevonpay.admin_fx.ledger_failed', ['error' => $e->getMessage()]);
+        }
 
         return [
             'ok' => true,
@@ -144,8 +163,29 @@ final class MevonPayAdminFxConversionService
         }
 
         $convertedNgn = $this->extractConvertedAmount($conversion, 'NGN');
+        $this->balances->forgetCache();
         $after = $this->balances->forDashboard();
         $this->recordSnapshotAfterTrade('admin_sell_usd');
+
+        if ($convertedNgn > 0) {
+            try {
+                app(\App\Services\MevonPay\MevonPayLedgerRecorder::class)->recordNgnCredit(
+                    \App\Models\MevonPayLedgerEntry::FLOW_FX_NGN_USD,
+                    $convertedNgn,
+                    'fx-admin-sell-'.now()->format('YmdHis').'-'.substr(sha1((string) $adminId.$usdAmount.$convertedNgn), 0, 10),
+                    \App\Models\MevonPayLedgerEntry::PAYOUT_API_EXCHANGE,
+                    null,
+                    [
+                        'admin_id' => $adminId,
+                        'direction' => 'sell',
+                        'usd_amount' => $usdAmount,
+                        'source' => 'admin_fx',
+                    ],
+                );
+            } catch (\Throwable $e) {
+                Log::warning('mevonpay.admin_fx.ledger_failed', ['error' => $e->getMessage()]);
+            }
+        }
 
         return [
             'ok' => true,

@@ -28,6 +28,25 @@
         <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{{ session('error') }}</div>
     @endif
 
+    <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800 shadow-sm">
+        <p class="font-semibold text-slate-900">Wallet impact formula (master NGN)</p>
+        <p class="mt-1 font-mono text-xs sm:text-sm">expected = opening_balance + Σ net_mevon_impact</p>
+        <ul class="mt-2 list-disc pl-5 space-y-1 text-slate-700">
+            <li>Inbound funding: <span class="font-mono text-xs">+(gross − inbound_fee)</span> (₦30 / ₦50)</li>
+            <li>Outbound success/pending: <span class="font-mono text-xs">−(gross + outbound_api_fee)</span></li>
+            <li>Outbound failed: <span class="font-mono text-xs">0</span></li>
+            <li>FX / Mevon VTU / BVN·NIN fees: <span class="font-mono text-xs">−gross</span> (no createtransfer fee)</li>
+        </ul>
+        <p class="mt-3 font-semibold text-slate-900">Contabo after deploy (SSH)</p>
+        <ol class="mt-1 list-decimal pl-5 space-y-1 font-mono text-xs text-slate-700">
+            <li>php artisan config:clear</li>
+            <li>php artisan mevon:recon-recompute-impacts</li>
+            <li>php artisan mevon:ledger-backfill</li>
+            <li>Reset baseline here (or Start monitoring) from current live</li>
+            <li>php artisan mevon:check-balance · GET /ops/v1/balances → within_tolerance</li>
+        </ol>
+    </div>
+
     @if(!$b['active'])
         <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-6 shadow-sm">
             <h2 class="text-lg font-semibold text-indigo-900">Start monitoring from now</h2>
@@ -110,9 +129,15 @@
                 <p class="mt-2 text-3xl font-bold text-indigo-950">{{ $fmt($s['expected_balance']) }}</p>
                 <p class="mt-3 text-sm text-indigo-900">
                     Opening {{ $fmt($s['opening_balance'] ?? $b['opening_balance']) }}
-                    <span class="text-indigo-700">− ledger impact {{ $fmt(abs($s['net_mevon_impact'])) }}</span>
+                    <span class="text-indigo-700">+ Σ net impact {{ $fmt($s['net_mevon_impact']) }}</span>
                 </p>
-                <p class="mt-2 text-xs text-indigo-800/80">Expected = baseline opening + net Mevon impact ({{ number_format($s['entry_count']) }} entries)</p>
+                <p class="mt-2 text-xs text-indigo-800/80">
+                    <code class="text-[11px]">expected = opening + Σ net_mevon_impact</code>
+                    · inbound <code class="text-[11px]">+(gross−fee)</code>
+                    · outbound success <code class="text-[11px]">−(gross+fee)</code>
+                    · failed <code class="text-[11px]">0</code>
+                    ({{ number_format($s['entry_count']) }} entries)
+                </p>
             </div>
 
             <div class="rounded-xl border-2 {{ $varianceBad ? 'border-red-400 bg-red-50' : 'border-green-400 bg-green-50' }} p-5 shadow-sm">

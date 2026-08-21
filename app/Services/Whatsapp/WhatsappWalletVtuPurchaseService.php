@@ -489,6 +489,38 @@ class WhatsappWalletVtuPurchaseService
         $meta = is_array($txn->meta) ? $txn->meta : [];
         $meta['vtu_pending'] = false;
         $txn->update(['meta' => array_merge($meta, $extra)]);
+
+        $this->maybeRecordMevonVtuLedger($txn->fresh() ?? $txn, $externalRef);
+    }
+
+    private function maybeRecordMevonVtuLedger(WhatsappWalletTransaction $txn, string $externalRef): void
+    {
+        try {
+            if ($this->vtuResolver->activeKey() !== VtuProviderResolver::PROVIDER_MEVONPAY) {
+                return;
+            }
+            $amount = round(abs((float) $txn->amount), 2);
+            if ($amount <= 0) {
+                return;
+            }
+            app(\App\Services\MevonPay\MevonPayLedgerRecorder::class)->recordNgnDrain(
+                \App\Models\MevonPayLedgerEntry::FLOW_VTU,
+                $amount,
+                'vtu-'.$externalRef,
+                \App\Models\MevonPayLedgerEntry::PAYOUT_API_VTU,
+                $txn,
+                [
+                    'vtu_kind' => is_array($txn->meta) ? ($txn->meta['vtu_kind'] ?? null) : null,
+                    'whatsapp_wallet_id' => $txn->whatsapp_wallet_id,
+                    'source' => 'whatsapp_vtu',
+                ],
+            );
+        } catch (\Throwable $e) {
+            Log::warning('mevonpay.vtu.ledger_failed', [
+                'reference' => $externalRef,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

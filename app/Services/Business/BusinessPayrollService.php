@@ -391,7 +391,7 @@ final class BusinessPayrollService
             $bucket = $result['bucket'] ?? MavonPayTransferService::BUCKET_FAILED;
 
             $this->ledger->recordOutbound(
-                MevonPayLedgerEntry::FLOW_BUSINESS_WITHDRAWAL,
+                MevonPayLedgerEntry::FLOW_BUSINESS_PAYROLL,
                 $amount,
                 $reference,
                 MevonPayLedgerEntry::PAYOUT_API_CREATETRANSFER,

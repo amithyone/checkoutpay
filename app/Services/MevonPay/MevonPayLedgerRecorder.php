@@ -170,6 +170,191 @@ final class MevonPayLedgerRecorder
         return $entry->fresh();
     }
 
+    /**
+     * Direct Mevon NGN wallet credit (e.g. FX USD→NGN) — impact = +gross, no inbound VA fee.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    public function recordNgnCredit(
+        string $flowType,
+        float $grossAmount,
+        string $reference,
+        string $creditApi,
+        ?Model $source = null,
+        array $meta = [],
+        ?Carbon $occurredAt = null,
+    ): ?MevonPayLedgerEntry {
+        $grossAmount = round($grossAmount, 2);
+        if ($grossAmount <= 0) {
+            return null;
+        }
+
+        $ref = $this->normalizeReference($reference);
+        if ($ref === null || $this->inboundExists($ref)) {
+            return null;
+        }
+
+        try {
+            return MevonPayLedgerEntry::query()->create([
+                'direction' => MevonPayLedgerEntry::DIRECTION_INBOUND,
+                'flow_type' => $flowType,
+                'gross_amount' => $grossAmount,
+                'mevon_inbound_fee' => 0,
+                'mevon_outbound_fee' => null,
+                'net_mevon_impact' => $grossAmount,
+                'external_reference' => $ref,
+                'payout_reference' => null,
+                'account_number' => (string) config('services.mevonpay.debit_account_number', '') ?: null,
+                'source_type' => $source !== null ? $source->getMorphClass() : null,
+                'source_id' => $source?->getKey(),
+                'payout_api' => $creditApi,
+                'payout_bucket' => null,
+                'meta' => array_merge(['ngn_credit' => true], $meta),
+                'occurred_at' => $occurredAt ?? now(),
+            ]);
+        } catch (\Throwable $e) {
+            if ($this->isDuplicateKey($e)) {
+                return null;
+            }
+            Log::warning('mevonpay.ledger.credit_failed', [
+                'flow_type' => $flowType,
+                'reference' => $ref,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Direct Mevon NGN wallet drain (FX / VTU / identity fees) — impact = −gross, no createtransfer API fee.
+     *
+     * @param  array<string, mixed>  $meta
+     */
+    public function recordNgnDrain(
+        string $flowType,
+        float $grossAmount,
+        string $reference,
+        string $drainApi,
+        ?Model $source = null,
+        array $meta = [],
+        ?Carbon $occurredAt = null,
+    ): ?MevonPayLedgerEntry {
+        $grossAmount = round($grossAmount, 2);
+        if ($grossAmount <= 0) {
+            return null;
+        }
+
+        $ref = trim($reference);
+        if ($ref === '') {
+            return null;
+        }
+
+        if ($this->outboundExists($ref)) {
+            return null;
+        }
+
+        $impact = round(-1 * $grossAmount, 2);
+
+        try {
+            return MevonPayLedgerEntry::query()->create([
+                'direction' => MevonPayLedgerEntry::DIRECTION_OUTBOUND,
+                'flow_type' => $flowType,
+                'gross_amount' => $grossAmount,
+                'mevon_inbound_fee' => null,
+                'mevon_outbound_fee' => 0,
+                'net_mevon_impact' => $impact,
+                'external_reference' => null,
+                'payout_reference' => $ref,
+                'account_number' => (string) config('services.mevonpay.debit_account_number', '') ?: null,
+                'source_type' => $source !== null ? $source->getMorphClass() : null,
+                'source_id' => $source?->getKey(),
+                'payout_api' => $drainApi,
+                'payout_bucket' => MavonPayTransferService::BUCKET_SUCCESSFUL,
+                'meta' => array_merge(['ngn_drain' => true], $meta),
+                'occurred_at' => $occurredAt ?? now(),
+            ]);
+        } catch (\Throwable $e) {
+            if ($this->isDuplicateKey($e)) {
+                return null;
+            }
+            Log::warning('mevonpay.ledger.drain_failed', [
+                'flow_type' => $flowType,
+                'reference' => $ref,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Recompute fee + net_mevon_impact for an existing row (after formula changes).
+     */
+    public function recomputeEntryImpacts(MevonPayLedgerEntry $entry): MevonPayLedgerEntry
+    {
+        $gross = (float) $entry->gross_amount;
+
+        if ($entry->direction === MevonPayLedgerEntry::DIRECTION_INBOUND) {
+            $meta = is_array($entry->meta) ? $entry->meta : [];
+            if (! empty($meta['ngn_credit'])) {
+                $entry->update([
+                    'mevon_inbound_fee' => 0,
+                    'mevon_outbound_fee' => null,
+                    'net_mevon_impact' => round((float) $entry->gross_amount, 2),
+                ]);
+
+                return $entry->fresh() ?? $entry;
+            }
+
+            $breakdown = $this->fees->inboundBreakdown($gross);
+            $entry->update([
+                'mevon_inbound_fee' => $breakdown['inbound_fee'],
+                'mevon_outbound_fee' => null,
+                'net_mevon_impact' => $breakdown['net_mevon_impact'],
+            ]);
+
+            return $entry->fresh() ?? $entry;
+        }
+
+        $meta = is_array($entry->meta) ? $entry->meta : [];
+        $isDrain = ! empty($meta['ngn_drain'])
+            || in_array((string) $entry->payout_api, [
+                MevonPayLedgerEntry::PAYOUT_API_EXCHANGE,
+                MevonPayLedgerEntry::PAYOUT_API_VTU,
+                MevonPayLedgerEntry::PAYOUT_API_IDENTITY,
+            ], true);
+
+        if ($isDrain) {
+            $bucket = (string) ($entry->payout_bucket ?? '');
+            $impact = in_array($bucket, [
+                MavonPayTransferService::BUCKET_FAILED,
+            ], true) ? 0.0 : round(-1 * $gross, 2);
+
+            $entry->update([
+                'mevon_inbound_fee' => null,
+                'mevon_outbound_fee' => 0,
+                'net_mevon_impact' => $impact,
+            ]);
+
+            return $entry->fresh() ?? $entry;
+        }
+
+        $chargeApiFee = in_array((string) $entry->payout_bucket, [
+            MavonPayTransferService::BUCKET_SUCCESSFUL,
+            MavonPayTransferService::BUCKET_PENDING,
+        ], true);
+
+        $breakdown = $this->fees->outboundBreakdown($gross, $chargeApiFee);
+        $entry->update([
+            'mevon_inbound_fee' => null,
+            'mevon_outbound_fee' => $breakdown['outbound_fee'],
+            'net_mevon_impact' => $breakdown['net_mevon_impact'],
+        ]);
+
+        return $entry->fresh() ?? $entry;
+    }
+
     private function inboundExists(string $externalReference): bool
     {
         return MevonPayLedgerEntry::query()

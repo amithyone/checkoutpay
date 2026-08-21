@@ -68,8 +68,8 @@ class MevonPayBalanceMonitorTest extends TestCase
         $summary = $monitor->summary();
 
         $this->assertSame(1, $summary['entry_count']);
-        $this->assertSame(-30.0, $summary['net_mevon_impact']);
-        $this->assertSame(round(100_000.00 - 30.0, 2), $summary['expected_balance']);
+        $this->assertSame(1970.0, $summary['net_mevon_impact']);
+        $this->assertSame(round(100_000.00 + 1970.0, 2), $summary['expected_balance']);
     }
 
     public function test_running_balance_on_three_sample_entries(): void
@@ -104,8 +104,8 @@ class MevonPayBalanceMonitorTest extends TestCase
         $ledger = $monitor->ledgerWithRunningBalance(50);
         $rows = $ledger->getCollection()->keyBy('id');
 
-        $inboundNet1 = -30.0;
-        $inboundNet2 = -30.0;
+        $inboundNet1 = 970.0; // 1000 - 30
+        $inboundNet2 = 1970.0; // 2000 - 30
         $outboundNet = -510.0;
 
         $byRef = $rows->keyBy(fn ($row) => $row->external_reference ?: $row->payout_reference);
@@ -165,7 +165,7 @@ class MevonPayBalanceMonitorTest extends TestCase
             now(),
         );
 
-        $expected = round(10_000 - 30, 2);
+        $expected = round(10_000 + 970, 2);
         $this->mockBalanceSnapshot($expected);
 
         $result = app(MevonPayBalanceMonitorService::class)->checkNow(MevonPayDiscrepancyAlert::TRIGGER_SCHEDULED);

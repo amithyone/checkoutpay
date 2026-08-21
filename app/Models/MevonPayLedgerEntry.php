@@ -22,11 +22,25 @@ class MevonPayLedgerEntry extends Model
 
     public const FLOW_BUSINESS_WITHDRAWAL = 'business_withdrawal';
 
+    public const FLOW_BUSINESS_PAYROLL = 'business_payroll';
+
+    public const FLOW_FX_NGN_USD = 'fx_ngn_usd';
+
+    public const FLOW_VTU = 'vtu';
+
+    public const FLOW_IDENTITY_FEE = 'identity_fee';
+
     public const FLOW_OTHER = 'other';
 
     public const PAYOUT_API_CREATETRANSFER = 'createtransfer';
 
     public const PAYOUT_API_PAYOUT = 'payout';
+
+    public const PAYOUT_API_EXCHANGE = 'exchange';
+
+    public const PAYOUT_API_VTU = 'vtu';
+
+    public const PAYOUT_API_IDENTITY = 'identity_verify';
 
     protected $fillable = [
         'direction',
@@ -76,6 +90,10 @@ class MevonPayLedgerEntry extends Model
             self::FLOW_MERCHANT_CHECKOUT => 'Merchant checkout',
             self::FLOW_BUSINESS_RUBIES_VA => 'Business Rubies VA',
             self::FLOW_BUSINESS_WITHDRAWAL => 'Business withdrawal',
+            self::FLOW_BUSINESS_PAYROLL => 'Business payroll',
+            self::FLOW_FX_NGN_USD => 'FX NGN→USD',
+            self::FLOW_VTU => 'VTU (Mevon)',
+            self::FLOW_IDENTITY_FEE => 'BVN/NIN fee',
             default => str_replace('_', ' ', (string) $this->flow_type),
         };
     }
