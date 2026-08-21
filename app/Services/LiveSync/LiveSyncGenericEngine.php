@@ -38,6 +38,19 @@ final class LiveSyncGenericEngine
     }
 
     /**
+     * Customer-liability rows that drive /enter0/audits site float vs Mevon.
+     *
+     * @return list<string>
+     */
+    public function floatEntities(): array
+    {
+        return array_values(array_filter(
+            (array) config('live_sync.float_order', ['renter', 'business', 'whatsapp_wallet']),
+            fn ($e) => is_string($e) && is_array(config('live_sync.entities.'.$e)),
+        ));
+    }
+
+    /**
      * @return list<string>
      */
     public function observableEntities(): array

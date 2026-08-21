@@ -51,6 +51,15 @@ return [
         'wallet_savings_lock',
     ],
 
+    /**
+     * Bank-float liabilities only. Always push with --mode=recent (missing skips stale balances).
+     */
+    'float_order' => [
+        'renter',
+        'business',
+        'whatsapp_wallet',
+    ],
+
     'entities' => [
         'payment' => [
             'model' => Payment::class,

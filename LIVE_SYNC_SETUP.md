@@ -17,6 +17,19 @@ Still **not** synced: admins, sessions, cache, jobs, nigtax, rentals catalog, de
 
 Catch-up is **missing-only** by default (probe Contabo, push gaps only, 48h/watermark window, `--limit`).
 
+### Bank float / Ops (`/enter0/audits`)
+
+Site float = non-exempt `business` + `whatsapp_wallet` + `renter` balances.  
+**`--mode=missing` does not refresh those** if Contabo already has the rows (old dump = stale ₦3.1M while live is ~₦3.7M).
+
+On **Namecheap**, force a balance upsert:
+
+```bash
+php artisan live-sync:push --entity=float --mode=recent --force-all --limit=500 --sync
+```
+
+Then re-check Contabo `/enter0/audits` (site float should track live).
+
 ## Contabo (receiver)
 
 ```env
@@ -49,11 +62,13 @@ php artisan migrate --force
 php artisan config:clear
 php artisan queue:work   # if QUEUE=true
 
-# Common money path (wallets + balances + payments + activity…)
-php artisan live-sync:push --entity=common --mode=missing --sync
+# Bank float first (required for Ops site-float ≈ live)
+php artisan live-sync:push --entity=float --mode=recent --force-all --limit=500 --sync
 
-# Or one entity
-php artisan live-sync:push --entity=whatsapp_wallet --mode=missing --sync
+# Then other money-path gaps (accounts, payments, ledger…)
+php artisan live-sync:push --entity=common --mode=missing --sync
 ```
 
-Ongoing: configured models auto-push single-row changes when saved/deleted on Namecheap.
+Ongoing: configured models auto-push single-row changes when saved/deleted on Namecheap.  
+Balance changes on Namecheap only land on Contabo if transmitters + observers are enabled there.
+

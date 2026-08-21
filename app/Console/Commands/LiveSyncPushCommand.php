@@ -15,8 +15,8 @@ class LiveSyncPushCommand extends Command
     public const WATERMARK_KEY = 'live_sync_push_watermark';
 
     protected $signature = 'live-sync:push
-        {--entity=common : Entity name, common (money path), or all}
-        {--mode=missing : missing=only keys Contabo lacks; recent=upsert changed rows}
+        {--entity=common : Entity name, common, float (balances), or all}
+        {--mode=missing : missing=only keys Contabo lacks; recent=upsert balances/rows}
         {--since= : Override watermark / default lookback (ISO or Y-m-d)}
         {--id= : Push a single primary key id}
         {--limit=200 : Max candidate rows per entity}
@@ -24,7 +24,7 @@ class LiveSyncPushCommand extends Command
         {--dry-run : Count / probe only, do not send upserts}
         {--sync : Send inline (ignore LIVE_SYNC_QUEUE)}';
 
-    protected $description = 'Push common money-path data Namecheap → Contabo (missing-only by default)';
+    protected $description = 'Push common money-path data Namecheap → Contabo (use --entity=float --mode=recent for bank float)';
 
     public function handle(
         LiveSyncOutboundService $outbound,
@@ -47,6 +47,7 @@ class LiveSyncPushCommand extends Command
         $entityOpt = strtolower(trim((string) $this->option('entity')));
         $entities = match ($entityOpt) {
             'common', 'all' => $engine->commonEntities(),
+            'float' => $engine->floatEntities(),
             default => [$entityOpt],
         };
 
@@ -58,6 +59,18 @@ class LiveSyncPushCommand extends Command
 
                 return self::FAILURE;
             }
+        }
+
+        // Bank float rows already exist on Contabo from old dumps; missing-only never refreshes balances.
+        $floatSet = $engine->floatEntities();
+        $pushingFloat = $entityOpt === 'float'
+            || count(array_intersect($entities, $floatSet)) === count($entities);
+        if ($entityOpt === 'float' && $mode === 'missing') {
+            $this->warn('float entities require balance upserts — switching to --mode=recent');
+            $mode = 'recent';
+        } elseif ($mode === 'missing' && array_intersect($entities, $floatSet) !== []) {
+            $this->warn('Tip: --mode=missing skips rows Contabo already has. For site float ≈ live, use:');
+            $this->warn('  php artisan live-sync:push --entity=float --mode=recent --force-all --limit=500 --sync');
         }
 
         $since = null;
@@ -83,7 +96,9 @@ class LiveSyncPushCommand extends Command
             $this->info('Window since: '.$since->toDateTimeString().' UTC');
         }
         $this->info('Mode: '.$mode.' · entities: '.count($entities).' · limit: '.(int) $this->option('limit'));
-
+        if ($pushingFloat && $mode === 'recent') {
+            $this->info('Float push: upserting renter/business/whatsapp_wallet balances onto Contabo.');
+        }
         $limit = max(1, min(2000, (int) $this->option('limit')));
         $dryRun = (bool) $this->option('dry-run');
         if ((bool) $this->option('sync')) {
