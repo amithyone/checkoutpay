@@ -419,7 +419,8 @@
                                     </button>
                                     <button type="submit" formaction="{{ route('admin.whatsapp-wallet.wallets.test-mevon-identity', $wallet) }}" formmethod="POST"
                                         class="px-3 py-1.5 rounded-lg bg-slate-600 text-white text-xs font-semibold hover:bg-slate-700"
-                                        @disabled(! ($kycProvisionConfigured ?? false))>
+                                        @disabled(! ($kycProvisionConfigured ?? false))
+                                        onclick="var m=this.form.querySelector('input[name=_method]'); if(m){m.disabled=true;} return true;">
                                         <i class="fas fa-vial mr-1"></i> Test Mevon identity verify (uses fields above)
                                     </button>
                                 </div>
