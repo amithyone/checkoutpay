@@ -54,7 +54,7 @@ Invoke-RestMethod -Uri 'https://check-outnow.com/ops/v1/ping' -Headers @{ 'X-Ops
 | `GET /ops/v1/security` | Quarantine + DB allowlist flags (no passwords) |
 | `GET /ops/v1/health` | Health + last cron + queue depth |
 | `GET /ops/v1/activity` | Curated office activity feed (pay-ins, payouts, account creates, quarantine, Mevon alerts) |
-| `GET /ops/v1/balances` | Mevon snapshot (primary only) |
+| `GET /ops/v1/balances` | **Primary:** site bank float vs Mevon live NGN (`variance = mevon − site_float`). Secondary: `ledger_recon` baseline monitor. |
 
 These routes stay reachable during quarantine so the wall can report `quarantine.active`.
 

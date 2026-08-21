@@ -8,4 +8,6 @@ return [
     'bvn_verify_fee' => (int) env('MEVONPAY_BVN_VERIFY_FEE', 30),
     'nin_verify_fee' => (int) env('MEVONPAY_NIN_VERIFY_FEE', 50),
     'reconciliation_tolerance' => (float) env('MEVONPAY_RECONCILIATION_TOLERANCE', 0.01),
+    /** Site bank float (customer liabilities) vs live Mevon NGN — Ops Sentinel primary gap. */
+    'float_vs_mevon_tolerance' => (float) env('MEVONPAY_FLOAT_VS_MEVON_TOLERANCE', 1000),
 ];

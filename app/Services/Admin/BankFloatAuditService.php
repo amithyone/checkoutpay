@@ -5,6 +5,7 @@ namespace App\Services\Admin;
 use App\Models\Business;
 use App\Models\Renter;
 use App\Models\WhatsappWallet;
+use App\Services\MevonPay\MevonPayBalanceSnapshotService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -14,6 +15,10 @@ use Illuminate\Support\Facades\Schema;
  */
 class BankFloatAuditService
 {
+    public function __construct(
+        private MevonPayBalanceSnapshotService $mevonBalances,
+    ) {}
+
     /**
      * @return array{
      *   business: array{total: float, exempt_total: float, count: int, exempt_count: int},
@@ -40,6 +45,51 @@ class BankFloatAuditService
             ],
             'exempt_businesses' => $this->exemptBusinessRows(),
             'exempt_wallets' => $this->exemptWalletRows(),
+        ];
+    }
+
+    /**
+     * Ops / audit primary check: site customer liabilities vs live Mevon NGN wallet.
+     * variance = mevon_live − site_float (positive = Mevon holds more than we owe customers).
+     *
+     * @return array{
+     *   site_float_total: float,
+     *   site_float: array{business: float, wallet: float, rentals: float},
+     *   mevon_live_balance: ?float,
+     *   mevon_ok: bool,
+     *   mevon_message: string,
+     *   variance_amount: ?float,
+     *   within_tolerance: bool,
+     *   tolerance: float,
+     *   formula: string
+     * }
+     */
+    public function compareToMevonLive(?array $float = null): array
+    {
+        $float ??= $this->summarize();
+        $siteTotal = (float) ($float['site']['total'] ?? 0);
+        $tolerance = max(0.0, (float) config('mevonpay_fees.float_vs_mevon_tolerance', 1000));
+
+        $snap = $this->mevonBalances->forDashboard();
+        $mevonOk = (bool) ($snap['ok'] ?? false);
+        $mevonLive = $mevonOk ? ($snap['naira_balance'] ?? null) : null;
+        $variance = is_numeric($mevonLive) ? round((float) $mevonLive - $siteTotal, 2) : null;
+        $within = $variance !== null && abs($variance) <= $tolerance;
+
+        return [
+            'site_float_total' => $siteTotal,
+            'site_float' => [
+                'business' => (float) ($float['business']['total'] ?? 0),
+                'wallet' => (float) ($float['wallet']['total'] ?? 0),
+                'rentals' => (float) ($float['rentals']['total'] ?? 0),
+            ],
+            'mevon_live_balance' => is_numeric($mevonLive) ? round((float) $mevonLive, 2) : null,
+            'mevon_ok' => $mevonOk,
+            'mevon_message' => (string) ($snap['message'] ?? ($mevonOk ? 'OK' : 'Mevon balance unavailable')),
+            'variance_amount' => $variance,
+            'within_tolerance' => $within,
+            'tolerance' => $tolerance,
+            'formula' => 'variance = mevon_live_balance − site_float_total',
         ];
     }
 

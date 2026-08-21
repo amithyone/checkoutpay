@@ -14,18 +14,21 @@ class AuditsController extends Controller
 
     public function index(): View
     {
+        $float = $this->bankFloat->summarize();
+
         return view('admin.audits.index', [
-            'float' => $this->bankFloat->summarize(),
+            'float' => $float,
+            'floatVsMevon' => $this->bankFloat->compareToMevonLive($float),
             'providers' => [
                 [
                     'name' => 'Mevon Pay',
-                    'description' => 'Inbound fee ledger, outbound API fees, and balance reconciliation for Mevon Pay webhooks and payouts.',
+                    'description' => 'Inbound/outbound fee ledger and transaction export.',
                     'route' => 'admin.audits.mevonpay.index',
                     'icon' => 'fa-wallet',
                 ],
                 [
-                    'name' => 'Mevon Balance Monitor',
-                    'description' => 'Live balance tracking from a deploy baseline, running expected balance, and discrepancy alerts.',
+                    'name' => 'Mevon ledger monitor',
+                    'description' => 'Optional deploy-baseline ledger check (secondary). Ops uses site float vs Mevon live.',
                     'route' => 'admin.audits.mevonpay.monitor',
                     'icon' => 'fa-chart-line',
                 ],

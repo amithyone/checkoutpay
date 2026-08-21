@@ -58,6 +58,59 @@
         </div>
     </div>
 
+    @php
+        $vs = $floatVsMevon ?? null;
+        $vsBad = $vs && (($vs['variance_amount'] === null) || !($vs['within_tolerance'] ?? false));
+    @endphp
+    @if($vs)
+        <div class="rounded-xl border-2 {{ $vsBad ? 'border-red-400 bg-red-50' : 'border-green-400 bg-green-50' }} p-5 shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide {{ $vsBad ? 'text-red-800' : 'text-green-800' }}">
+                        Ops check · Site float vs Mevon live
+                    </p>
+                    <p class="mt-1 text-sm {{ $vsBad ? 'text-red-900' : 'text-green-900' }}">
+                        This is what Ops Sentinel should show: customer liabilities on this site versus money in Mevon now.
+                    </p>
+                </div>
+                <p class="text-xs font-mono {{ $vsBad ? 'text-red-700' : 'text-green-700' }}">{{ $vs['formula'] }}</p>
+            </div>
+            <div class="mt-4 grid gap-4 sm:grid-cols-3">
+                <div>
+                    <p class="text-xs uppercase tracking-wide opacity-80">Site float</p>
+                    <p class="mt-1 text-2xl font-bold tabular-nums">{{ $fmt($vs['site_float_total']) }}</p>
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-wide opacity-80">Mevon live NGN</p>
+                    <p class="mt-1 text-2xl font-bold tabular-nums">
+                        @if($vs['mevon_live_balance'] !== null)
+                            {{ $fmt($vs['mevon_live_balance']) }}
+                        @else
+                            —
+                        @endif
+                    </p>
+                    @unless($vs['mevon_ok'])
+                        <p class="mt-1 text-xs opacity-80">{{ $vs['mevon_message'] }}</p>
+                    @endunless
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-wide opacity-80">Difference</p>
+                    <p class="mt-1 text-2xl font-bold tabular-nums">
+                        @if($vs['variance_amount'] !== null)
+                            {{ $fmt($vs['variance_amount']) }}
+                        @else
+                            —
+                        @endif
+                    </p>
+                    <p class="mt-1 text-xs">
+                        Tolerance ₦{{ number_format($vs['tolerance'], 2) }}
+                        · {{ ($vs['within_tolerance'] ?? false) ? 'within tolerance' : 'outside tolerance' }}
+                    </p>
+                </div>
+            </div>
+        </div>
+    @endif
+
     @if(count($float['exempt_businesses']) > 0 || count($float['exempt_wallets']) > 0)
         <div class="bg-white rounded-lg border border-gray-200 p-5 shadow-sm space-y-4">
             <h3 class="text-sm font-semibold text-gray-900">Exempt from float calculation</h3>

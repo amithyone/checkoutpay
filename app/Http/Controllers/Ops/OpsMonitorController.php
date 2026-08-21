@@ -10,6 +10,7 @@ use App\Models\MevonPayLedgerEntry;
 use App\Models\Payment;
 use App\Models\Setting;
 use App\Models\WithdrawalRequest;
+use App\Services\Admin\BankFloatAuditService;
 use App\Services\MevonPay\MevonPayBalanceMonitorService;
 use App\Services\Quarantine\QuarantineService;
 use App\Support\SiteBranding;
@@ -23,6 +24,7 @@ class OpsMonitorController extends Controller
     public function __construct(
         private QuarantineService $quarantine,
         private MevonPayBalanceMonitorService $mevonBalance,
+        private BankFloatAuditService $bankFloat,
     ) {}
 
     public function ping(): JsonResponse
@@ -143,34 +145,58 @@ class OpsMonitorController extends Controller
                 'ok' => true,
                 'available' => false,
                 'role' => 'relay',
-                'message' => 'Mevon balances are Contabo-primary only.',
+                'message' => 'Float vs Mevon balances are Contabo-primary only.',
                 'timestamp' => now()->toIso8601String(),
             ]);
         }
 
         try {
-            $summary = $this->mevonBalance->summary();
+            $float = $this->bankFloat->summarize();
+            $vs = $this->bankFloat->compareToMevonLive($float);
         } catch (Throwable $e) {
             return response()->json([
                 'ok' => false,
                 'available' => false,
                 'role' => 'primary',
-                'message' => 'Balance snapshot unavailable',
+                'message' => 'Float / Mevon snapshot unavailable',
                 'timestamp' => now()->toIso8601String(),
             ], 200);
+        }
+
+        $ledgerRecon = null;
+        try {
+            $summary = $this->mevonBalance->summary();
+            $ledgerRecon = [
+                'active' => (bool) ($summary['active'] ?? false),
+                'expected_balance' => $summary['expected_balance'] ?? null,
+                'live_naira_balance' => $summary['live_naira_balance'] ?? null,
+                'variance_amount' => $summary['variance_amount'] ?? null,
+                'within_tolerance' => (bool) ($summary['within_tolerance'] ?? true),
+                'tolerance' => $summary['tolerance'] ?? null,
+                'last_checked_at' => $summary['last_checked_at'] ?? null,
+            ];
+        } catch (Throwable) {
+            $ledgerRecon = null;
         }
 
         return response()->json([
             'ok' => true,
             'available' => true,
             'role' => 'primary',
-            'active' => (bool) ($summary['active'] ?? false),
-            'expected_balance' => $summary['expected_balance'] ?? null,
-            'live_naira_balance' => $summary['live_naira_balance'] ?? null,
-            'variance_amount' => $summary['variance_amount'] ?? null,
-            'within_tolerance' => (bool) ($summary['within_tolerance'] ?? true),
-            'tolerance' => $summary['tolerance'] ?? null,
-            'last_checked_at' => $summary['last_checked_at'] ?? null,
+            // Primary Ops signal: customer liabilities on site vs money in Mevon
+            'check' => 'site_float_vs_mevon',
+            'formula' => $vs['formula'],
+            'site_float_total' => $vs['site_float_total'],
+            'site_float' => $vs['site_float'],
+            'mevon_live_balance' => $vs['mevon_live_balance'],
+            'live_naira_balance' => $vs['mevon_live_balance'], // alias for older clients
+            'variance_amount' => $vs['variance_amount'],
+            'within_tolerance' => (bool) ($vs['within_tolerance'] ?? false),
+            'tolerance' => $vs['tolerance'],
+            'mevon_ok' => (bool) ($vs['mevon_ok'] ?? false),
+            'mevon_message' => $vs['mevon_message'] ?? null,
+            // Secondary: deploy-baseline ledger recon (admin monitor page)
+            'ledger_recon' => $ledgerRecon,
             'timestamp' => now()->toIso8601String(),
         ]);
     }
