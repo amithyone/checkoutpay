@@ -187,12 +187,16 @@ class ConsumerWalletKycService
             ];
         }
 
-        $cac = strtoupper(trim((string) ($input['cac'] ?? '')));
+        $cac = \App\Models\Business::normalizeCacRegistrationNumber((string) ($input['cac'] ?? ''));
         $dob = (string) ($input['dob'] ?? '');
         $email = strtolower(trim((string) ($input['email'] ?? '')));
         $bvn = preg_replace('/\D+/', '', (string) ($input['bvn'] ?? '')) ?? '';
         $fname = trim((string) ($input['fname'] ?? $wallet->kyc_fname ?? ''));
         $lname = trim((string) ($input['lname'] ?? $wallet->kyc_lname ?? ''));
+        $businessName = trim((string) ($input['business_name'] ?? $wallet->kyc_business_name ?? ''));
+        if ($businessName === '') {
+            $businessName = $wallet->registeredBusinessNameForPayIn();
+        }
 
         if ($emailErr = WhatsappWalletKycInputGuard::emailError($email)) {
             return ['ok' => false, 'message' => $emailErr];
@@ -203,6 +207,9 @@ class ConsumerWalletKycService
         if ($bvnErr = WhatsappWalletKycInputGuard::bvnOrNinError($bvn, 'BVN')) {
             return ['ok' => false, 'message' => $bvnErr];
         }
+        if ($businessName === '' || strcasecmp($businessName, $cac) === 0) {
+            return ['ok' => false, 'message' => 'Registered business name is required (company name on CAC).'];
+        }
 
         $result = $this->provision->dispatchPersonalBusinessIfReady($wallet, [
             'cac' => $cac,
@@ -211,7 +218,7 @@ class ConsumerWalletKycService
             'bvn' => $bvn,
             'fname' => $fname,
             'lname' => $lname,
-            'business_name' => trim((string) ($input['business_name'] ?? $cac)),
+            'business_name' => $businessName,
         ]);
 
         if (! $result['dispatched']) {

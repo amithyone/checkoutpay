@@ -90,15 +90,51 @@ class CreatePersonalPrivateAccountJob implements ShouldQueue
         );
 
         if (! $identityResult['ok']) {
-            $this->markFailed($wallet, (string) $identityResult['message']);
-            throw new \RuntimeException((string) $identityResult['message']);
+            // Business permanent accounts use company name + CAC (merchant path). Signatory BVN
+            // may still return a different registered personal name — sync and continue when Mevon
+            // returned a provider name (same createBusinessAccount call as CreateBusinessPrivateAccountJob).
+            $providerName = trim((string) ($identityResult['full_name'] ?? ''));
+            $isNameMismatch = $isBusiness
+                && $providerName !== ''
+                && str_contains(strtolower((string) ($identityResult['message'] ?? '')), 'name mismatch');
+
+            if (! $isNameMismatch) {
+                $this->markFailed($wallet, (string) $identityResult['message']);
+                throw new \RuntimeException((string) $identityResult['message']);
+            }
+
+            $parts = preg_split('/\s+/', $providerName, 2) ?: [];
+            $fname = trim((string) ($parts[0] ?? $fname));
+            $lname = trim((string) ($parts[1] ?? $lname));
+            $wallet->forceFill([
+                'kyc_fname' => $fname !== '' ? $fname : $wallet->kyc_fname,
+                'kyc_lname' => $lname !== '' ? $lname : $wallet->kyc_lname,
+            ])->saveQuietly();
+
+            Log::info('private_account.business_signatory_name_synced', [
+                'wallet_id' => $wallet->id,
+                'provider_name' => $providerName,
+            ]);
         }
 
         try {
             if ($isBusiness) {
+                $cac = \App\Models\Business::normalizeCacRegistrationNumber(
+                    (string) ($this->options['cac'] ?? $wallet->kyc_cac ?? '')
+                );
+                $businessName = trim((string) ($this->options['business_name'] ?? ''));
+                if ($businessName === '' || strcasecmp($businessName, $cac) === 0) {
+                    $businessName = $wallet->registeredBusinessNameForPayIn();
+                }
+                if ($businessName === '' || $cac === '') {
+                    throw new \RuntimeException(
+                        'Registered business name and CAC RC/BN are required for a business pay-in account.'
+                    );
+                }
+
                 $va = $privateAccount->createBusinessAccount(
-                    businessName: (string) ($this->options['business_name'] ?? $wallet->kyc_cac ?? ''),
-                    cac: strtoupper(trim((string) ($this->options['cac'] ?? $wallet->kyc_cac ?? ''))),
+                    businessName: $businessName,
+                    cac: $cac,
                     phoneLocal11: $apiPhone,
                     dobYmd: $dobYmd,
                     email: $email,

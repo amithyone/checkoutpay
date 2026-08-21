@@ -196,6 +196,10 @@
                                 <dt class="text-gray-500">CAC / business registration</dt>
                                 <dd class="font-mono">{{ $wallet->kyc_cac ?: '—' }}</dd>
                             </div>
+                            <div class="sm:col-span-2">
+                                <dt class="text-gray-500">Registered business name</dt>
+                                <dd>{{ $wallet->kyc_business_name ?: ($wallet->registeredBusinessNameForPayIn() ?: '—') }}</dd>
+                            </div>
                         @endif
                         <div>
                             <dt class="text-gray-500">First name</dt>
@@ -330,6 +334,13 @@
                                         <input type="text" name="kyc_cac" value="{{ old('kyc_cac', $wallet->kyc_cac) }}"
                                                maxlength="100" placeholder="e.g. RC1234567 or BN1234567"
                                                class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono uppercase">
+                                    </div>
+                                    <div class="sm:col-span-2">
+                                        <label class="block text-gray-600 mb-1">Registered business name (Mevon company name)</label>
+                                        <input type="text" name="kyc_business_name" value="{{ old('kyc_business_name', $wallet->kyc_business_name) }}"
+                                               maxlength="255" placeholder="Company name on CAC — not the RC/BN number"
+                                               class="w-full rounded-lg border border-gray-300 px-3 py-2">
+                                        <p class="text-xs text-gray-500 mt-1">Required for account type <strong>business</strong>. Same field merchants use for permanent pay-in.</p>
                                     </div>
                                     <div>
                                         <label class="block text-gray-600 mb-1">First name</label>

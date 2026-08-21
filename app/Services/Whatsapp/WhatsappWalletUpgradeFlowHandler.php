@@ -144,6 +144,7 @@ class WhatsappWalletUpgradeFlowHandler
         match ($step) {
             'account_kind' => $this->stepAccountKind($session, $instance, $phone, $text, $ctx),
             'cac' => $this->stepCac($session, $instance, $phone, $text, $ctx),
+            'business_name' => $this->stepBusinessName($session, $instance, $phone, $text, $ctx),
             'fname' => $this->stepFname($session, $instance, $phone, $text, $ctx),
             'lname' => $this->stepLname($session, $instance, $phone, $text, $ctx),
             'dob' => $this->stepDob($session, $instance, $phone, $text, $ctx),
@@ -231,6 +232,45 @@ class WhatsappWalletUpgradeFlowHandler
         }
 
         $ctx['cac'] = $cac;
+        $ctx['step'] = 'business_name';
+        $session->update(['chat_context' => $ctx]);
+        $this->client->sendText(
+            $instance,
+            $phone,
+            'Send the *registered company name* exactly as on CAC (not the RC/BN number).'
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $ctx
+     */
+    private function stepBusinessName(WhatsappSession $session, string $instance, string $phone, string $text, array $ctx): void
+    {
+        $name = trim($text);
+        $cac = strtoupper(trim((string) ($ctx['cac'] ?? '')));
+        if (strlen($name) < 3) {
+            $this->kycLog('notice', 'whatsapp.wallet.kyc.validation_failed', [
+                'phone' => $phone,
+                'instance' => $instance,
+                'step' => 'business_name',
+                'reason' => 'too_short',
+                'length' => strlen($name),
+            ]);
+            $this->client->sendText($instance, $phone, 'Send the registered company name (at least 3 characters).');
+
+            return;
+        }
+        if ($cac !== '' && strcasecmp(preg_replace('/\s+/', '', $name) ?? '', preg_replace('/\s+/', '', $cac) ?? '') === 0) {
+            $this->client->sendText(
+                $instance,
+                $phone,
+                'That looks like the CAC number. Send the *company name* on the registration certificate.'
+            );
+
+            return;
+        }
+
+        $ctx['business_name'] = $name;
         $ctx['step'] = 'fname';
         $session->update(['chat_context' => $ctx]);
         $this->client->sendText($instance, $phone, 'Send the *signatory first name* (as on BVN).');
@@ -518,7 +558,7 @@ class WhatsappWalletUpgradeFlowHandler
                     'bvn' => (string) ($ctx['bvn'] ?? ''),
                     'fname' => (string) ($ctx['fname'] ?? ''),
                     'lname' => (string) ($ctx['lname'] ?? ''),
-                    'business_name' => (string) ($ctx['cac'] ?? ''),
+                    'business_name' => (string) ($ctx['business_name'] ?? ''),
                 ]);
             } else {
                 $result = $this->provision->dispatchPersonalIfReady($wallet, [
@@ -591,6 +631,7 @@ class WhatsappWalletUpgradeFlowHandler
             'tier' => WhatsappWallet::TIER_RUBIES_VA,
             'rubies_account_type' => $isBusiness ? 'business' : 'personal',
             'kyc_cac' => $isBusiness ? (string) ($ctx['cac'] ?? '') : null,
+            'kyc_business_name' => $isBusiness ? (string) ($ctx['business_name'] ?? '') : null,
             'kyc_fname' => $isBusiness ? null : (string) ($ctx['fname'] ?? ''),
             'kyc_lname' => $isBusiness ? null : (string) ($ctx['lname'] ?? ''),
             'kyc_gender' => $isBusiness ? null : (string) ($ctx['gender'] ?? ''),
@@ -693,6 +734,7 @@ class WhatsappWalletUpgradeFlowHandler
                 'input_type' => 'cac',
                 'length' => strlen(preg_replace('/\s+/', '', strtoupper($trim)) ?? ''),
             ],
+            'business_name' => ['input_type' => 'business_name', 'value' => substr($trim, 0, 80)],
             'bvn' => [
                 'input_type' => 'bvn',
                 'digit_count' => strlen(preg_replace('/\D+/', '', $trim) ?? ''),

@@ -257,6 +257,7 @@ class WhatsappWalletAdminController extends Controller
             'kyc_bvn' => ['nullable', 'string', 'max:20'],
             'kyc_nin' => ['nullable', 'string', 'max:20'],
             'kyc_cac' => ['nullable', 'string', 'max:100'],
+            'kyc_business_name' => ['nullable', 'string', 'max:255'],
             'rubies_account_type' => ['nullable', 'in:personal,business'],
             'mevon_virtual_account_number' => ['nullable', 'string', 'max:20'],
             'mevon_bank_name' => ['nullable', 'string', 'max:100'],
@@ -283,6 +284,11 @@ class WhatsappWalletAdminController extends Controller
         if ($request->has('kyc_cac')) {
             $cac = \App\Models\Business::normalizeCacRegistrationNumber((string) $request->input('kyc_cac'));
             $updates['kyc_cac'] = $cac !== '' ? $cac : null;
+        }
+
+        if ($request->has('kyc_business_name')) {
+            $bizName = trim((string) $request->input('kyc_business_name'));
+            $updates['kyc_business_name'] = $bizName !== '' ? $bizName : null;
         }
 
         if ($request->has('kyc_dob')) {

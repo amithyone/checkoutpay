@@ -347,17 +347,17 @@ final class PrivateAccountProvisionService
 
         if (($wallet->rubies_account_type ?? 'personal') === 'business') {
             $bvn = preg_replace('/\D+/', '', (string) $wallet->kyc_bvn) ?? '';
+            $businessName = $wallet->registeredBusinessNameForPayIn();
+            $cac = \App\Models\Business::normalizeCacRegistrationNumber((string) ($wallet->kyc_cac ?? ''));
 
             return $this->dispatchPersonalBusinessIfReady($wallet, [
-                'cac' => (string) ($wallet->kyc_cac ?? ''),
+                'cac' => $cac,
                 'dob' => optional($wallet->kyc_dob)?->format('Y-m-d') ?? '',
                 'email' => (string) ($wallet->kyc_email ?? ''),
                 'bvn' => $bvn,
                 'fname' => (string) ($wallet->kyc_fname ?? ''),
                 'lname' => (string) ($wallet->kyc_lname ?? ''),
-                'business_name' => trim((string) ($wallet->kyc_cac ?? '')) !== ''
-                    ? (string) $wallet->kyc_cac
-                    : trim((string) ($wallet->kyc_fname ?? '').' '.(string) ($wallet->kyc_lname ?? '')),
+                'business_name' => $businessName,
             ], $forceRetry);
         }
 
@@ -392,13 +392,16 @@ final class PrivateAccountProvisionService
             return ['dispatched' => false, 'message' => 'Tier 2 provisioning is not configured.'];
         }
 
-        $cac = strtoupper(trim((string) ($input['cac'] ?? '')));
+        $cac = \App\Models\Business::normalizeCacRegistrationNumber((string) ($input['cac'] ?? ''));
         $dob = (string) ($input['dob'] ?? '');
         $email = strtolower(trim((string) ($input['email'] ?? '')));
         $bvn = preg_replace('/\D+/', '', (string) ($input['bvn'] ?? '')) ?? '';
         $fname = trim((string) ($input['fname'] ?? ''));
         $lname = trim((string) ($input['lname'] ?? ''));
-        $businessName = trim((string) ($input['business_name'] ?? $cac));
+        $businessName = trim((string) ($input['business_name'] ?? ''));
+        if ($businessName === '') {
+            $businessName = $wallet->registeredBusinessNameForPayIn();
+        }
 
         if ($fname === '' && trim((string) $wallet->kyc_fname) !== '') {
             $fname = trim((string) $wallet->kyc_fname);
@@ -432,8 +435,8 @@ final class PrivateAccountProvisionService
         } elseif ($bvnErr = WhatsappWalletKycInputGuard::bvnOrNinError($bvn, 'BVN')) {
             $missing[] = $bvnErr;
         }
-        if ($businessName === '') {
-            $missing[] = 'Business name is required.';
+        if ($businessName === '' || strcasecmp($businessName, $cac) === 0) {
+            $missing[] = 'Registered business name is required (company name on CAC — not the RC/BN number alone).';
         }
 
         $status = (string) ($wallet->private_account_provision_status ?? '');
@@ -449,6 +452,7 @@ final class PrivateAccountProvisionService
             'tier' => WhatsappWallet::TIER_RUBIES_VA,
             'rubies_account_type' => 'business',
             'kyc_cac' => $cac,
+            'kyc_business_name' => $businessName,
             'kyc_fname' => $fname !== '' ? $fname : null,
             'kyc_lname' => $lname !== '' ? $lname : null,
             'kyc_gender' => null,
@@ -462,6 +466,7 @@ final class PrivateAccountProvisionService
             'private_account_provision_queued_at' => now(),
         ]);
 
+        // Same Mevon create_business_account path as merchant permanent pay-in (CreateBusinessPrivateAccountJob).
         CreatePersonalPrivateAccountJob::dispatch($wallet->id, [
             'account_kind' => 'business',
             'business_name' => $businessName,
@@ -570,10 +575,11 @@ final class PrivateAccountProvisionService
 
         $options = [];
         if (($wallet->rubies_account_type ?? 'personal') === 'business') {
-            $cac = strtoupper(trim((string) ($wallet->kyc_cac ?? '')));
+            $cac = \App\Models\Business::normalizeCacRegistrationNumber((string) ($wallet->kyc_cac ?? ''));
+            $businessName = $wallet->registeredBusinessNameForPayIn();
             $options = [
                 'account_kind' => 'business',
-                'business_name' => $cac !== '' ? $cac : trim((string) ($wallet->kyc_fname ?? '').' '.(string) ($wallet->kyc_lname ?? '')),
+                'business_name' => $businessName !== '' ? $businessName : $cac,
                 'cac' => $cac,
             ];
         }

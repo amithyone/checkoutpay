@@ -63,6 +63,7 @@ class WhatsappWallet extends Model
         'card_home_address',
         'rubies_account_type',
         'kyc_cac',
+        'kyc_business_name',
         'transfer_email_otp_enabled',
         'money_request_balance_hint_enabled',
         'money_request_paused_until',
@@ -268,6 +269,40 @@ class WhatsappWallet extends Model
         $n = trim((string) $this->sender_name);
 
         return $n !== '' ? $n : null;
+    }
+
+    /**
+     * Registered company name for Mevon create_business_account (same role as Business::registeredBusinessNameForPayIn).
+     * Never use CAC alone as the company name.
+     */
+    public function registeredBusinessNameForPayIn(): string
+    {
+        $explicit = trim((string) ($this->kyc_business_name ?? ''));
+        if ($explicit !== '') {
+            return $explicit;
+        }
+
+        if ($this->relationLoaded('activeBusinessNameRegistration') || $this->active_business_name_registration_id) {
+            $reg = $this->activeBusinessNameRegistration;
+            if ($reg) {
+                foreach (['approved_business_name', 'proposed_name', 'alternate_name'] as $field) {
+                    $candidate = trim((string) ($reg->{$field} ?? ''));
+                    if ($candidate !== '') {
+                        return $candidate;
+                    }
+                }
+            }
+        }
+
+        $sender = $this->normalizedSenderName();
+        if ($sender !== null) {
+            $person = trim(trim((string) $this->kyc_fname).' '.trim((string) $this->kyc_lname));
+            if ($person === '' || strcasecmp($sender, $person) !== 0) {
+                return $sender;
+            }
+        }
+
+        return '';
     }
 
     /** Best display name for P2P / history (sender name, else Tier 2 KYC name). */
