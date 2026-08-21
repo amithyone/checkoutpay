@@ -396,11 +396,31 @@ class VerificationController extends Controller
 
     private function formatPayInUserMessage(string $message): string
     {
-        return match ($message) {
+        $message = trim($message);
+
+        $mapped = match ($message) {
             'pay_in_unavailable' => 'Pay-in account setup is temporarily unavailable. Try again later or contact support.',
             'cac_dob_required' => 'Enter your registered business name, CAC RC or BN number, and signatory date of birth in the pay-in section.',
-            default => $message,
+            default => null,
         };
+        if ($mapped !== null) {
+            return $mapped;
+        }
+
+        // Never expose banking/KYC provider brand names to merchants.
+        $scrubbed = preg_replace(
+            '/\b(MevonPay|Mevon|MavonPay|Mavon|Rubies|Paga|NUBAN\.com\.ng)\b/iu',
+            '',
+            $message
+        ) ?? $message;
+        $scrubbed = preg_replace('/\s{2,}/', ' ', trim($scrubbed, " \t:-–—")) ?? $scrubbed;
+        $scrubbed = preg_replace('/\s+([.,;:!])/u', '$1', $scrubbed) ?? $scrubbed;
+
+        if ($scrubbed === '' || preg_match('/\b(mevon|rubies|paga|imunify|waf|curl|sqlstate|stack trace)\b/i', $scrubbed)) {
+            return 'Something went wrong while finishing setup. Please try again shortly or contact support.';
+        }
+
+        return $scrubbed;
     }
 
     private function isProvisionProcessingMessage(string $message): bool
