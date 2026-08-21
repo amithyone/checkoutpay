@@ -156,10 +156,10 @@ class PaymentService
                     $externalExpiresAt = null;
                 } else {
                     throw new \RuntimeException(
-                        'Could not get a MevonPay account number right now (provider timeout/network). Please retry in a minute.',
-                        0,
-                        $e
-                    );
+                'Could not get an account number right now (provider timeout/network). Please retry in a minute.',
+                0,
+                $e
+            );
                 }
             }
         }

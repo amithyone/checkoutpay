@@ -70,7 +70,7 @@ class VerificationController extends Controller
 
         if ($auto['attempted'] && ! $auto['skipped'] && $this->isProvisionProcessingMessage($auto['message'])) {
             return redirect()->route('business.verification.index')
-                ->with('info', $auto['message']);
+                ->with('info', $this->formatPayInUserMessage($auto['message']));
         }
 
         if ($auto['skipped'] && $auto['message'] === '') {
@@ -270,9 +270,10 @@ class VerificationController extends Controller
                 $identityResult = $mevonVerify->verifyAutomatically($verification->fresh());
                 $verification->refresh();
                 if ($identityResult['ok'] && empty($identityResult['skipped'])) {
-                    $identityVerifyNote = 'Identity verified automatically via Mevon.';
+                    $identityVerifyNote = 'Identity verified automatically.';
                 } elseif (! ($identityResult['skipped'] ?? false)) {
-                    $identityVerifyNote = 'Identity verification could not be completed yet: '.$identityResult['message'];
+                    $identityVerifyNote = 'Identity verification could not be completed yet. '
+                        .$this->formatPayInUserMessage((string) ($identityResult['message'] ?? 'Please try again or contact support.'));
                 }
             }
         }
@@ -287,7 +288,7 @@ class VerificationController extends Controller
 
         if ($auto['attempted'] && ! $auto['skipped'] && $this->isProvisionProcessingMessage($auto['message'])) {
             return redirect()->route('business.verification.index')
-                ->with('info', $auto['message'].' Your submissions are saved.');
+                ->with('info', $this->formatPayInUserMessage($auto['message']).' Your submissions are saved.');
         }
 
         if ($auto['attempted'] && ! $auto['skipped'] && $auto['message'] !== '') {
