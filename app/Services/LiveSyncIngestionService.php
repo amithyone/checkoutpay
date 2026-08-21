@@ -6,6 +6,7 @@ use App\Models\Business;
 use App\Models\LiveSyncEvent;
 use App\Models\Payment;
 use App\Models\Renter;
+use App\Services\LiveSync\LiveSyncOutboundService;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -13,6 +14,13 @@ use Illuminate\Support\Str;
 class LiveSyncIngestionService
 {
     public function ingest(array $payload): array
+    {
+        return LiveSyncOutboundService::withoutOutbound(function () use ($payload) {
+            return $this->ingestUnsafe($payload);
+        });
+    }
+
+    private function ingestUnsafe(array $payload): array
     {
         $eventId = (string) $payload['event_id'];
         $entity = (string) $payload['entity'];
@@ -84,6 +92,7 @@ class LiveSyncIngestionService
             if ($payment) {
                 $payment->delete();
             }
+
             return $transactionId;
         }
 
@@ -95,14 +104,19 @@ class LiveSyncIngestionService
             'transaction_id', 'amount', 'payer_name', 'bank', 'webhook_url',
             'account_number', 'payer_account_number', 'business_id', 'user_id',
             'renter_id', 'business_website_id', 'rental_id', 'status',
-            'payment_source', 'external_reference', 'received_amount',
-            'is_mismatch', 'mismatch_reason', 'matched_at', 'expires_at',
+            'payment_source', 'payment_method_used', 'external_reference',
+            'checkout_pay_code', 'checkout_pay_code_expires_at',
+            'received_amount', 'is_mismatch', 'mismatch_reason', 'matched_at', 'expires_at',
+            'charge_percentage', 'charge_fixed', 'total_charges', 'business_receives',
+            'charges_paid_by_customer', 'webhook_status', 'webhook_attempts', 'webhook_sent_at',
+            'developer_program_partner_business_id', 'developer_program_partner_share_amount',
+            'developer_program_partner_share_credited_at',
         ];
 
         $attributes = Arr::only($data, $allowed);
         $attributes['transaction_id'] = $transactionId;
 
-        if (isset($attributes['status']) && !in_array($attributes['status'], [
+        if (isset($attributes['status']) && ! in_array($attributes['status'], [
             Payment::STATUS_PENDING,
             Payment::STATUS_APPROVED,
             Payment::STATUS_REJECTED,
@@ -111,14 +125,15 @@ class LiveSyncIngestionService
         }
 
         $payment = Payment::withTrashed()->where('transaction_id', $transactionId)->first();
-        if (!$payment) {
-            if (!isset($attributes['amount'])) {
+        if (! $payment) {
+            if (! isset($attributes['amount'])) {
                 throw new \InvalidArgumentException('payment.amount is required for create.');
             }
-            if (!isset($attributes['status'])) {
+            if (! isset($attributes['status'])) {
                 $attributes['status'] = Payment::STATUS_PENDING;
             }
             Payment::create($attributes);
+
             return $transactionId;
         }
 
@@ -149,6 +164,7 @@ class LiveSyncIngestionService
             if ($business) {
                 $business->delete();
             }
+
             return $businessId !== '' ? $businessId : $email;
         }
 
@@ -160,7 +176,7 @@ class LiveSyncIngestionService
             'business_id', 'name', 'email', 'phone', 'address', 'website',
             'webhook_url', 'is_active', 'website_approved', 'timezone',
             'currency', 'charges_paid_by_customer', 'charge_percentage',
-            'charge_fixed', 'charge_exempt',
+            'charge_fixed', 'charge_exempt', 'balance',
         ];
         $attributes = Arr::only($data, $allowed);
         if (isset($attributes['email'])) {
@@ -170,12 +186,13 @@ class LiveSyncIngestionService
             $attributes['business_id'] = strtoupper(trim((string) $attributes['business_id']));
         }
 
-        if (!$business) {
+        if (! $business) {
             if (empty($attributes['email']) || empty($attributes['name'])) {
                 throw new \InvalidArgumentException('business.name and business.email are required for create.');
             }
             $attributes['password'] = Str::random(40);
             Business::create($attributes);
+
             return (string) ($attributes['business_id'] ?? $attributes['email']);
         }
 
@@ -196,6 +213,7 @@ class LiveSyncIngestionService
             if ($renter) {
                 $renter->delete();
             }
+
             return $email;
         }
 
@@ -212,12 +230,13 @@ class LiveSyncIngestionService
         $attributes = Arr::only($data, $allowed);
         $attributes['email'] = $email;
 
-        if (!$renter) {
+        if (! $renter) {
             if (empty($attributes['name'])) {
                 throw new \InvalidArgumentException('renter.name is required for create.');
             }
             $attributes['password'] = Str::random(40);
             Renter::create($attributes);
+
             return $email;
         }
 
@@ -226,6 +245,7 @@ class LiveSyncIngestionService
         }
 
         $renter->fill($attributes)->save();
+
         return $email;
     }
 }

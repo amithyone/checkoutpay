@@ -1,131 +1,103 @@
-# Live Sync Secure API (Receiver)
+# Live Sync (Namecheap → Contabo)
 
-This app now exposes a secure receiver endpoint for your live transmitter site:
+Namecheap is the **live source of truth**. Contabo receives signed upserts so its DB stays aligned.
 
-- `POST /api/v1/sync/live`
+- Receiver (Contabo): `POST /api/v1/sync/live`
+- Transmitter (Namecheap): model observers + `php artisan live-sync:push`
 
-Security controls:
+Entities: `payment`, `business`, `renter`  
+Operations: `upsert`, `delete`
 
-- HMAC-SHA256 signature (`X-LiveSync-Signature`)
-- key id check (`X-LiveSync-Key`)
-- timestamp drift check (`X-LiveSync-Timestamp`)
-- nonce replay protection (`X-LiveSync-Nonce`)
-- optional source IP allowlist (`LIVE_SYNC_ALLOWED_IPS`)
-- payload validation + strict entity/operation whitelist
-- idempotency via `event_id` (`live_sync_events` table)
+## Contabo (receiver) — already this host
 
-## 1) Receiver env setup
-
-Set these in this app's `.env`:
+In `.error`:
 
 ```env
 LIVE_SYNC_ENABLED=true
+LIVE_SYNC_TRANSMIT_ENABLED=false
 LIVE_SYNC_KEY_ID=live-site-1
-LIVE_SYNC_SECRET=put-a-long-random-secret-here
+LIVE_SYNC_SECRET=<same-long-secret>
 LIVE_SYNC_MAX_DRIFT_SECONDS=300
 LIVE_SYNC_NONCE_TTL_SECONDS=600
-LIVE_SYNC_ALLOWED_IPS=
+# Optional: Namecheap server egress IP(s)
+# LIVE_SYNC_ALLOWED_IPS=
 ```
 
-Then run:
+Then:
 
 ```bash
 php artisan config:clear
-php artisan migrate
 ```
 
-## 2) Required headers from transmitter
+Probe (must be 401 without headers):
+
+```bash
+curl -sS -X POST https://check-outnow.com/api/v1/sync/live -H 'Content-Type: application/json' -d '{}'
+```
+
+Watch ingest:
+
+```bash
+php artisan tinker --execute='echo App\Models\LiveSyncEvent::count()."\n"; echo optional(App\Models\LiveSyncEvent::latest("id")->first())->created_at;'
+```
+
+## Namecheap (transmitter) — after you `git pull`
+
+In Namecheap `.error` / `.env`:
+
+```env
+LIVE_SYNC_ENABLED=false
+LIVE_SYNC_TRANSMIT_ENABLED=true
+LIVE_SYNC_RECEIVER_URL=https://check-outnow.com/api/v1/sync/live
+LIVE_SYNC_RECEIVER_PATH=/api/v1/sync/live
+LIVE_SYNC_KEY_ID=live-site-1
+LIVE_SYNC_SECRET=<same-secret-as-contabo>
+LIVE_SYNC_SOURCE_NAME=namecheap-live
+LIVE_SYNC_QUEUE=true
+LIVE_SYNC_TIMEOUT_SECONDS=15
+```
+
+Then:
+
+```bash
+php artisan config:clear
+# Ensure a queue worker is running if LIVE_SYNC_QUEUE=true
+php artisan queue:work --queue=default
+```
+
+### Catch-up (run on Namecheap)
+
+```bash
+# recent payments first
+php artisan live-sync:push --entity=payment --since=2026-08-01 --limit=2000 --sync
+
+php artisan live-sync:push --entity=business --limit=500 --sync
+php artisan live-sync:push --entity=renter --limit=2000 --sync
+```
+
+Ongoing: saving/deleting Payment, Business, or Renter on Namecheap queues a push to Contabo automatically.
+
+## Security (headers)
 
 - `X-LiveSync-Key`
 - `X-LiveSync-Timestamp` (unix seconds)
-- `X-LiveSync-Nonce` (unique per request, e.g. UUID)
-- `X-LiveSync-Signature` (hex hmac)
-- `Content-Type: application/json`
+- `X-LiveSync-Nonce` (UUID)
+- `X-LiveSync-Signature` (HMAC-SHA256 hex)
 
-## 3) Signature algorithm (must match receiver)
+Canonical string:
 
-`body_hash = sha256(raw_json_body)`
-
-`canonical = METHOD + "\n" + PATH + "\n" + TIMESTAMP + "\n" + NONCE + "\n" + body_hash`
-
-Where:
-
-- `METHOD` is uppercase (`POST`)
-- `PATH` is exact path string with leading slash (`/api/v1/sync/live`)
-
-`signature = HMAC_SHA256(canonical, LIVE_SYNC_SECRET)` as lowercase hex.
-
-## 4) Payload format
-
-```json
-{
-  "event_id": "c5ef0f57-e8a7-4f9e-88ea-ff8a5de06f61",
-  "source": "live-site",
-  "entity": "payment",
-  "operation": "upsert",
-  "sent_at": "2026-04-15T10:00:00Z",
-  "data": {
-    "transaction_id": "TX-123",
-    "amount": 5000,
-    "status": "approved",
-    "business_id": 12
-  }
-}
+```text
+POST
+/api/v1/sync/live
+{timestamp}
+{nonce}
+{sha256(raw_json_body)}
 ```
 
-Supported:
+`signature = HMAC_SHA256(canonical, LIVE_SYNC_SECRET)` lowercase hex.
 
-- `entity`: `payment`, `business`, `renter`
-- `operation`: `upsert`, `delete`
+## Do not
 
-Delete uses identifier fields:
-
-- payment: `transaction_id`
-- business: `business_id` or `email`
-- renter: `email`
-
-## 5) Node.js transmitter example
-
-```js
-import crypto from "crypto";
-
-const url = "https://receiver-domain.com/api/v1/sync/live";
-const method = "POST";
-const path = "/api/v1/sync/live";
-const keyId = process.env.LIVE_SYNC_KEY_ID;
-const secret = process.env.LIVE_SYNC_SECRET;
-const timestamp = String(Math.floor(Date.now() / 1000));
-const nonce = crypto.randomUUID();
-
-const payload = {
-  event_id: crypto.randomUUID(),
-  source: "live-site",
-  entity: "payment",
-  operation: "upsert",
-  sent_at: new Date().toISOString(),
-  data: {
-    transaction_id: "TX-123",
-    amount: 5000,
-    status: "pending"
-  }
-};
-
-const body = JSON.stringify(payload);
-const bodyHash = crypto.createHash("sha256").update(body).digest("hex");
-const canonical = [method, path, timestamp, nonce, bodyHash].join("\n");
-const signature = crypto.createHmac("sha256", secret).update(canonical).digest("hex");
-
-const res = await fetch(url, {
-  method,
-  headers: {
-    "Content-Type": "application/json",
-    "X-LiveSync-Key": keyId,
-    "X-LiveSync-Timestamp": timestamp,
-    "X-LiveSync-Nonce": nonce,
-    "X-LiveSync-Signature": signature
-  },
-  body
-});
-
-console.log(await res.text());
-```
+- Enable `LIVE_SYNC_TRANSMIT_ENABLED` on Contabo (echo loop risk).
+- Point Namecheap receiver URL at itself.
+- Expect wallet / Mevon ledger / VTU tables to sync yet — only payment, business, renter today.

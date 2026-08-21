@@ -160,12 +160,23 @@ return [
     ],
 
     'live_sync' => [
+        // Receiver (Contabo / backup): accept POST /api/v1/sync/live
         'enabled' => (bool) env('LIVE_SYNC_ENABLED', false),
         'key_id' => env('LIVE_SYNC_KEY_ID', 'live-site-1'),
         'secret' => env('LIVE_SYNC_SECRET', ''),
         'max_drift_seconds' => (int) env('LIVE_SYNC_MAX_DRIFT_SECONDS', 300),
         'nonce_ttl_seconds' => (int) env('LIVE_SYNC_NONCE_TTL_SECONDS', 600),
         'allowed_ips' => array_values(array_filter(array_map('trim', explode(',', (string) env('LIVE_SYNC_ALLOWED_IPS', ''))))),
+
+        // Transmitter (Namecheap / live source of truth): push to Contabo receiver
+        'transmit_enabled' => (bool) env('LIVE_SYNC_TRANSMIT_ENABLED', false),
+        'receiver_url' => rtrim((string) env('LIVE_SYNC_RECEIVER_URL', ''), '/'),
+        'receiver_path' => (string) env('LIVE_SYNC_RECEIVER_PATH', '/api/v1/sync/live'),
+        'source_name' => (string) env('LIVE_SYNC_SOURCE_NAME', 'namecheap-live'),
+        'timeout_seconds' => max(3, (int) env('LIVE_SYNC_TIMEOUT_SECONDS', 15)),
+        'queue' => (bool) env('LIVE_SYNC_QUEUE', true),
+        'queue_connection' => env('LIVE_SYNC_QUEUE_CONNECTION'),
+        'queue_name' => env('LIVE_SYNC_QUEUE_NAME', 'default'),
     ],
 
 ];
