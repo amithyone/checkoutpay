@@ -144,8 +144,8 @@ class WhatsappWalletAdminController extends Controller
 
         $isNigeriaWallet = $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164);
         $kycProvisionConfigured = $this->privateAccountProvision->isConfigured();
-        $kycPersonalReadiness = $isNigeriaWallet
-            ? $this->privateAccountProvision->personalReadiness($wallet)
+        $kycPayInReadiness = $isNigeriaWallet
+            ? $this->privateAccountProvision->walletPayInReadiness($wallet)
             : ['ready' => false, 'missing' => ['Tier 2 Rubies accounts are only for Nigeria wallet numbers.']];
 
         $otpLockout = $this->walletOtp->lockoutStatusForAdmin((string) $wallet->phone_e164);
@@ -168,7 +168,9 @@ class WhatsappWalletAdminController extends Controller
             'referralsMadeCount' => $wallet->referralsAsReferrer->count(),
             'isNigeriaWallet' => $isNigeriaWallet,
             'kycProvisionConfigured' => $kycProvisionConfigured,
-            'kycPersonalReadiness' => $kycPersonalReadiness,
+            'kycPayInReadiness' => $kycPayInReadiness,
+            // Back-compat alias used by older blade snippets
+            'kycPersonalReadiness' => $kycPayInReadiness,
             'otpLockout' => $otpLockout,
         ]);
     }

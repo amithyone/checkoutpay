@@ -213,6 +213,82 @@ final class PrivateAccountProvisionService
      * @param  array<string, mixed>  $input
      * @return array{ready: bool, missing: list<string>}
      */
+    /**
+     * Admin / UI readiness for permanent pay-in (personal vs business wallet account type).
+     *
+     * @return array{ready: bool, missing: list<string>}
+     */
+    public function walletPayInReadiness(WhatsappWallet $wallet): array
+    {
+        $wallet->refresh();
+
+        if (($wallet->rubies_account_type ?? 'personal') === 'business') {
+            return $this->personalBusinessReadiness($wallet);
+        }
+
+        return $this->personalReadiness($wallet);
+    }
+
+    /**
+     * @return array{ready: bool, missing: list<string>}
+     */
+    public function personalBusinessReadiness(WhatsappWallet $wallet, array $input = []): array
+    {
+        $wallet->refresh();
+        $missing = [];
+
+        if (trim((string) $wallet->mevon_virtual_account_number) !== '') {
+            return ['ready' => false, 'missing' => ['Permanent account already exists.']];
+        }
+
+        if (! $this->privateAccount->isConfigured()) {
+            return ['ready' => false, 'missing' => ['Tier 2 provisioning is not configured.']];
+        }
+
+        $cac = Business::normalizeCacRegistrationNumber((string) ($input['cac'] ?? $wallet->kyc_cac ?? ''));
+        $dob = (string) ($input['dob'] ?? optional($wallet->kyc_dob)?->format('Y-m-d') ?? '');
+        $email = strtolower(trim((string) ($input['email'] ?? $wallet->kyc_email ?? '')));
+        $bvn = preg_replace('/\D+/', '', (string) ($input['bvn'] ?? $wallet->kyc_bvn ?? '')) ?? '';
+        $fname = trim((string) ($input['fname'] ?? $wallet->kyc_fname ?? ''));
+        $lname = trim((string) ($input['lname'] ?? $wallet->kyc_lname ?? ''));
+        $businessName = trim((string) ($input['business_name'] ?? $wallet->kyc_business_name ?? ''));
+        if ($businessName === '') {
+            $businessName = $wallet->registeredBusinessNameForPayIn();
+        }
+
+        if ($cac === '' || strlen($cac) < 3) {
+            $missing[] = 'CAC / registration number is required.';
+        } elseif ($cacErr = WhatsappWalletKycInputGuard::cacError($cac)) {
+            $missing[] = $cacErr;
+        }
+        if ($fname === '' || $lname === '') {
+            $missing[] = 'Signatory first and last name are required.';
+        }
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $dob)) {
+            $missing[] = 'Valid date of birth is required.';
+        }
+        if ($email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $missing[] = 'Valid email is required.';
+        } elseif ($emailErr = WhatsappWalletKycInputGuard::emailError($email)) {
+            $missing[] = $emailErr;
+        }
+        if (strlen($bvn) !== 11) {
+            $missing[] = 'Signatory BVN (11 digits) is required.';
+        } elseif ($bvnErr = WhatsappWalletKycInputGuard::bvnOrNinError($bvn, 'BVN')) {
+            $missing[] = $bvnErr;
+        }
+        if ($businessName === '' || strcasecmp($businessName, $cac) === 0) {
+            $missing[] = 'Registered business name is required (company name on CAC — not the RC/BN number alone).';
+        }
+
+        $status = (string) ($wallet->private_account_provision_status ?? '');
+        if (in_array($status, [self::STATUS_QUEUED, self::STATUS_PROCESSING], true)) {
+            return ['ready' => false, 'missing' => ['Account creation is already in progress.']];
+        }
+
+        return ['ready' => $missing === [], 'missing' => $missing];
+    }
+
     public function personalReadiness(WhatsappWallet $wallet, array $input = []): array
     {
         $wallet->refresh();
@@ -444,8 +520,17 @@ final class PrivateAccountProvisionService
             $missing[] = 'Account creation is already in progress.';
         }
 
-        if ($missing !== [] && ! ($forceRetry && $wallet->private_account_provision_status === self::STATUS_FAILED)) {
-            return ['dispatched' => false, 'message' => implode(' ', $missing), 'missing' => $missing];
+        if ($missing !== []) {
+            $blocking = $missing;
+            if ($forceRetry && $wallet->private_account_provision_status === self::STATUS_FAILED) {
+                $blocking = array_values(array_filter(
+                    $missing,
+                    fn (string $item) => $item !== 'Account creation is already in progress.'
+                ));
+            }
+            if ($blocking !== []) {
+                return ['dispatched' => false, 'message' => implode(' ', $blocking), 'missing' => $blocking];
+            }
         }
 
         $wallet->update([
@@ -560,7 +645,7 @@ final class PrivateAccountProvisionService
             return $this->dispatchPersonalFromStoredKyc($wallet, forceRetry: true);
         }
 
-        $readiness = $this->personalReadiness($wallet);
+        $readiness = $this->walletPayInReadiness($wallet);
         $blocking = array_values(array_filter(
             $readiness['missing'],
             fn (string $item) => $item !== 'Account creation is already in progress.'
@@ -575,7 +660,7 @@ final class PrivateAccountProvisionService
 
         $options = [];
         if (($wallet->rubies_account_type ?? 'personal') === 'business') {
-            $cac = \App\Models\Business::normalizeCacRegistrationNumber((string) ($wallet->kyc_cac ?? ''));
+            $cac = Business::normalizeCacRegistrationNumber((string) ($wallet->kyc_cac ?? ''));
             $businessName = $wallet->registeredBusinessNameForPayIn();
             $options = [
                 'account_kind' => 'business',
