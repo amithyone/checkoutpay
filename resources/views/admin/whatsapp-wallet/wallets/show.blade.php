@@ -191,10 +191,10 @@
                             <dt class="text-gray-500">KYC verified at</dt>
                             <dd>{{ $wallet->kyc_verified_at?->format('M j, Y H:i') ?? '—' }}</dd>
                         </div>
-                        @if(($wallet->rubies_account_type ?? 'personal') === 'business')
+                        @if(filled($wallet->kyc_cac) || ($wallet->rubies_account_type ?? 'personal') === 'business')
                             <div class="sm:col-span-2">
-                                <dt class="text-gray-500">CAC</dt>
-                                <dd class="font-mono">{{ $wallet->kyc_cac ?? '—' }}</dd>
+                                <dt class="text-gray-500">CAC / business registration</dt>
+                                <dd class="font-mono">{{ $wallet->kyc_cac ?: '—' }}</dd>
                             </div>
                         @endif
                         <div>
@@ -318,6 +318,19 @@
                                 @csrf
                                 @method('PUT')
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                        <label class="block text-gray-600 mb-1">Account type</label>
+                                        <select name="rubies_account_type" class="w-full rounded-lg border border-gray-300 px-3 py-2">
+                                            <option value="personal" @selected(old('rubies_account_type', $wallet->rubies_account_type ?? 'personal') === 'personal')>Personal</option>
+                                            <option value="business" @selected(old('rubies_account_type', $wallet->rubies_account_type ?? 'personal') === 'business')>Business</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-gray-600 mb-1">CAC / business registration (RC/BN)</label>
+                                        <input type="text" name="kyc_cac" value="{{ old('kyc_cac', $wallet->kyc_cac) }}"
+                                               maxlength="100" placeholder="e.g. RC1234567 or BN1234567"
+                                               class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono uppercase">
+                                    </div>
                                     <div>
                                         <label class="block text-gray-600 mb-1">First name</label>
                                         <input type="text" name="kyc_fname" value="{{ old('kyc_fname', $wallet->kyc_fname) }}"
