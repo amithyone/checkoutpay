@@ -49,7 +49,7 @@ class WhatsappWalletAdminController extends Controller
 
     public function wallets(Request $request): View
     {
-        $query = WhatsappWallet::query()->orderByDesc('id');
+        $query = WhatsappWallet::query();
 
         if ($request->filled('search')) {
             $query->search((string) $request->query('search'));
@@ -79,10 +79,26 @@ class WhatsappWalletAdminController extends Controller
             $query->where('admin_bot_paused', true);
         }
 
+        $sort = (string) $request->query('sort', 'newest');
+        if (! in_array($sort, ['newest', 'oldest', 'most_active'], true)) {
+            $sort = 'newest';
+        }
+
+        match ($sort) {
+            'oldest' => $query->orderBy('id'),
+            'most_active' => $query
+                ->withMax('transactions as last_activity_at', 'created_at')
+                ->orderByRaw('last_activity_at IS NULL')
+                ->orderByDesc('last_activity_at')
+                ->orderByDesc('id'),
+            default => $query->orderByDesc('id'),
+        };
+
         $wallets = $query->paginate(25)->withQueryString();
 
         return view('admin.whatsapp-wallet.wallets.index', [
             'wallets' => $wallets,
+            'sort' => $sort,
         ]);
     }
 

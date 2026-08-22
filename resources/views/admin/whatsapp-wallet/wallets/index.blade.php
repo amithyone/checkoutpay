@@ -19,12 +19,20 @@
     </div>
 
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <form method="GET" action="{{ route('admin.whatsapp-wallet.wallets.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <form method="GET" action="{{ route('admin.whatsapp-wallet.wallets.index') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             <div class="sm:col-span-2">
                 <label class="block text-xs font-medium text-gray-700 mb-1">Search</label>
                 <input type="text" name="search" value="{{ request('search') }}"
                     placeholder="Phone, pay code, name, VA number…"
                     class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Sort</label>
+                <select name="sort" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    <option value="newest" @selected($sort === 'newest')>Newest first</option>
+                    <option value="oldest" @selected($sort === 'oldest')>Oldest first</option>
+                    <option value="most_active" @selected($sort === 'most_active')>Most active</option>
+                </select>
             </div>
             <div>
                 <label class="block text-xs font-medium text-gray-700 mb-1">Status</label>
@@ -52,11 +60,14 @@
                     Manual chat
                 </label>
             </div>
-            <div class="flex items-end gap-2 lg:col-span-5">
+            <div class="flex items-end gap-2 lg:col-span-6">
                 <button type="submit" class="bg-primary text-white px-4 py-2 rounded-lg text-sm">Filter</button>
                 <a href="{{ route('admin.whatsapp-wallet.wallets.index') }}" class="text-sm text-gray-600 py-2">Reset</a>
             </div>
         </form>
+        @if($sort === 'most_active')
+            <p class="text-xs text-gray-500 mt-3">Most active = latest wallet transaction (top-ups, transfers, VTU, etc.). Wallets with no transactions appear last.</p>
+        @endif
     </div>
 
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
