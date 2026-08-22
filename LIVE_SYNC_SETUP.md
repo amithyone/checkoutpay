@@ -71,11 +71,44 @@ php artisan live-sync:incremental --sync
 
 Only processes rows with `id > saved cursor`. No full-table re-scan.
 
-Enable cron on Namecheap:
+Enable cron on Namecheap (Laravel scheduler):
 
 ```env
 LIVE_SYNC_INCREMENTAL_CRON=true
 LIVE_SYNC_INCREMENTAL_CRON_MINUTES=5
+```
+
+### HTTP cron URL (cPanel / external cron on Namecheap)
+
+Same token as other cron jobs (`CRON_EMAIL_FETCH_TOKEN`):
+
+```bash
+# Incremental — new rows only (recommended every 5–15 min)
+curl -sS "https://check-outpay.com/cron/live-sync?token=YOUR_CRON_TOKEN"
+
+# Incremental + refresh bank float
+curl -sS "https://check-outpay.com/cron/live-sync?token=YOUR_CRON_TOKEN&float=1"
+
+# Heavy full backfill (manual only)
+curl -sS "https://check-outpay.com/cron/live-sync?token=YOUR_CRON_TOKEN&mode=full&no-probe=1"
+```
+
+| Query param | Default | Meaning |
+|-------------|---------|---------|
+| `token` | required | `CRON_EMAIL_FETCH_TOKEN` |
+| `mode` | `incremental` | `incremental` or `full` |
+| `float` | off | `1` = also upsert float balances |
+| `entity` | `common` | Entity preset |
+| `no-probe` | off | `1` = skip probe on full fill |
+
+### Payment timestamps
+
+Sync preserves live `created_at`, `updated_at`, and `matched_at` (`LIVE_SYNC_PRESERVE_TIMESTAMPS=true`).
+
+Rows already on Contabo with today's date (from earlier insert-only sync) can be repaired:
+
+```bash
+php artisan live-sync:push --entity=payment --mode=recent --force-all --sync --chunk=25
 ```
 
 ### Push / refresh — `live-sync:push`

@@ -382,6 +382,7 @@ final class LiveSyncGenericEngine
         unset($fill['id']);
 
         $local->fill($fill);
+        $this->applyPreservedTimestamps($local, $data, $cfg, ! $local->exists);
         $local->save();
 
         $nk = $this->naturalKeyValue($entity, $data, $local);
@@ -577,5 +578,36 @@ final class LiveSyncGenericEngine
         }
 
         return $attrs;
+    }
+
+    /**
+     * Keep original created_at / updated_at from live (Payment etc. are not fillable for these).
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $cfg
+     */
+    private function applyPreservedTimestamps(Model $local, array $data, array $cfg, bool $isNew): void
+    {
+        $enabled = (bool) ($cfg['preserve_timestamps'] ?? config('live_sync.preserve_timestamps', true));
+        if (! $enabled) {
+            return;
+        }
+
+        $columns = $isNew
+            ? ['created_at', 'updated_at']
+            : (array_filter([
+                'updated_at',
+                ($cfg['preserve_created_at_on_update'] ?? config('live_sync.preserve_created_at_on_update', true))
+                    ? 'created_at'
+                    : null,
+            ]));
+
+        $local->timestamps = false;
+        foreach ($columns as $column) {
+            if (! array_key_exists($column, $data) || $data[$column] === null || $data[$column] === '') {
+                continue;
+            }
+            $local->setAttribute($column, $data[$column]);
+        }
     }
 }

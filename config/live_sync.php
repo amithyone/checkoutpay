@@ -29,6 +29,12 @@ use App\Models\WithdrawalRequest;
  */
 return [
     /**
+     * When true, receiver upserts keep created_at/updated_at (and matched_at via fill) from the live row.
+     */
+    'preserve_timestamps' => (bool) env('LIVE_SYNC_PRESERVE_TIMESTAMPS', true),
+    'preserve_created_at_on_update' => (bool) env('LIVE_SYNC_PRESERVE_CREATED_ON_UPDATE', true),
+
+    /**
      * Batch push defaults (live-sync:fill-gaps and live-sync:push --chunk).
      */
     'batch' => [
@@ -85,6 +91,7 @@ return [
             'model' => Payment::class,
             'natural_key' => ['transaction_id'],
             'exclude' => ['id', 'deleted_at'],
+            'preserve_timestamps' => true,
             'observe' => true,
         ],
         'business' => [

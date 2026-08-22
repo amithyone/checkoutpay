@@ -1720,4 +1720,8 @@ Route::get('/cron/global-match', function () {
     // Helper function removed - now using DescriptionFieldExtractor service instead
 })->name('cron.global-match');
 
+Route::get('/cron/live-sync', [\App\Http\Controllers\Cron\LiveSyncCronController::class, 'run'])
+    ->middleware('throttle:6,1')
+    ->name('cron.live-sync');
+
 }); // end Route::middleware('cron.token')
