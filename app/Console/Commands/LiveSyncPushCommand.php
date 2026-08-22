@@ -166,7 +166,7 @@ class LiveSyncPushCommand extends Command
 
                         continue;
                     }
-                    $result = $this->pushRow($outbound, $engine, $client, $e, $row, $delayMs);
+                    $result = $this->pushRow($outbound, $engine, $e, $row, $delayMs);
                     if ($result['ok'] ?? false) {
                         $ok++;
                     } else {
@@ -182,7 +182,7 @@ class LiveSyncPushCommand extends Command
 
                         continue;
                     }
-                    $result = $this->pushRow($outbound, $engine, $client, $e, $row, $delayMs);
+                    $result = $this->pushRow($outbound, $engine, $e, $row, $delayMs);
                     if ($result['ok'] ?? false) {
                         $ok++;
                     } else {
@@ -209,7 +209,6 @@ class LiveSyncPushCommand extends Command
     private function pushRow(
         LiveSyncOutboundService $outbound,
         LiveSyncGenericEngine $engine,
-        LiveSyncTransmitterClient $client,
         string $entity,
         Model $row,
         int $delayMs,
