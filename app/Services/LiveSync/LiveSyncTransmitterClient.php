@@ -67,33 +67,41 @@ final class LiveSyncTransmitterClient
             $path = '/api/v1/sync/live/probe';
         }
 
-        $result = $this->signedPost($url, $path, [
-            'entity' => $entity,
-            'keys' => $keys,
-        ]);
+        $chunkSize = max(50, min(500, (int) config('live_sync.batch.probe_chunk', 100)));
+        $missing = [];
+        $present = [];
 
-        if (! ($result['ok'] ?? false)) {
-            $detail = (string) ($result['message'] ?? 'Probe failed');
-            $status = $result['status'] ?? null;
-            if (is_array($result['body'] ?? null) && isset($result['body']['message'])) {
-                $detail = (string) $result['body']['message'];
+        foreach (array_chunk($keys, $chunkSize) as $chunk) {
+            $result = $this->signedPost($url, $path, [
+                'entity' => $entity,
+                'keys' => $chunk,
+            ]);
+
+            if (! ($result['ok'] ?? false)) {
+                $detail = (string) ($result['message'] ?? 'Probe failed');
+                $status = $result['status'] ?? null;
+                if (is_array($result['body'] ?? null) && isset($result['body']['message'])) {
+                    $detail = (string) $result['body']['message'];
+                }
+
+                return [
+                    'ok' => false,
+                    'missing' => [],
+                    'present' => [],
+                    'message' => $status ? "HTTP {$status}: {$detail}" : $detail,
+                ];
             }
 
-            return [
-                'ok' => false,
-                'missing' => [],
-                'present' => [],
-                'message' => $status ? "HTTP {$status}: {$detail}" : $detail,
-            ];
+            $data = is_array($result['body']['data'] ?? null) ? $result['body']['data'] : [];
+            array_push($missing, ...array_map('strval', $data['missing'] ?? []));
+            array_push($present, ...array_map('strval', $data['present'] ?? []));
         }
-
-        $data = is_array($result['body']['data'] ?? null) ? $result['body']['data'] : [];
 
         return [
             'ok' => true,
-            'missing' => array_values(array_map('strval', $data['missing'] ?? [])),
-            'present' => array_values(array_map('strval', $data['present'] ?? [])),
-            'message' => (string) ($result['message'] ?? 'OK'),
+            'missing' => array_values(array_unique($missing)),
+            'present' => array_values(array_unique($present)),
+            'message' => 'OK',
         ];
     }
 
@@ -184,30 +192,32 @@ final class LiveSyncTransmitterClient
             return ['ok' => false, 'message' => 'Failed to encode sync payload.'];
         }
 
-        $timestamp = (string) time();
-        $nonce = (string) Str::uuid();
-        $bodyHash = hash('sha256', $body);
-        $canonical = implode("\n", ['POST', $path, $timestamp, $nonce, $bodyHash]);
-        $signature = hash_hmac('sha256', $canonical, (string) config('services.live_sync.secret'));
-
         $maxAttempts = 3;
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $auth = $this->signRequest($path, $body);
+
             try {
                 $response = Http::timeout((int) config('services.live_sync.timeout_seconds', 15))
                     ->withHeaders([
                         'Content-Type' => 'application/json',
                         'Accept' => 'application/json',
                         'X-LiveSync-Key' => (string) config('services.live_sync.key_id'),
-                        'X-LiveSync-Timestamp' => $timestamp,
-                        'X-LiveSync-Nonce' => $nonce,
-                        'X-LiveSync-Signature' => $signature,
+                        'X-LiveSync-Timestamp' => $auth['timestamp'],
+                        'X-LiveSync-Nonce' => $auth['nonce'],
+                        'X-LiveSync-Signature' => $auth['signature'],
                     ])
                     ->withBody($body, 'application/json')
                     ->post($url);
 
-                if ($response->status() === 429 && $attempt < $maxAttempts) {
-                    $retryAfter = (int) ($response->header('Retry-After') ?: 5);
-                    usleep(max(1, $retryAfter) * 1_000_000);
+                $retryable = in_array($response->status(), [409, 429], true);
+                if ($retryable && $attempt < $maxAttempts) {
+                    if ($response->status() === 429) {
+                        $retryAfter = (int) ($response->header('Retry-After') ?: 5);
+                        usleep(max(1, $retryAfter) * 1_000_000);
+                    } else {
+                        // 409 replay: prior attempt likely reached Contabo; fresh nonce and retry.
+                        usleep(500_000);
+                    }
 
                     continue;
                 }
@@ -247,6 +257,24 @@ final class LiveSyncTransmitterClient
         }
 
         return ['ok' => false, 'message' => 'Transmit failed after retries'];
+    }
+
+    /**
+     * @return array{timestamp: string, nonce: string, signature: string}
+     */
+    private function signRequest(string $path, string $body): array
+    {
+        $timestamp = (string) time();
+        $nonce = (string) Str::uuid();
+        $bodyHash = hash('sha256', $body);
+        $canonical = implode("\n", ['POST', $path, $timestamp, $nonce, $bodyHash]);
+        $signature = hash_hmac('sha256', $canonical, (string) config('services.live_sync.secret'));
+
+        return [
+            'timestamp' => $timestamp,
+            'nonce' => $nonce,
+            'signature' => $signature,
+        ];
     }
 
     private function receiverUrl(): string

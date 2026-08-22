@@ -34,7 +34,7 @@ return [
     'batch' => [
         'chunk_size' => max(1, min(50, (int) env('LIVE_SYNC_BATCH_CHUNK_SIZE', 25))),
         'max_events' => max(1, min(50, (int) env('LIVE_SYNC_BATCH_MAX_EVENTS', 50))),
-        'probe_chunk' => max(50, min(500, (int) env('LIVE_SYNC_PROBE_CHUNK_SIZE', 500))),
+        'probe_chunk' => max(50, min(500, (int) env('LIVE_SYNC_PROBE_CHUNK_SIZE', 100))),
     ],
 
     /**
