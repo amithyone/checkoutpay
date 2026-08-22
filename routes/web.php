@@ -770,6 +770,7 @@ Route::get('/cron/peer-loans/collect-monthly', [\App\Http\Controllers\Cron\PeerL
 Route::get('/cron/wallet/inactive-reminders/morning', [\App\Http\Controllers\Cron\WalletInactiveReminderCronController::class, 'sendMorning'])->name('cron.wallet.inactive-reminders.morning');
 Route::get('/cron/wallet/inactive-reminders/evening', [\App\Http\Controllers\Cron\WalletInactiveReminderCronController::class, 'sendEvening'])->name('cron.wallet.inactive-reminders.evening');
 Route::get('/cron/process-kyc-queue', [\App\Http\Controllers\Cron\KycProvisionCronController::class, 'process'])->name('cron.process-kyc-queue');
+Route::get('/cron/wallet/provision-tier2-batch', [\App\Http\Controllers\Cron\WalletTier2BatchCronController::class, 'provision'])->name('cron.wallet.provision-tier2-batch');
 
 // Master Email Processing Cron (All 3 Steps Sequentially)
 Route::get('/cron/process-emails', function () {

@@ -428,6 +428,50 @@ class WhatsappWalletBankPayoutService
     }
 
     /**
+     * Faster name enquiry for bulk import: primary NIP code only, then NUBAN.
+     * Avoids trying up to 8 Mevon variants (each can take the full HTTP timeout).
+     *
+     * @return array{account_name: string, bank_code: string}|null
+     */
+    public function nameEnquiryPrimary(string $bankCode, string $accountNumber): ?array
+    {
+        $bankCode = NigerianBankCodeNormalizer::toNipTransferCode($bankCode);
+
+        $acct = preg_replace('/\D/', '', $accountNumber) ?? '';
+        if (strlen($acct) !== 10) {
+            return null;
+        }
+
+        if ($this->bankService->isConfigured()) {
+            $ne = $this->bankService->nameEnquiry($bankCode, $acct);
+            if (is_array($ne) && trim((string) ($ne['account_name'] ?? '')) !== '') {
+                $name = trim((string) $ne['account_name']);
+                if ($name !== '' && ! $this->isWeakVerifiedName($name)) {
+                    return [
+                        'account_name' => $name,
+                        'bank_code' => (string) ($ne['bank_code'] ?? $bankCode),
+                    ];
+                }
+            }
+        }
+
+        if ($this->nuban->isConfigured()) {
+            $n = $this->nuban->validate($acct, $bankCode);
+            if (is_array($n) && ! empty($n['account_name'])) {
+                $name = trim((string) $n['account_name']);
+                if ($name !== '' && ! $this->isWeakVerifiedName($name)) {
+                    return [
+                        'account_name' => $name,
+                        'bank_code' => (string) ($n['bank_code'] ?? $bankCode),
+                    ];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * MevonPay/NIBSS sometimes expect 3-digit legacy codes; fintechs use 6-digit. Try a small set of variants.
      *
      * @return list<string>

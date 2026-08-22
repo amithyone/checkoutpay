@@ -49,6 +49,7 @@ database/backups/*.sql
 database/backups/*.zip
 database/backups/imports/*.csv
 database/backups/imports/*.csv.gz
+database/backups/imports/sterilized/
 
 # Prepared payment import CSVs (large)
 /storage/app/payment-imports/
