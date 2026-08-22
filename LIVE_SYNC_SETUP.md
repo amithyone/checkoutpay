@@ -26,6 +26,8 @@ Still **not** synced: admins, sessions, cache, jobs, nigtax, rentals catalog, de
 
 Insert-only: probes Contabo, pushes rows that are **absent**, skips everything already there. Uses **batch HTTP** (25 events/request by default) and **id cursor** pagination so you do not re-run the same command 50 times.
 
+`--entity=common` syncs the money path **except** renter/business/whatsapp_wallet balances (run `live-sync:push --entity=float` for those first).
+
 Run on **Namecheap** only:
 
 ```bash

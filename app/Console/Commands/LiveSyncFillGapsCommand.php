@@ -46,17 +46,30 @@ class LiveSyncFillGapsCommand extends Command
         }
 
         $entityOpt = strtolower(trim((string) $this->option('entity')));
-        $entities = match ($entityOpt) {
-            'common', 'all' => $engine->commonEntities(),
-            default => [$entityOpt],
-        };
-
         $floatSet = $engine->floatEntities();
-        if ($entityOpt === 'float' || count(array_intersect($entities, $floatSet)) > 0) {
+
+        if ($entityOpt === 'float') {
             $this->error('fill-gaps is insert-only and skips existing rows. Float/balances need overwrite:');
             $this->line('  php artisan live-sync:push --entity=float --mode=recent --force-all --limit=500 --sync --chunk=25');
 
             return self::FAILURE;
+        }
+
+        $entities = match ($entityOpt) {
+            'common', 'all' => array_values(array_diff($engine->commonEntities(), $floatSet)),
+            default => [$entityOpt],
+        };
+
+        if ($entities === []) {
+            $this->error('No entities to sync.');
+
+            return self::FAILURE;
+        }
+
+        if ($entityOpt === 'common' || $entityOpt === 'all') {
+            $this->info('Skipping float entities (renter, business, whatsapp_wallet). Refresh balances with live-sync:push --entity=float.');
+        } elseif (in_array($entityOpt, $floatSet, true)) {
+            $this->warn("{$entityOpt}: insert-only adds missing rows only — will not refresh balances on rows Contabo already has.");
         }
 
         foreach ($entities as $e) {
