@@ -91,6 +91,34 @@ final class LiveSyncOutboundService
     }
 
     /**
+     * @param  list<array{entity: string, operation: string, data: array<string, mixed>, insert_only?: bool}>  $items
+     * @return array{ok: bool, message: string, processed?: int, failed?: int, status?: int, body?: mixed}
+     */
+    public function pushBatchNow(array $items, bool $insertOnly = false): array
+    {
+        if ($items === []) {
+            return ['ok' => true, 'message' => 'No items', 'processed' => 0, 'failed' => 0];
+        }
+
+        $source = (string) config('services.live_sync.source_name', 'namecheap-live');
+        $sentAt = now()->toIso8601String();
+        $events = [];
+        foreach ($items as $item) {
+            $events[] = [
+                'event_id' => (string) Str::uuid(),
+                'source' => $source,
+                'entity' => (string) $item['entity'],
+                'operation' => (string) ($item['operation'] ?? 'upsert'),
+                'insert_only' => $insertOnly || (bool) ($item['insert_only'] ?? false),
+                'sent_at' => $sentAt,
+                'data' => (array) ($item['data'] ?? []),
+            ];
+        }
+
+        return $this->client->sendBatch($events);
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     private function dispatch(string $entity, string $operation, array $data): void

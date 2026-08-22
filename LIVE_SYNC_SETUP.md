@@ -15,22 +15,63 @@ Namecheap is the **live source of truth**. Contabo receives signed upserts for t
 
 Still **not** synced: admins, sessions, cache, jobs, nigtax, rentals catalog, desktop telemetry, chat, etc.
 
-Catch-up is **missing-only** by default (probe Contabo, push gaps only, 48h/watermark window, `--limit`).
+## Two commands (pick the right one)
 
-### Bank float / Ops (`/enter0/audits`)
+| Goal | Command |
+|------|---------|
+| **Missing rows only** (manual gap-fill, never overwrite Contabo) | `live-sync:fill-gaps` |
+| **Recent changes / balance refresh** (upsert, including float) | `live-sync:push` |
 
-Site float = non-exempt `business` + `whatsapp_wallet` + `renter` balances.  
-**`--mode=missing` does not refresh those** if Contabo already has the rows (old dump = stale ₦3.1M while live is ~₦3.7M).
+### Manual gap-fill — `live-sync:fill-gaps` (recommended for “data on live not on Contabo”)
 
-On **Namecheap**, force a balance upsert:
+Insert-only: probes Contabo, pushes rows that are **absent**, skips everything already there. Uses **batch HTTP** (25 events/request by default) and **id cursor** pagination so you do not re-run the same command 50 times.
+
+Run on **Namecheap** only:
 
 ```bash
-php artisan live-sync:push --entity=float --mode=recent --force-all --limit=500 --sync
+# Full money-path gap scan (safe, insert-only)
+php artisan live-sync:fill-gaps --entity=common --until-done --sync
+
+# One entity, optional date window
+php artisan live-sync:fill-gaps --entity=payment --since=2026-01-01 --until-done --sync
+
+# Resume after interrupt (use last id from output)
+php artisan live-sync:fill-gaps --entity=payment --cursor=12000 --until-done --sync
+
+# Dry-run: count missing without sending
+php artisan live-sync:fill-gaps --entity=common --until-done --dry-run
 ```
 
-Then re-check Contabo `/enter0/audits` (site float should track live).
+Options:
 
-**Rate limits:** Contabo sync uses a dedicated `live_sync` limiter (600/min by HMAC key), not the generic API 60/min. If you still see `Too Many Attempts`, wait 1 minute and re-run, or use `--delay-ms=100`.
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `--batch-size` | 500 | Rows scanned per page |
+| `--chunk` | 25 | Events per HTTP batch (max 50) |
+| `--cursor` | 0 | Start after this id |
+| `--until-done` | off | Keep paging until exhausted |
+| `--since` | (none) | Optional time filter; omit = full table |
+
+**Does not** refresh balances. For float, use `live-sync:push` below.
+
+### Push / refresh — `live-sync:push`
+
+Catch-up for **recent window** (48h/watermark) or **balance upserts**:
+
+```bash
+# Bank float first (required for Ops site-float ≈ live)
+php artisan live-sync:push --entity=float --mode=recent --force-all --limit=500 --sync --chunk=25
+
+# Recent missing rows (48h window, batch HTTP)
+php artisan live-sync:push --entity=common --mode=missing --sync --chunk=25
+
+# Large backlog with pagination
+php artisan live-sync:push --entity=payment --mode=missing --force-all --until-done --sync --chunk=25
+```
+
+`--mode=missing` skips rows Contabo already has. `--mode=recent` **overwrites** (needed for balances).
+
+**Rate limits:** Contabo sync uses a dedicated `live_sync` limiter (600/min by HMAC key). Batch mode sends up to 25 rows per request, so effective throughput is much higher than row-by-row.
 
 ## Contabo (receiver)
 
@@ -46,6 +87,8 @@ php artisan migrate --force
 php artisan config:clear
 ```
 
+Receiver endpoints: `POST /api/v1/sync/live`, `/probe`, `/batch`.
+
 ## Namecheap (transmitter)
 
 ```env
@@ -59,18 +102,21 @@ LIVE_SYNC_SOURCE_NAME=namecheap-live
 LIVE_SYNC_QUEUE=true
 ```
 
+Optional batch tuning:
+
+```env
+LIVE_SYNC_BATCH_CHUNK_SIZE=25
+LIVE_SYNC_BATCH_MAX_EVENTS=50
+```
+
 ```bash
 php artisan migrate --force
 php artisan config:clear
 php artisan queue:work   # if QUEUE=true
 
-# Bank float first (required for Ops site-float ≈ live)
-php artisan live-sync:push --entity=float --mode=recent --force-all --limit=500 --sync
-
-# Then other money-path gaps (accounts, payments, ledger…)
-php artisan live-sync:push --entity=common --mode=missing --sync
+# Typical manual run after deploy:
+php artisan live-sync:push --entity=float --mode=recent --force-all --limit=500 --sync --chunk=25
+php artisan live-sync:fill-gaps --entity=common --until-done --sync
 ```
 
-Ongoing: configured models auto-push single-row changes when saved/deleted on Namecheap.  
-Balance changes on Namecheap only land on Contabo if transmitters + observers are enabled there.
-
+Ongoing: configured models auto-push single-row changes when saved/deleted on Namecheap.

@@ -97,6 +97,58 @@ final class LiveSyncTransmitterClient
         ];
     }
 
+    /**
+     * Send many events in one signed POST (much faster than row-by-row).
+     *
+     * @param  list<array<string, mixed>>  $events
+     * @return array{ok: bool, status?: int, body?: mixed, message: string, processed?: int, failed?: int}
+     */
+    public function sendBatch(array $events): array
+    {
+        $maxEvents = max(1, min(50, (int) config('live_sync.batch.max_events', 50)));
+        $events = array_values($events);
+        if ($events === []) {
+            return ['ok' => true, 'message' => 'No events', 'processed' => 0, 'failed' => 0];
+        }
+        if (count($events) > $maxEvents) {
+            return ['ok' => false, 'message' => "Batch exceeds max {$maxEvents} events"];
+        }
+
+        $normalized = [];
+        foreach ($events as $event) {
+            $eventId = (string) ($event['event_id'] ?? '');
+            if ($eventId === '') {
+                $eventId = (string) Str::uuid();
+            }
+            $normalized[] = array_merge($event, [
+                'event_id' => $eventId,
+                'source' => $event['source'] ?? (string) config('services.live_sync.source_name', 'namecheap-live'),
+                'sent_at' => $event['sent_at'] ?? now()->toIso8601String(),
+            ]);
+        }
+
+        $path = $this->receiverPath().'/batch';
+        $url = rtrim($this->receiverUrl(), '/');
+        if (str_ends_with($url, '/api/v1/sync/live')) {
+            $url .= '/batch';
+        } else {
+            $url = rtrim((string) config('services.live_sync.receiver_url'), '/').'/batch';
+            $path = '/api/v1/sync/live/batch';
+        }
+
+        $result = $this->signedPost($url, $path, ['events' => $normalized]);
+        $data = is_array($result['body']['data'] ?? null) ? $result['body']['data'] : [];
+
+        return [
+            'ok' => $result['ok'] ?? false,
+            'status' => $result['status'] ?? null,
+            'body' => $result['body'] ?? null,
+            'message' => (string) ($result['message'] ?? 'Batch failed'),
+            'processed' => (int) ($data['processed'] ?? 0),
+            'failed' => (int) ($data['failed'] ?? 0),
+        ];
+    }
+
     public function isConfigured(): bool
     {
         if (! (bool) config('services.live_sync.transmit_enabled', false)) {

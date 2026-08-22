@@ -104,4 +104,57 @@ class LiveSyncReceiverController extends Controller
             ],
         ]);
     }
+
+    /**
+     * Batch upsert/delete — one HTTP round-trip for many rows (gap-fill / catch-up).
+     */
+    public function receiveBatch(Request $request, LiveSyncIngestionService $sync): JsonResponse
+    {
+        $entities = array_keys((array) config('live_sync.entities', []));
+        $maxEvents = max(1, min(50, (int) config('live_sync.batch.max_events', 50)));
+
+        $validator = Validator::make($request->all(), [
+            'events' => ['required', 'array', 'min:1', 'max:'.$maxEvents],
+            'events.*.event_id' => ['required', 'string', 'uuid'],
+            'events.*.source' => ['nullable', 'string', 'max:100'],
+            'events.*.entity' => ['required', Rule::in($entities)],
+            'events.*.operation' => ['required', Rule::in(['upsert', 'delete'])],
+            'events.*.insert_only' => ['nullable', 'boolean'],
+            'events.*.sent_at' => ['nullable', 'date'],
+            'events.*.data' => ['required', 'array'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        /** @var list<array<string, mixed>> $events */
+        $events = array_values((array) $request->input('events', []));
+
+        try {
+            $summary = $sync->ingestBatch($events);
+        } catch (\Throwable $e) {
+            Log::error('Live sync batch receiver failed', [
+                'error' => $e->getMessage(),
+                'count' => count($events),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Unable to process sync batch',
+            ], 500);
+        }
+
+        $failed = (int) ($summary['failed'] ?? 0);
+
+        return response()->json([
+            'success' => $failed === 0,
+            'message' => $failed === 0 ? 'Batch processed' : "Batch completed with {$failed} failure(s)",
+            'data' => $summary,
+        ], $failed === 0 ? 200 : 207);
+    }
 }

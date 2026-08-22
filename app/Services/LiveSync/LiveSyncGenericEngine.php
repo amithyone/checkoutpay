@@ -174,6 +174,31 @@ final class LiveSyncGenericEngine
     }
 
     /**
+     * Lightweight probe key (no full serialize) — safe for existence checks only.
+     */
+    public function probeKeyLightForModel(string $entity, Model $model): string
+    {
+        if ($entity === 'mevon_pay_ledger_entry') {
+            $ext = trim((string) ($model->external_reference ?? ''));
+            $pay = trim((string) ($model->payout_reference ?? ''));
+            if ($ext !== '') {
+                return 'ext:'.$ext;
+            }
+            if ($pay !== '') {
+                return 'pay:'.$pay;
+            }
+        }
+
+        $attrs = $model->getAttributes();
+        $nk = $this->naturalKeyValue($entity, $attrs, $model);
+        if ($nk !== null) {
+            return $nk;
+        }
+
+        return 'origin:'.(int) $model->getKey();
+    }
+
+    /**
      * @param  list<string>  $keys
      * @return array{missing: list<string>, present: list<string>}
      */
@@ -195,7 +220,7 @@ final class LiveSyncGenericEngine
     /**
      * @param  array<string, mixed>  $data
      */
-    public function upsert(string $entity, array $data, string $operation = 'upsert'): string
+    public function upsert(string $entity, array $data, string $operation = 'upsert', bool $insertOnly = false): string
     {
         $cfg = $this->entityConfig($entity);
         /** @var class-string<Model> $class */
@@ -216,6 +241,10 @@ final class LiveSyncGenericEngine
 
         $attributes = $this->attributesForWrite($entity, $data);
         $local = $this->findLocal($entity, $data);
+
+        if ($insertOnly && $local) {
+            return (string) ($this->naturalKeyValue($entity, $data, $local) ?: $local->getKey());
+        }
 
         if (! $local) {
             $local = new $class;

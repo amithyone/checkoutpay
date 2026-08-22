@@ -307,6 +307,9 @@ Route::prefix('v1')->group(function () {
     Route::post('sync/live/probe', [LiveSyncReceiverController::class, 'probe'])
         ->withoutMiddleware([\Illuminate\Routing\Middleware\ThrottleRequests::class.':api'])
         ->middleware([\App\Http\Middleware\VerifyLiveSyncSignature::class, 'throttle:live_sync']);
+    Route::post('sync/live/batch', [LiveSyncReceiverController::class, 'receiveBatch'])
+        ->withoutMiddleware([\Illuminate\Routing\Middleware\ThrottleRequests::class.':api'])
+        ->middleware([\App\Http\Middleware\VerifyLiveSyncSignature::class, 'throttle:live_sync']);
 
     // Statistics — locked (cron token); not for public / merchant use
     Route::get('/statistics', [\App\Http\Controllers\Api\StatisticsController::class, 'index'])
