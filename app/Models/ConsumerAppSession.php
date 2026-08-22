@@ -27,6 +27,7 @@ class ConsumerAppSession extends Model
         'platform',
         'app_version',
         'device_label',
+        'device_id',
         'ip_address',
         'user_agent',
         'personal_access_token_id',

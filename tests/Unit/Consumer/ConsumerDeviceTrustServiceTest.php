@@ -11,7 +11,7 @@ class ConsumerDeviceTrustServiceTest extends TestCase
     public function test_high_value_transfer_blocked_when_lock_active(): void
     {
         config([
-            'consumer_wallet.high_value_single_transfer_cap' => 10000,
+            'consumer_wallet.high_value_single_transfer_cap' => 20000,
         ]);
 
         $account = new ConsumerWalletApiAccount([
@@ -20,26 +20,42 @@ class ConsumerDeviceTrustServiceTest extends TestCase
 
         $service = $this->app->make(ConsumerDeviceTrustService::class);
 
-        $this->assertTrue($service->isHighValueTransferBlocked($account, 10001));
-        $this->assertFalse($service->isHighValueTransferBlocked($account, 10000));
+        $this->assertTrue($service->isHighValueTransferBlocked($account, 20001));
+        $this->assertFalse($service->isHighValueTransferBlocked($account, 20000));
         $this->assertFalse($service->isHighValueTransferBlocked($account, 5000));
     }
 
     public function test_transfer_lock_meta_shape(): void
     {
         config([
-            'consumer_wallet.high_value_single_transfer_cap' => 10000,
+            'consumer_wallet.high_value_single_transfer_cap' => 20000,
         ]);
 
         $account = new ConsumerWalletApiAccount([
             'transfer_lock_until' => now()->addHours(6),
+            'pin_reset_required' => false,
         ]);
 
         $service = $this->app->make(ConsumerDeviceTrustService::class);
         $meta = $service->transferLockMeta($account);
 
-        $this->assertSame(10000, $meta['high_value_single_transfer_cap']);
+        $this->assertSame(20000, $meta['high_value_single_transfer_cap']);
         $this->assertTrue($meta['high_value_transfer_blocked']);
+        $this->assertFalse($meta['pin_reset_required']);
         $this->assertNotNull($meta['transfer_lock_until']);
+    }
+
+    public function test_requires_step_up_only_when_trusted_device_differs(): void
+    {
+        config([
+            'consumer_wallet.device_trust_enabled' => true,
+            'consumer_wallet.device_stepup_required_on_login' => true,
+        ]);
+
+        $service = $this->app->make(ConsumerDeviceTrustService::class);
+        $account = new ConsumerWalletApiAccount(['id' => 1]);
+        $account->setRelation('trustedDevices', collect());
+
+        $this->assertFalse($service->requiresStepUp($account, 'device-a'));
     }
 }

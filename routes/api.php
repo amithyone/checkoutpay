@@ -150,6 +150,7 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/device/stepup/bvn', [ConsumerDeviceAuthController::class, 'stepupBvn']);
         Route::post('auth/device/stepup/otp/request', [ConsumerDeviceAuthController::class, 'stepupOtpRequest']);
         Route::post('auth/device/stepup/otp/verify', [ConsumerDeviceAuthController::class, 'stepupOtpVerify']);
+        Route::post('auth/device/bind/kyc', [ConsumerDeviceAuthController::class, 'bindKycDevice']);
         Route::post('auth/device/bind/options', [ConsumerDeviceAuthController::class, 'bindOptions']);
         Route::post('auth/device/bind', [ConsumerDeviceAuthController::class, 'bindDevice']);
     });

@@ -10,13 +10,16 @@ class ConsumerTrustedDevice extends Model
 {
     protected $fillable = [
         'consumer_wallet_api_account_id',
+        'device_id',
         'label',
         'platform',
         'last_active_at',
+        'kyc_confirmed_at',
     ];
 
     protected $casts = [
         'last_active_at' => 'datetime',
+        'kyc_confirmed_at' => 'datetime',
     ];
 
     public function account(): BelongsTo

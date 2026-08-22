@@ -899,6 +899,11 @@ class ConsumerWalletApiController extends Controller
         $wallet->pin_locked_until = null;
         $wallet->save();
 
+        $user = $request->user();
+        if ($user instanceof ConsumerWalletApiAccount && $user->requiresPinReset()) {
+            $user->forceFill(['pin_reset_required' => false])->save();
+        }
+
         $instance = \App\Services\Whatsapp\WhatsappEvolutionConfigResolver::walletInstance();
         if ($instance !== '') {
             $this->pendingP2p->tryClaimForWallet($wallet->fresh(), $instance);
@@ -1721,6 +1726,18 @@ class ConsumerWalletApiController extends Controller
             : ['fname', 'lname', 'dob', 'email', 'bvn', 'nin'];
 
         $out = $this->kyc->submitPersonalTier2($wallet, array_merge($request->only($fields), ['gender' => $g]));
+
+        $user = $request->user();
+        if ($out['ok'] && $user instanceof ConsumerWalletApiAccount) {
+            $wallet = $wallet->fresh();
+            $this->deviceTrust->bootstrapTrustedDeviceIfEligible(
+                $user,
+                $wallet,
+                $this->appSessions->deviceIdFromRequest($request),
+                $this->appSessions->clientContextFromRequest($request)['platform'] ?? null,
+                $this->appSessions->clientContextFromRequest($request)['device_label'] ?? null,
+            );
+        }
 
         return response()->json([
             'success' => $out['ok'],

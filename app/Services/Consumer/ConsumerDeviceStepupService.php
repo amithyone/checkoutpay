@@ -22,8 +22,14 @@ class ConsumerDeviceStepupService
     /**
      * @return array{ok: bool, message?: string, stepup_required?: bool, stepup_session?: string, other_device_label?: string|null, channels?: string[]}
      */
-    public function start(string $phoneInput, ?string $pin = null, ?string $otpCode = null): array
-    {
+    public function start(
+        string $phoneInput,
+        ?string $pin = null,
+        ?string $otpCode = null,
+        ?string $deviceId = null,
+        ?string $platform = null,
+        ?string $deviceLabel = null,
+    ): array {
         if (! $this->trust->isEnabled()) {
             return ['ok' => false, 'message' => 'Device trust is disabled.'];
         }
@@ -57,7 +63,7 @@ class ConsumerDeviceStepupService
         $account->phone_e164 = $e164;
         $account->save();
 
-        if (! $this->trust->requiresStepUp($account)) {
+        if (! $this->trust->requiresStepUp($account, $deviceId)) {
             return [
                 'ok' => true,
                 'stepup_required' => false,
@@ -65,7 +71,7 @@ class ConsumerDeviceStepupService
             ];
         }
 
-        $session = $this->createSession($account, $wallet);
+        $session = $this->createSession($account, $wallet, $deviceId, $platform, $deviceLabel);
 
         return array_merge([
             'ok' => true,
@@ -144,7 +150,12 @@ class ConsumerDeviceStepupService
         $session->stepup_token_expires_at = now()->addMinutes(15);
         $session->save();
 
-        return ['ok' => true, 'stepup_token' => $token];
+        return [
+            'ok' => true,
+            'stepup_token' => $token,
+            'pin_reset_required' => true,
+            'next_step' => 'set_new_pin_and_bind',
+        ];
     }
 
     public function findSessionByStepupToken(string $token): ?ConsumerDeviceStepupSession
@@ -160,18 +171,28 @@ class ConsumerDeviceStepupService
         return $session;
     }
 
-    public function createSession(ConsumerWalletApiAccount $account, WhatsappWallet $wallet): ConsumerDeviceStepupSession
-    {
+    public function createSession(
+        ConsumerWalletApiAccount $account,
+        WhatsappWallet $wallet,
+        ?string $pendingDeviceId = null,
+        ?string $pendingPlatform = null,
+        ?string $pendingDeviceLabel = null,
+    ): ConsumerDeviceStepupSession {
         ConsumerDeviceStepupSession::query()
             ->where('consumer_wallet_api_account_id', $account->id)
             ->where('expires_at', '>', now())
             ->delete();
+
+        $account->forceFill(['pin_reset_required' => true])->save();
 
         return ConsumerDeviceStepupSession::query()->create([
             'session_token' => 'sess_'.Str::random(40),
             'consumer_wallet_api_account_id' => $account->id,
             'phone_e164' => (string) $account->phone_e164,
             'whatsapp_wallet_id' => $wallet->id,
+            'pending_device_id' => $this->trust->normalizeDeviceId($pendingDeviceId),
+            'pending_platform' => $pendingPlatform,
+            'pending_device_label' => $pendingDeviceLabel,
             'auth_verified_at' => now(),
             'expires_at' => now()->addMinutes(30),
         ]);

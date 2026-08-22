@@ -126,8 +126,17 @@ class ConsumerWalletAuthController extends Controller
         $account->phone_e164 = $e164;
         $account->save();
 
-        if ($trust->requiresStepUp($account)) {
-            $session = $stepup->createSession($account, $wallet);
+        $deviceId = $sessions->deviceIdFromRequest($request);
+        $ctx = $sessions->clientContextFromRequest($request);
+
+        if ($trust->requiresStepUp($account, $deviceId)) {
+            $session = $stepup->createSession(
+                $account,
+                $wallet,
+                $deviceId,
+                $ctx['platform'],
+                $ctx['device_label'],
+            );
 
             return response()->json([
                 'success' => false,
@@ -137,6 +146,14 @@ class ConsumerWalletAuthController extends Controller
                 ]),
             ], 403);
         }
+
+        $trust->bootstrapTrustedDeviceIfEligible(
+            $account,
+            $wallet,
+            $deviceId,
+            $ctx['platform'],
+            $ctx['device_label'],
+        );
 
         $account->tokens()->delete();
         $accessToken = $sessions->createAccessToken($account);
@@ -152,6 +169,8 @@ class ConsumerWalletAuthController extends Controller
                 'wallet_id' => $wallet->id,
                 'app_session_id' => $appSessionId,
                 'region' => $region,
+                'transfer_lock_until' => $account->fresh()->transfer_lock_until?->toIso8601String(),
+                'high_value_single_transfer_cap' => $trust->highValueCap(),
             ],
         ]);
     }
@@ -282,8 +301,17 @@ class ConsumerWalletAuthController extends Controller
         $account->phone_e164 = $e164;
         $account->save();
 
-        if ($trust->requiresStepUp($account)) {
-            $session = $stepup->createSession($account, $wallet);
+        $deviceId = $sessions->deviceIdFromRequest($request);
+        $ctx = $sessions->clientContextFromRequest($request);
+
+        if ($trust->requiresStepUp($account, $deviceId)) {
+            $session = $stepup->createSession(
+                $account,
+                $wallet,
+                $deviceId,
+                $ctx['platform'],
+                $ctx['device_label'],
+            );
 
             return response()->json([
                 'success' => false,
@@ -291,6 +319,14 @@ class ConsumerWalletAuthController extends Controller
                 'data' => $trust->stepUpPayload($session, $wallet),
             ], 403);
         }
+
+        $trust->bootstrapTrustedDeviceIfEligible(
+            $account,
+            $wallet,
+            $deviceId,
+            $ctx['platform'],
+            $ctx['device_label'],
+        );
 
         $account->tokens()->delete();
         $accessToken = $sessions->createAccessToken($account);
@@ -306,6 +342,8 @@ class ConsumerWalletAuthController extends Controller
                 'wallet_id' => $wallet->id,
                 'app_session_id' => $appSessionId,
                 'region' => $regions->forPhone($e164),
+                'transfer_lock_until' => $account->fresh()->transfer_lock_until?->toIso8601String(),
+                'high_value_single_transfer_cap' => $trust->highValueCap(),
             ],
         ]);
     }

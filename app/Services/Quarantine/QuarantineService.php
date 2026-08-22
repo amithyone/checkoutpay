@@ -113,6 +113,11 @@ class QuarantineService
 
         $this->trip($reasons);
 
+        // trip() is a no-op in testing (must not write production lock). Do not 503 the suite.
+        if (app()->environment('testing') && ! $this->isLocked()) {
+            return false;
+        }
+
         return true;
     }
 

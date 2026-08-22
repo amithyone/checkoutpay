@@ -180,18 +180,22 @@ class ConsumerDeviceAuthController extends Controller
         ]);
     }
 
-    public function stepupStart(Request $request, ConsumerDeviceStepupService $stepup): JsonResponse
+    public function stepupStart(Request $request, ConsumerDeviceStepupService $stepup, ConsumerAppSessionService $sessions, ConsumerDeviceTrustService $trust): JsonResponse
     {
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
             'pin' => ['nullable', 'regex:/^\d{4}$/', 'required_without:otp_code'],
             'otp_code' => ['nullable', 'string', 'max:12', 'required_without:pin'],
+            'device_id' => 'nullable|string|max:128',
         ]);
 
         $result = $stepup->start(
             (string) $request->input('phone'),
             $request->filled('pin') ? (string) $request->input('pin') : null,
             $request->filled('otp_code') ? (string) $request->input('otp_code') : null,
+            $sessions->deviceIdFromRequest($request),
+            $sessions->clientContextFromRequest($request)['platform'] ?? null,
+            $sessions->clientContextFromRequest($request)['device_label'] ?? null,
         );
 
         if (! ($result['ok'] ?? false)) {
@@ -216,6 +220,8 @@ class ConsumerDeviceAuthController extends Controller
                 'stepup_session' => $result['stepup_session'],
                 'other_device_label' => $result['other_device_label'] ?? null,
                 'channels' => $result['channels'] ?? ['whatsapp'],
+                'pin_reset_required' => true,
+                'next_step' => 'verify_kyc',
             ], [
                 'push_approval_available' => (bool) ($result['push_approval_available'] ?? false),
                 'push_approval_expires_at' => $result['push_approval_expires_at'] ?? null,
@@ -343,8 +349,89 @@ class ConsumerDeviceAuthController extends Controller
         return response()->json([
             'success' => $result['ok'],
             'message' => $result['message'] ?? null,
-            'data' => $result['ok'] ? ['stepup_token' => $result['stepup_token']] : null,
+            'data' => $result['ok'] ? [
+                'stepup_token' => $result['stepup_token'],
+                'pin_reset_required' => true,
+                'next_step' => $result['next_step'] ?? 'set_new_pin_and_bind',
+            ] : null,
         ], $result['ok'] ? 200 : 422);
+    }
+
+    /**
+     * Complete new-device unlock: set new PIN + bind KYC-trusted device (moves trust, applies transfer lock).
+     */
+    public function bindKycDevice(Request $request, ConsumerDeviceStepupService $stepup, ConsumerDeviceTrustService $trust, ConsumerAppSessionService $sessions): JsonResponse
+    {
+        $request->validate([
+            'stepup_token' => 'required|string|max:128',
+            'pin' => ['required', 'regex:/^\d{4}$/'],
+            'pin_confirmation' => ['required', 'same:pin'],
+            'device_id' => 'nullable|string|max:128',
+            'platform' => 'nullable|string|max:32',
+            'device_name' => 'nullable|string|max:120',
+        ]);
+
+        $session = $stepup->findSessionByStepupToken((string) $request->input('stepup_token'));
+        if ($session === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid or expired step-up token.',
+            ], 422);
+        }
+
+        $accountId = (int) $session->consumer_wallet_api_account_id;
+        $ctx = $sessions->clientContextFromRequest($request);
+        $result = $trust->bindKycTrustedDevice(
+            $session,
+            (string) $request->input('stepup_token'),
+            (string) $request->input('pin'),
+            $sessions->deviceIdFromRequest($request) ?? $request->input('device_id'),
+            $request->input('platform') ? (string) $request->input('platform') : $ctx['platform'],
+            $request->input('device_name') ? (string) $request->input('device_name') : $ctx['device_label'],
+        );
+
+        if (! ($result['ok'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Could not bind device.',
+            ], 422);
+        }
+
+        $account = ConsumerWalletApiAccount::query()->find($accountId);
+        $appSessionId = null;
+        if ($account instanceof ConsumerWalletApiAccount) {
+            $appSessionId = $sessions->afterPlainTokenIssued(
+                $account,
+                ConsumerAppSession::LOGIN_DEVICE_BIND,
+                $request,
+            );
+            $sessions->recordForAccount(
+                $account,
+                $request,
+                ConsumerAppSessionEvent::TYPE_DEVICE_STEPUP,
+                'Trusted device moved after KYC + OTP + new PIN',
+                [
+                    'devices_revoked' => $result['devices_revoked'] ?? 0,
+                    'platform' => $ctx['platform'],
+                ],
+            );
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Device verified. New PIN saved. High-value transfers temporarily limited.',
+            'data' => array_filter([
+                'token' => $result['token'],
+                'token_type' => 'Bearer',
+                'phone_e164' => $account?->phone_e164,
+                'wallet_id' => $result['wallet_id'],
+                'devices_revoked' => $result['devices_revoked'] ?? 0,
+                'transfer_lock_until' => $result['transfer_lock_until'] ?? null,
+                'high_value_single_transfer_cap' => $result['high_value_single_transfer_cap'] ?? $trust->highValueCap(),
+                'app_session_id' => $appSessionId,
+                'pin_reset_required' => false,
+            ], fn ($v) => $v !== null),
+        ]);
     }
 
     public function bindOptions(Request $request, ConsumerDeviceStepupService $stepup, ConsumerWebAuthnService $webauthn): JsonResponse
@@ -393,6 +480,7 @@ class ConsumerDeviceAuthController extends Controller
             'credential' => 'required|array',
             'platform' => 'required|string|max:32',
             'device_name' => 'nullable|string|max:120',
+            'device_id' => 'nullable|string|max:128',
         ]);
 
         $session = $stepup->findSessionByStepupToken((string) $request->input('stepup_token'));
@@ -410,6 +498,7 @@ class ConsumerDeviceAuthController extends Controller
             (array) $request->input('credential'),
             (string) $request->input('platform'),
             $request->input('device_name') ? (string) $request->input('device_name') : null,
+            $sessions->deviceIdFromRequest($request) ?? ($request->input('device_id') ? (string) $request->input('device_id') : null),
         );
 
         if (! $result['ok']) {
@@ -458,14 +547,15 @@ class ConsumerDeviceAuthController extends Controller
         ]);
     }
 
-    public function listDevices(Request $request, ConsumerDeviceTrustService $trust): JsonResponse
+    public function listDevices(Request $request, ConsumerDeviceTrustService $trust, ConsumerAppSessionService $sessions): JsonResponse
     {
         $account = $this->accountFor($request);
 
         return response()->json([
             'success' => true,
             'data' => [
-                'devices' => $trust->listDevices($account),
+                'devices' => $trust->listDevices($account, null, $sessions->deviceIdFromRequest($request)),
+                'transfer_lock' => $trust->transferLockMeta($account),
             ],
         ]);
     }

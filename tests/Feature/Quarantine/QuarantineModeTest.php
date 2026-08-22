@@ -61,6 +61,13 @@ class QuarantineModeTest extends TestCase
 
         /** @var QuarantineService $q */
         $q = app(QuarantineService::class);
+        // PHPUnit must not write the real lock file; simulate a tripped lock for HTTP blocking.
+        File::put($this->lockPath, json_encode([
+            'tripped_at' => now()->toIso8601String(),
+            'reasons' => [QuarantineService::REASON_HOST_NOT_ALLOWED],
+            'db_host' => 'evil.attacker.example',
+        ]));
+
         $this->assertTrue($q->guard());
         $this->assertTrue($q->isLocked());
 

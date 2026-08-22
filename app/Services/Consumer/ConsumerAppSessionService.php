@@ -88,7 +88,7 @@ class ConsumerAppSessionService
         }
     }
     /**
-     * @return array{platform: ?string, app_version: ?string, device_label: ?string}
+     * @return array{platform: ?string, app_version: ?string, device_label: ?string, device_id: ?string}
      */
     public function clientContextFromRequest(Request $request): array
     {
@@ -103,7 +103,28 @@ class ConsumerAppSessionService
             ),
             'app_version' => $this->trimNullable((string) ($ctx['app_version'] ?? $request->header('X-App-Version', ''))),
             'device_label' => $this->trimNullable((string) ($ctx['device_label'] ?? $request->header('X-Device-Label', ''))),
+            'device_id' => $this->normalizeDeviceId(
+                (string) ($ctx['device_id'] ?? $request->input('device_id') ?? $request->header('X-Device-Id', ''))
+            ),
         ];
+    }
+
+    public function deviceIdFromRequest(Request $request): ?string
+    {
+        return $this->clientContextFromRequest($request)['device_id'];
+    }
+
+    private function normalizeDeviceId(string $raw): ?string
+    {
+        $id = trim($raw);
+        if ($id === '' || strlen($id) > 128) {
+            return null;
+        }
+        if (! preg_match('/^[A-Za-z0-9._:-]+$/', $id)) {
+            return null;
+        }
+
+        return $id;
     }
 
     public function sessionUuidFromRequest(Request $request): ?string
@@ -135,6 +156,7 @@ class ConsumerAppSessionService
             'platform' => $ctx['platform'],
             'app_version' => $ctx['app_version'],
             'device_label' => $ctx['device_label'],
+            'device_id' => $ctx['device_id'],
             'ip_address' => $request->ip(),
             'user_agent' => Str::limit((string) $request->userAgent(), 500, ''),
             'personal_access_token_id' => $personalAccessTokenId,

@@ -24,13 +24,20 @@ class ConsumerWalletApiAccount extends Model implements AuthenticatableContract
         'fcm_platform',
         'last_app_active_at',
         'transfer_lock_until',
+        'pin_reset_required',
     ];
 
     protected $casts = [
         'fcm_token_updated_at' => 'datetime',
         'last_app_active_at' => 'datetime',
         'transfer_lock_until' => 'datetime',
+        'pin_reset_required' => 'boolean',
     ];
+
+    public function requiresPinReset(): bool
+    {
+        return (bool) $this->pin_reset_required;
+    }
 
     public function wallet(): BelongsTo
     {

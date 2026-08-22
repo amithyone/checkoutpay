@@ -1,6 +1,6 @@
 # Device trust (backend)
 
-Consumer mobile API at `/api/v1/consumer/auth/*` implements WebAuthn passkeys, new-device step-up (BVN + OTP), and a 24-hour high-value transfer lock after binding a new trusted device.
+Consumer mobile API at `/api/v1/consumer/auth/*` implements WebAuthn passkeys, new-device step-up (BVN/NIN + OTP + new PIN), KYC trust keyed by `X-Device-Id`, and a 48-hour high-value transfer lock (₦20,000 cap) after moving trust to a new device. See also [`docs/CONSUMER_DEVICE_TRUST.md`](../docs/CONSUMER_DEVICE_TRUST.md).
 
 Mobile contract (client setup, UI, checklist): [`checkoutnow/docs/native/DEVICE_TRUST.md`](../../checkoutnow/docs/native/DEVICE_TRUST.md).
 
@@ -34,6 +34,7 @@ Public (no token):
 | POST | `device/stepup/otp/verify` | `stepupOtpVerify` |
 | POST | `device/bind/options` | `bindOptions` |
 | POST | `device/bind` | `bindDevice` |
+| POST | `device/bind/kyc` | `bindKycDevice` (new PIN + move trust) |
 
 Authenticated (`auth:sanctum`):
 
@@ -46,9 +47,9 @@ Authenticated (`auth:sanctum`):
 | GET | `devices` | `listDevices` |
 | DELETE | `devices/{id}` | `revokeDevice` |
 
-PIN/OTP login step-up: `POST auth/pin/verify` and `POST auth/otp/verify` return **403** with `data.stepup_required`, `stepup_session`, `other_device_label`, `channels` when another passkey device is active.
+PIN/OTP login step-up: `POST auth/pin/verify` and `POST auth/otp/verify` return **403** with `data.stepup_required`, `stepup_session`, `other_device_label`, `channels`, `pin_reset_required` when a KYC-trusted device exists and `X-Device-Id` does not match.
 
-Wallet lock fields: `GET consumer/wallet` includes `transfer_lock_until`, `high_value_single_transfer_cap`, `high_value_transfer_blocked`.
+Wallet lock fields: `GET consumer/wallet` includes `transfer_lock_until`, `high_value_single_transfer_cap`, `high_value_transfer_blocked`, `pin_reset_required`.
 
 ---
 
@@ -56,10 +57,12 @@ Wallet lock fields: `GET consumer/wallet` includes `transfer_lock_until`, `high_
 
 | Table | Purpose |
 |-------|---------|
-| `consumer_trusted_devices` | Bound device label/platform per `consumer_wallet_api_accounts` row |
+| `consumer_trusted_devices` | KYC-trusted device (`device_id` + optional passkey) per account |
 | `consumer_passkey_credentials` | WebAuthn credential record JSON + counter |
-| `consumer_device_stepup_sessions` | BVN/OTP step-up state between login and `device/bind` |
+| `consumer_device_stepup_sessions` | BVN/OTP/PIN step-up state between login and `device/bind/kyc` |
+| `consumer_app_sessions.device_id` | Install id from `X-Device-Id` |
 | `consumer_wallet_api_accounts.transfer_lock_until` | High-value transfer lock expiry |
+| `consumer_wallet_api_accounts.pin_reset_required` | Blocks transfers until new PIN set |
 
 ---
 
@@ -70,10 +73,11 @@ Wallet lock fields: `GET consumer/wallet` includes `transfer_lock_until`, `high_
 | `device_trust_enabled` | `true` | Master switch |
 | `webauthn_rp_id` | `check-outpay.com` | Must match mobile associated domains |
 | `webauthn_rp_name` | `CheckoutNow` | RP display name |
-| `high_value_single_transfer_cap` | `10000` | NGN; blocked while lock active |
-| `transfer_lock_hours` | `24` | Set on `device/bind` with `revoke_others: true` |
+| `device_stepup_required_on_login` | `true` | Gate PIN/OTP login on `X-Device-Id` |
+| `high_value_single_transfer_cap` | `20000` | NGN; blocked while lock active |
+| `transfer_lock_hours` | `48` | Set when trust moves to a new device |
 
-Env: `CONSUMER_DEVICE_TRUST_ENABLED`, `CONSUMER_WEBAUTHN_RP_ID`, `CONSUMER_WEBAUTHN_RP_NAME`, `CONSUMER_HIGH_VALUE_SINGLE_TRANSFER_CAP`, `CONSUMER_TRANSFER_LOCK_HOURS`.
+Env: `CONSUMER_DEVICE_TRUST_ENABLED`, `CONSUMER_DEVICE_STEPUP_REQUIRED_ON_LOGIN`, `CONSUMER_WEBAUTHN_RP_ID`, `CONSUMER_WEBAUTHN_RP_NAME`, `CONSUMER_HIGH_VALUE_SINGLE_TRANSFER_CAP`, `CONSUMER_TRANSFER_LOCK_HOURS`.
 
 ---
 

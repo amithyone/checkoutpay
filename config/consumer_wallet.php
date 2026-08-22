@@ -5,11 +5,10 @@ return [
     'device_trust_enabled' => filter_var(env('CONSUMER_DEVICE_TRUST_ENABLED', true), FILTER_VALIDATE_BOOL),
 
     /**
-     * When true, PIN/OTP login returns 403 “Verify this device” if the account already has a passkey.
-     * Default false so PIN/OTP sign-in works on the same phone without a stuck step-up wall.
-     * Passkey login remains available as a separate auth path.
+     * When true, PIN/OTP login returns 403 “Verify this device” if the account already has a
+     * KYC-trusted device and the request X-Device-Id does not match.
      */
-    'device_stepup_required_on_login' => filter_var(env('CONSUMER_DEVICE_STEPUP_REQUIRED_ON_LOGIN', false), FILTER_VALIDATE_BOOL),
+    'device_stepup_required_on_login' => filter_var(env('CONSUMER_DEVICE_STEPUP_REQUIRED_ON_LOGIN', true), FILTER_VALIDATE_BOOL),
 
     /** WebAuthn relying party ID (must match associated domains / asset links). */
     'webauthn_rp_id' => env('CONSUMER_WEBAUTHN_RP_ID', 'check-outpay.com'),
@@ -46,11 +45,11 @@ return [
         explode(',', (string) env('CONSUMER_ANDROID_ASSETLINKS_SHA256', ''))
     ))),
 
-    /** Max single transfer amount (NGN) while transfer lock is active. */
-    'high_value_single_transfer_cap' => (int) env('CONSUMER_HIGH_VALUE_SINGLE_TRANSFER_CAP', 10000),
+    /** Max single transfer amount (NGN) while transfer lock is active after new-device KYC. */
+    'high_value_single_transfer_cap' => (int) env('CONSUMER_HIGH_VALUE_SINGLE_TRANSFER_CAP', 20000),
 
     /** Hours to lock high-value transfers after binding a new trusted device. */
-    'transfer_lock_hours' => (int) env('CONSUMER_TRANSFER_LOCK_HOURS', 24),
+    'transfer_lock_hours' => (int) env('CONSUMER_TRANSFER_LOCK_HOURS', 48),
 
     /** Short-lived passkey payment_token TTL (minutes). */
     'payment_token_ttl_minutes' => (int) env('CONSUMER_PAYMENT_TOKEN_TTL_MINUTES', 5),
