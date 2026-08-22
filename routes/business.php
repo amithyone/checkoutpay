@@ -19,7 +19,7 @@ Route::prefix('dashboard')->name('business.')->group(function () {
     // Business authentication routes
     Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
     Route::post('/register', [RegisterController::class, 'register'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:3,1');
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [LoginController::class, 'login'])
         ->middleware('throttle:10,1');

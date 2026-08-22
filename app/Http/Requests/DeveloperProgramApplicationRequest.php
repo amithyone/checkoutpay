@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Services\RecaptchaService;
+use App\Services\Security\RegistrationAbuseGuard;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 
@@ -37,6 +38,19 @@ class DeveloperProgramApplicationRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator): void {
+            $abuseGuard = app(RegistrationAbuseGuard::class);
+            $fields = [
+                'name' => $this->input('name'),
+                'email' => $this->input('email'),
+                'business_id' => $this->input('business_id'),
+            ];
+            if ($reason = $abuseGuard->blockReason((string) $this->ip(), $fields)) {
+                $abuseGuard->logBlocked('developer_program_apply', (string) $this->ip(), $fields, $reason);
+                $validator->errors()->add('email', 'Application could not be submitted. Contact support if you need help.');
+
+                return;
+            }
+
             $recaptcha = app(RecaptchaService::class);
             if (! $recaptcha->isEnabled()) {
                 return;

@@ -50,4 +50,22 @@ return [
             "/;\\s*(?:drop|truncate|alter|create|grant|revoke|delete|update|insert|select)\\b/i",
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Public registration abuse guard (business signup, developer program, etc.)
+    |--------------------------------------------------------------------------
+    */
+    'registration_abuse_guard' => [
+        'enabled' => env('REGISTRATION_ABUSE_GUARD_ENABLED', true),
+        'block_tor_exits' => env('REGISTRATION_ABUSE_BLOCK_TOR', true),
+        'require_website_dns' => env('REGISTRATION_ABUSE_REQUIRE_WEBSITE_DNS', true),
+        'rdns_cache_seconds' => (int) env('REGISTRATION_ABUSE_RDNS_CACHE_SECONDS', 3600),
+        'dns_cache_seconds' => (int) env('REGISTRATION_ABUSE_DNS_CACHE_SECONDS', 3600),
+        'tor_rdns_needles' => [
+            'tor-exit',
+            '.relayon.org',
+            'relayon.org',
+        ],
+    ],
 ];

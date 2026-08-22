@@ -173,7 +173,7 @@ Route::get('/developers', [\App\Http\Controllers\DevelopersController::class, 'i
 Route::get('/developers/program/apply/thanks', [\App\Http\Controllers\DevelopersController::class, 'applyThanks'])->name('developers.program.apply.thanks');
 Route::get('/developers/program/apply', [\App\Http\Controllers\DevelopersController::class, 'apply'])->name('developers.program.apply');
 Route::post('/developers/program/apply', [\App\Http\Controllers\DevelopersController::class, 'applyStore'])
-    ->middleware('throttle:10,1')
+    ->middleware('throttle:3,1')
     ->name('developers.program.apply.store');
 Route::get('/developers/program', [\App\Http\Controllers\DevelopersController::class, 'program'])->name('developers.program');
 Route::get('/support', [\App\Http\Controllers\SupportController::class, 'index'])->name('support.index');

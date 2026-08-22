@@ -7,6 +7,7 @@ use App\Models\Business;
 use App\Models\BusinessWebsite;
 use App\Models\Renter;
 use App\Services\RecaptchaService;
+use App\Services\Security\RegistrationAbuseGuard;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,7 +21,7 @@ class RegisterController extends Controller
         return view('business.auth.register');
     }
 
-    public function register(Request $request, RecaptchaService $recaptcha): RedirectResponse|View
+    public function register(Request $request, RecaptchaService $recaptcha, RegistrationAbuseGuard $abuseGuard): RedirectResponse|View
     {
         // Fail closed: enabled without keys must not skip verification
         if ($recaptcha->isMisconfigured()) {
@@ -28,6 +29,19 @@ class RegisterController extends Controller
 
             return back()->withErrors([
                 'g-recaptcha-response' => 'Registration is temporarily unavailable. Please try again later.',
+            ])->withInput($request->except('password', 'password_confirmation'));
+        }
+
+        $abuseFields = [
+            'name' => $request->input('name'),
+            'email' => $request->input('email'),
+            'website' => $request->input('website'),
+        ];
+        if ($reason = $abuseGuard->blockReason((string) $request->ip(), $abuseFields)) {
+            $abuseGuard->logBlocked('business_register', (string) $request->ip(), $abuseFields, $reason);
+
+            return back()->withErrors([
+                'email' => 'Registration could not be completed. Contact support if you need help.',
             ])->withInput($request->except('password', 'password_confirmation'));
         }
 
@@ -56,6 +70,18 @@ class RegisterController extends Controller
             'address' => 'nullable|string|max:1000',
             'website' => 'required|url|max:500',
         ]);
+
+        if ($reason = $abuseGuard->blockReason((string) $request->ip(), [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'website' => $validated['website'],
+        ])) {
+            $abuseGuard->logBlocked('business_register_post_validate', (string) $request->ip(), $validated, $reason);
+
+            return back()->withErrors([
+                'website' => 'Enter a valid business website with working DNS.',
+            ])->withInput($request->except('password', 'password_confirmation'));
+        }
 
         // If renter exists, verify password matches
         if ($renter && ! Hash::check($validated['password'], $renter->password)) {
