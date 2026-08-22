@@ -812,13 +812,44 @@
     </div>
 
     <!-- Cron Job Info -->
+    @php
+        use App\Support\AdminCronUrl;
+        $cronApiToken = (string) config('checkout.cron_api_token', '');
+        $adminCronUrls = [
+            'direct' => AdminCronUrl::build('/cron/read-emails-direct'),
+            'global-match' => AdminCronUrl::build('/cron/global-match'),
+            'extract-names' => AdminCronUrl::build('/cron/extract-missing-names'),
+            'imap' => AdminCronUrl::build('/cron/monitor-emails'),
+            'webhooks' => AdminCronUrl::build('/api/v1/cron/process-webhooks'),
+            'kyc-queue' => AdminCronUrl::build('/cron/process-kyc-queue'),
+            'tier2-batch' => AdminCronUrl::build('/cron/wallet/provision-tier2-batch', ['limit' => 8, 'apply' => 1]),
+            'peer-loan-daily' => AdminCronUrl::build('/cron/peer-loans/collect-daily'),
+            'peer-loan-weekly' => AdminCronUrl::build('/cron/peer-loans/collect-weekly'),
+            'peer-loan-monthly' => AdminCronUrl::build('/cron/peer-loans/collect-monthly'),
+            'wallet-inactive-morning' => AdminCronUrl::build('/cron/wallet/inactive-reminders/morning'),
+            'wallet-inactive-evening' => AdminCronUrl::build('/cron/wallet/inactive-reminders/evening'),
+            'live-sync' => AdminCronUrl::build('/cron/live-sync'),
+        ];
+    @endphp
     <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
         <h3 class="text-lg font-semibold text-blue-900 mb-2">
             <i class="fas fa-clock mr-2"></i> Cron Job URLs
         </h3>
-        <p class="text-sm text-blue-800 mb-4">
-            Use these URLs in your cron job service (e.g., cron-job.org, EasyCron) to automatically process emails and match payments:
+        <p class="text-sm text-blue-800 mb-3">
+            Use these URLs in your cron job service (e.g., cron-job.org, EasyCron). When <code class="bg-blue-100 px-1 rounded">CRON_EMAIL_FETCH_TOKEN</code> is set in <code class="bg-blue-100 px-1 rounded">.error</code>, each URL below already includes <code class="bg-blue-100 px-1 rounded">?token=…</code> — copy and paste as-is.
         </p>
+        @if($cronApiToken !== '')
+            <div class="mb-4 bg-white border border-blue-200 rounded-lg p-3">
+                <p class="text-xs font-semibold text-blue-900 mb-1">CRON_EMAIL_FETCH_TOKEN</p>
+                <code class="text-xs text-gray-800 break-all block bg-gray-50 p-2 rounded">{{ $cronApiToken }}</code>
+            </div>
+        @else
+            <div class="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <p class="text-xs text-amber-900">
+                    <strong>CRON_EMAIL_FETCH_TOKEN</strong> is not set — protected cron endpoints return 503 outside local/testing until you add it to <code class="bg-amber-100 px-1 rounded">.error</code>.
+                </p>
+            </div>
+        @endif
         
         <div class="space-y-4">
             <!-- Direct Filesystem Reading (Recommended) -->
@@ -832,7 +863,7 @@
                         <i class="fas fa-copy mr-1"></i> Copy
                     </button>
                 </div>
-                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/read-emails-direct') }}</code>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['direct'] }}</code>
                 <p class="text-xs text-gray-600 mt-2">
                     <strong>Best for shared hosting.</strong> Reads emails directly from server mail directories (bypasses IMAP).
                 </p>
@@ -852,7 +883,7 @@
                         <i class="fas fa-copy mr-1"></i> Copy
                     </button>
                 </div>
-                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/global-match') }}</code>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['global-match'] }}</code>
                 <p class="text-xs text-gray-600 mt-2">
                     <strong>Matches unmatched payments with the newest {{ config('checkout.global_match_max_emails', 200) }} unmatched emails</strong> (per run). Uses the matching logic with full logging; run again or schedule often to clear backlog.
                 </p>
@@ -872,7 +903,7 @@
                         <i class="fas fa-copy mr-1"></i> Copy
                     </button>
                 </div>
-                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/extract-missing-names') }}</code>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['extract-names'] }}</code>
                 <p class="text-xs text-gray-600 mt-2">
                     <strong>Extracts sender names from processed emails using AdvancedNameExtractor.</strong> Handles multiple formats, quoted-printable encoding, and spacing variations.
                 </p>
@@ -891,7 +922,7 @@
                         <i class="fas fa-copy mr-1"></i> Copy
                     </button>
                 </div>
-                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/monitor-emails') }}</code>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['imap'] }}</code>
                 <p class="text-xs text-gray-600 mt-2">
                     Requires IMAP to be enabled. Will fail if IMAP fetching is disabled in settings.
                 </p>
@@ -911,7 +942,7 @@
                         <i class="fas fa-copy mr-1"></i> Copy
                     </button>
                 </div>
-                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/api/v1/cron/process-webhooks') }}</code>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['webhooks'] }}</code>
                 <p class="text-xs text-gray-600 mt-2">
                     <strong>Processes pending/failed webhooks.</strong> Sends webhook notifications for approved payments that haven't been sent yet.
                 </p>
@@ -931,7 +962,7 @@
                         <i class="fas fa-copy mr-1"></i> Copy
                     </button>
                 </div>
-                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/process-kyc-queue') }}</code>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['kyc-queue'] }}</code>
                 <p class="text-xs text-gray-600 mt-2">
                     <strong>Runs only Tier 2 KYC jobs</strong> (Mevon verify + Rubies account). Re-queues wallets stuck as “queued” with no job in the database, then processes the <code class="bg-gray-100 px-1 rounded">kyc-provision</code> queue.
                 </p>
@@ -946,10 +977,27 @@
                     @endif
                 </p>
                 <p class="text-xs text-gray-500 mt-1">
-                    <strong>Frequency:</strong> Every 1–5 minutes when KYC is active, or hit manually after queueing from a wallet page.
+                    <strong>Frequency:</strong> Every 1–5 minutes when KYC is active, or ~2 minutes after Tier-2 batch cron below.
+                </p>
+            </div>
+
+            <!-- Gradual Tier-2 VA batch (imported wallets) -->
+            <div class="bg-white rounded-lg p-4 border border-violet-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-xs font-semibold text-violet-700 bg-violet-100 px-2 py-1 rounded">WALLET IMPORT</span>
+                        <span class="text-sm font-medium text-gray-900 ml-2">Tier-2 VA batch (BVN wallets)</span>
+                    </div>
+                    <button onclick="copyCronUrl('tier2-batch')" class="text-violet-600 hover:text-violet-800 text-sm">
+                        <i class="fas fa-copy mr-1"></i> Copy
+                    </button>
+                </div>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['tier2-batch'] }}</code>
+                <p class="text-xs text-gray-600 mt-2">
+                    <strong>Queues up to 8 Mevon Tier-2 personal VAs per run</strong> for sterilized-import wallets with BVN. Schedule twice daily (09:00 and 18:00 Africa/Lagos), then run the KYC queue URL above.
                 </p>
                 <p class="text-xs text-gray-500 mt-1">
-                    <strong>Token:</strong> If <code class="bg-gray-100 px-1 rounded">CRON_EMAIL_FETCH_TOKEN</code> is set, append <code class="bg-gray-100 px-1 rounded">?token=YOUR_TOKEN</code>.
+                    <strong>Dry-run:</strong> change <code class="bg-gray-100 px-1 rounded">apply=1</code> to <code class="bg-gray-100 px-1 rounded">apply=0</code> in the URL.
                 </p>
             </div>
 
@@ -965,12 +1013,9 @@
                         <i class="fas fa-copy mr-1"></i> Copy
                     </button>
                 </div>
-                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/peer-loans/collect-daily') }}</code>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['peer-loan-daily'] }}</code>
                 <p class="text-xs text-gray-600 mt-2">
                     <strong>Daily split</strong> offers and <strong>lump-sum</strong> loans. Schedule once per day (e.g. cron-job.org daily).
-                </p>
-                <p class="text-xs text-gray-500 mt-1">
-                    <strong>Token:</strong> If <code class="bg-gray-100 px-1 rounded">CRON_EMAIL_FETCH_TOKEN</code> is set in <code class="bg-gray-100 px-1 rounded">.env</code>, append <code class="bg-gray-100 px-1 rounded">?token=YOUR_TOKEN</code> (same as other cron URLs).
                 </p>
             </div>
 
@@ -984,7 +1029,7 @@
                         <i class="fas fa-copy mr-1"></i> Copy
                     </button>
                 </div>
-                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/peer-loans/collect-weekly') }}</code>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['peer-loan-weekly'] }}</code>
                 <p class="text-xs text-gray-600 mt-2">
                     <strong>Weekly split</strong> offers (including when frequency is left blank). Schedule once per week.
                 </p>
@@ -1000,7 +1045,7 @@
                         <i class="fas fa-copy mr-1"></i> Copy
                     </button>
                 </div>
-                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/peer-loans/collect-monthly') }}</code>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['peer-loan-monthly'] }}</code>
                 <p class="text-xs text-gray-600 mt-2">
                     <strong>Monthly split</strong> offers (30-day step schedules). Schedule once per month.
                 </p>
@@ -1016,12 +1061,9 @@
                         <i class="fas fa-copy mr-1"></i> Copy
                     </button>
                 </div>
-                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/wallet/inactive-reminders/morning') }}</code>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['wallet-inactive-morning'] }}</code>
                 <p class="text-xs text-gray-600 mt-2">
                     <strong>WhatsApp + app push</strong> for wallets with balance and no activity today. Schedule once daily around <strong>09:00 Africa/Lagos</strong>.
-                </p>
-                <p class="text-xs text-gray-500 mt-1">
-                    <strong>Token:</strong> If <code class="bg-gray-100 px-1 rounded">CRON_EMAIL_FETCH_TOKEN</code> is set, append <code class="bg-gray-100 px-1 rounded">?token=YOUR_TOKEN</code>.
                 </p>
             </div>
 
@@ -1035,9 +1077,25 @@
                         <i class="fas fa-copy mr-1"></i> Copy
                     </button>
                 </div>
-                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ url('/cron/wallet/inactive-reminders/evening') }}</code>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['wallet-inactive-evening'] }}</code>
                 <p class="text-xs text-gray-600 mt-2">
                     Same reminder pass for inactive wallets. Schedule once daily around <strong>18:00 Africa/Lagos</strong>.
+                </p>
+            </div>
+
+            <div class="bg-white rounded-lg p-4 border border-sky-300">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-xs font-semibold text-sky-700 bg-sky-100 px-2 py-1 rounded">LIVE SYNC</span>
+                        <span class="text-sm font-medium text-gray-900 ml-2">Namecheap → Contabo sync</span>
+                    </div>
+                    <button type="button" onclick="copyCronUrl('live-sync')" class="text-sky-600 hover:text-sky-800 text-sm">
+                        <i class="fas fa-copy mr-1"></i> Copy
+                    </button>
+                </div>
+                <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['live-sync'] }}</code>
+                <p class="text-xs text-gray-600 mt-2">
+                    Incremental live DB sync transmitter. Only works when <code class="bg-gray-100 px-1 rounded">LIVE_SYNC_TRANSMIT_ENABLED=true</code> on the source host.
                 </p>
             </div>
             @endif
@@ -1051,7 +1109,8 @@
                 <li><strong>Email Reading:</strong> Every 5-15 minutes (Direct Filesystem or IMAP)</li>
                 <li><strong>Extract Missing Names:</strong> Every 5-10 minutes (extracts sender names from emails)</li>
                 <li><strong>Global Matching:</strong> Every 10-30 minutes (matches unmatched items)</li>
-                <li><strong>KYC / Rubies accounts:</strong> Every 1–5 minutes when users are upgrading, or open the URL manually after queueing</li>
+                <li><strong>KYC / Rubies accounts:</strong> Every 1–5 minutes when users are upgrading, or after Tier-2 batch cron</li>
+                <li><strong>Tier-2 VA import batch:</strong> Twice daily (09:00 and 18:00 Lagos) — then KYC queue ~2 minutes later</li>
                 @if(auth('admin')->user()->isSuperAdmin())
                 <li><strong>Peer loan repayments:</strong> Three URLs above — schedule <strong>daily</strong>, <strong>weekly</strong>, and <strong>monthly</strong> cadences separately (or use server cron <code class="bg-yellow-100 px-1 rounded text-yellow-900">php artisan schedule:run</code> every minute instead).</li>
                 <li><strong>Wallet inactive reminders:</strong> Morning and evening URLs — schedule twice daily (09:00 and 18:00 Lagos time), or rely on <code class="bg-yellow-100 px-1 rounded text-yellow-900">php artisan schedule:run</code>.</li>
@@ -1528,33 +1587,8 @@ function collectPeerLoanInstallments() {
 }
 
 function copyCronUrl(type = 'direct') {
-    let url;
-    
-    if (type === 'direct') {
-        url = '{{ url('/cron/read-emails-direct') }}';
-    } else if (type === 'imap') {
-        url = '{{ url('/cron/monitor-emails') }}';
-    } else if (type === 'global-match') {
-        url = '{{ url('/cron/global-match') }}';
-    } else if (type === 'extract-names') {
-        url = '{{ url('/cron/extract-missing-names') }}';
-    } else if (type === 'webhooks') {
-        url = '{{ url('/api/v1/cron/process-webhooks') }}';
-    } else if (type === 'peer-loan-daily') {
-        url = '{{ url('/cron/peer-loans/collect-daily') }}';
-    } else if (type === 'peer-loan-weekly') {
-        url = '{{ url('/cron/peer-loans/collect-weekly') }}';
-    } else if (type === 'peer-loan-monthly') {
-        url = '{{ url('/cron/peer-loans/collect-monthly') }}';
-    } else if (type === 'wallet-inactive-morning') {
-        url = '{{ url('/cron/wallet/inactive-reminders/morning') }}';
-    } else if (type === 'wallet-inactive-evening') {
-        url = '{{ url('/cron/wallet/inactive-reminders/evening') }}';
-    } else if (type === 'kyc-queue') {
-        url = '{{ url('/cron/process-kyc-queue') }}';
-    } else {
-        url = '{{ url('/cron/read-emails-direct') }}';
-    }
+    const adminCronUrls = @json($adminCronUrls);
+    const url = adminCronUrls[type] || adminCronUrls.direct;
     
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(function() {
