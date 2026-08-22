@@ -148,9 +148,10 @@ return [
     /*
     | Self bank transfer fee: when user sends to their own account (name match or fintech acct = WhatsApp phone).
     | Admin overrides via /admin/whatsapp-wallet (settings group whatsapp). P2P and other people's accounts stay free.
+    | Defaults are 0 (no charge) until ops raises percent/fixed in admin.
     */
     'self_bank_transfer_fee_enabled' => filter_var(env('WHATSAPP_SELF_BANK_TRANSFER_FEE_ENABLED', true), FILTER_VALIDATE_BOOL),
-    'self_bank_transfer_fee_percent' => (float) env('WHATSAPP_SELF_BANK_TRANSFER_FEE_PERCENT', 1.5),
+    'self_bank_transfer_fee_percent' => (float) env('WHATSAPP_SELF_BANK_TRANSFER_FEE_PERCENT', 0),
     'self_bank_transfer_fixed_fee' => max(0.0, (float) env('WHATSAPP_SELF_BANK_TRANSFER_FIXED_FEE', 0)),
     'self_bank_transfer_max_fee' => max(0.0, (float) env('WHATSAPP_SELF_BANK_TRANSFER_MAX_FEE', 500)),
     'self_bank_transfer_name_min_score' => max(50, min(100, (int) env('WHATSAPP_SELF_BANK_TRANSFER_NAME_MIN_SCORE', 68))),

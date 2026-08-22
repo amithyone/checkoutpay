@@ -818,7 +818,7 @@ class WhatsappWalletAdminController extends Controller
         );
         Setting::set(
             'whatsapp_self_bank_transfer_fee_percent',
-            $validated['whatsapp_self_bank_transfer_fee_percent'] ?? config('whatsapp.self_bank_transfer_fee_percent', 1.5),
+            $validated['whatsapp_self_bank_transfer_fee_percent'] ?? config('whatsapp.self_bank_transfer_fee_percent', 0),
             'float',
             'whatsapp',
             'Self bank transfer fee percent (deducted from amount sent; recipient gets remainder)'

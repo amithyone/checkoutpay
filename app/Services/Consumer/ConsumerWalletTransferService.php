@@ -40,6 +40,172 @@ class ConsumerWalletTransferService
         private \App\Services\Payout\MerchantPayoutMessageSanitizer $payoutCopy,
     ) {}
 
+    /**
+     * Preview fee for the amount screen (must match {@see bankTransfer()} / {@see p2p()} debit rules).
+     *
+     * Wallet debit is always the typed `amount`. Self-bank fees are taken from the payout
+     * (recipient receives amount − fee), not added on top.
+     *
+     * @return array{ok: bool, message?: string, data?: array<string, mixed>}
+     */
+    public function feeQuote(
+        WhatsappWallet $wallet,
+        string $kind,
+        float $amount,
+        string $ledgerScope = ConsumerWalletTransactionScope::SCOPE_PERSONAL,
+        ?string $bankCode = null,
+        ?string $accountNumber = null,
+        ?string $toPhone = null,
+    ): array {
+        $amount = round($amount, 2);
+        if ($amount < 1) {
+            return ['ok' => false, 'message' => 'Minimum amount is ₦1.'];
+        }
+
+        $kind = strtolower(trim($kind));
+        $ledgerScope = ConsumerWalletTransactionScope::normalize($ledgerScope);
+
+        if ($kind === 'p2p') {
+            return ['ok' => true, 'data' => $this->formatFeeQuotePayload(
+                amount: $amount,
+                feeAmount: 0.0,
+                payoutAmount: $amount,
+                selfTransfer: false,
+                feeWaived: false,
+                reason: null,
+            )];
+        }
+
+        if ($kind !== 'bank') {
+            return ['ok' => false, 'message' => 'kind must be bank or p2p.'];
+        }
+
+        $acct = preg_replace('/\D/', '', (string) $accountNumber) ?? '';
+        $code = trim((string) $bankCode);
+        if (strlen($acct) !== 10 || $code === '') {
+            return ['ok' => false, 'message' => 'bank_code and account_number (10 digits) are required for bank fee quotes.'];
+        }
+
+        if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS && ! $wallet->fresh()->hasBusinessWallet()) {
+            return ['ok' => false, 'message' => 'Business wallet is not linked yet.'];
+        }
+
+        $walletFresh = $wallet->fresh() ?? $wallet;
+
+        // Same free paths as bankTransfer(): business→own personal VA, or CheckoutNow internal VA.
+        if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS
+            && $this->internalVaTransfer->isOwnTier2Va($walletFresh, $acct)) {
+            return ['ok' => true, 'data' => $this->formatFeeQuotePayload(
+                amount: $amount,
+                feeAmount: 0.0,
+                payoutAmount: $amount,
+                selfTransfer: false,
+                feeWaived: true,
+                reason: 'business_to_own_personal',
+            )];
+        }
+
+        if ($this->internalVaTransfer->resolveRecipientWallet($walletFresh, $acct) !== null) {
+            return ['ok' => true, 'data' => $this->formatFeeQuotePayload(
+                amount: $amount,
+                feeAmount: 0.0,
+                payoutAmount: $amount,
+                selfTransfer: false,
+                feeWaived: true,
+                reason: 'internal_wallet',
+            )];
+        }
+
+        $beneficiaryForMatch = '';
+        $fromEnquiry = false;
+        if ($this->bankPayout->isNameEnquiryAvailable()) {
+            $ne = $this->cachedNameEnquiry($code, $acct);
+            if ($ne && ! $this->bankPayout->isWeakVerifiedName($ne['account_name'] ?? null)) {
+                $beneficiaryForMatch = trim((string) $ne['account_name']);
+                $fromEnquiry = true;
+            }
+        }
+
+        $isSelf = $this->selfBankTransfer->isSelfTransfer(
+            $walletFresh,
+            $acct,
+            $code,
+            $beneficiaryForMatch,
+            $fromEnquiry,
+        );
+        $quoted = $this->selfBankTransfer->quote($amount, $isSelf);
+        if (! ($quoted['ok'] ?? false)) {
+            return ['ok' => false, 'message' => (string) ($quoted['message'] ?? 'Invalid transfer amount.')];
+        }
+
+        $fee = (float) ($quoted['fee'] ?? 0);
+        $payout = (float) ($quoted['payout_amount'] ?? $amount);
+        $feeWaived = $isSelf && $fee <= 0.0 && $this->selfBankTransfer->isEnabled();
+
+        return ['ok' => true, 'data' => $this->formatFeeQuotePayload(
+            amount: $amount,
+            feeAmount: $fee,
+            payoutAmount: $payout,
+            selfTransfer: $isSelf,
+            feeWaived: $feeWaived,
+            reason: $isSelf ? 'self_transfer' : null,
+        )];
+    }
+
+    /**
+     * @return array{account_name: string, bank_code: string}|null
+     */
+    private function cachedNameEnquiry(string $bankCode, string $account10): ?array
+    {
+        $key = 'consumer_fee_quote_ne:'.md5(strtolower(trim($bankCode)).'|'.$account10);
+
+        /** @var array{account_name: string, bank_code: string}|null|false $cached */
+        $cached = \Illuminate\Support\Facades\Cache::remember($key, 120, function () use ($bankCode, $account10) {
+            $ne = $this->bankPayout->nameEnquiry($bankCode, $account10);
+
+            // Cache negative lookups briefly too (false sentinel) to avoid hammering Mevon on debounce.
+            return $ne ?? false;
+        });
+
+        return is_array($cached) ? $cached : null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formatFeeQuotePayload(
+        float $amount,
+        float $feeAmount,
+        float $payoutAmount,
+        bool $selfTransfer,
+        bool $feeWaived,
+        ?string $reason,
+    ): array {
+        $feeAmount = round(max(0.0, $feeAmount), 2);
+        $amount = round($amount, 2);
+        $payoutAmount = round($payoutAmount, 2);
+
+        return [
+            'amount' => $amount,
+            // Wallet debit matches POST transfers/bank|p2p (fee is taken from payout, not added).
+            'fee_amount' => $feeAmount,
+            'fee_currency' => 'NGN',
+            'total_debit' => $amount,
+            'payout_amount' => $payoutAmount,
+            'fee_mode' => 'from_amount',
+            'fee_label' => $feeAmount > 0 ? '₦'.$this->formatMoneyLabel($feeAmount) : 'No fee',
+            'total_label' => '₦'.$this->formatMoneyLabel($amount),
+            'fee_waived' => $feeWaived,
+            'reason' => $reason,
+            'self_transfer' => $selfTransfer,
+        ];
+    }
+
+    private function formatMoneyLabel(float $amount): string
+    {
+        return number_format($amount, 2, '.', ',');
+    }
+
     private function evolutionInstance(): string
     {
         return WhatsappEvolutionConfigResolver::walletInstance();

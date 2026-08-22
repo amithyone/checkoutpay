@@ -27,7 +27,7 @@ final class WhatsappWalletSelfBankTransferService
             return max(0.0, min(25.0, (float) $stored));
         }
 
-        return max(0.0, min(25.0, (float) config('whatsapp.self_bank_transfer_fee_percent', 1.5)));
+        return max(0.0, min(25.0, (float) config('whatsapp.self_bank_transfer_fee_percent', 0)));
     }
 
     /** Max naira fee charged on a self bank transfer (0 = no cap). */

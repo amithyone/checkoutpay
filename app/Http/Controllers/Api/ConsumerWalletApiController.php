@@ -1119,6 +1119,52 @@ class ConsumerWalletApiController extends Controller
         ], $result['ok'] ? 200 : 422);
     }
 
+    /**
+     * Live fee preview for the amount screen (no PIN). Must match bank/P2P debit rules.
+     */
+    public function transferFeeQuote(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'kind' => 'required|string|in:bank,p2p',
+            'amount' => 'required|numeric|min:1',
+            'ledger_scope' => 'nullable|string|in:personal,business',
+            'bank_code' => 'nullable|string|max:20',
+            'account_number' => 'nullable|string|max:20',
+            'to_phone' => 'nullable|string|min:10|max:20',
+        ]);
+
+        $kind = (string) $validated['kind'];
+        if ($kind === 'bank') {
+            $request->validate([
+                'bank_code' => 'required|string|max:20',
+                'account_number' => ['required', 'regex:/^\d{10}$/'],
+            ]);
+        }
+
+        $wallet = $this->walletFor($request)->fresh();
+        $result = $this->transfers->feeQuote(
+            $wallet,
+            $kind,
+            (float) $validated['amount'],
+            (string) ($validated['ledger_scope'] ?? 'personal'),
+            isset($validated['bank_code']) ? (string) $validated['bank_code'] : null,
+            isset($validated['account_number']) ? (string) $validated['account_number'] : null,
+            isset($validated['to_phone']) ? (string) $validated['to_phone'] : null,
+        );
+
+        if (! ($result['ok'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Could not quote fee.',
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $result['data'],
+        ]);
+    }
+
     public function transferBank(Request $request): JsonResponse
     {
         $request->validate(array_merge([

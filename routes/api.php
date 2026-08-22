@@ -203,6 +203,7 @@ Route::prefix('v1')->group(function () {
         Route::post('wallet/push-token', [ConsumerWalletApiController::class, 'registerPushToken']);
         Route::post('transfers/p2p', [ConsumerWalletApiController::class, 'transferP2p']);
         Route::post('transfers/bank', [ConsumerWalletApiController::class, 'transferBank']);
+        Route::post('transfers/fee-quote', [ConsumerWalletApiController::class, 'transferFeeQuote']);
         Route::get('banks', [ConsumerWalletApiController::class, 'banks']);
         Route::get('banks/name-enquiry', [ConsumerWalletApiController::class, 'bankNameEnquiry']);
         Route::get('vtu/networks', [ConsumerWalletApiController::class, 'vtuNetworks']);
