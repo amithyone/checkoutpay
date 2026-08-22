@@ -19,6 +19,7 @@ use App\Services\Consumer\VirtualCardFxService;
 use App\Services\MevonPay\MevonPayBalanceSnapshotService;
 use App\Services\MevonPay\MevonPayExchangeRateService;
 use App\Services\NigtaxRevenueStatsService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -192,8 +193,8 @@ class DashboardController extends Controller
         $mevonTodayStats = null;
         $admin = auth('admin')->user();
         if ($admin && ($admin->isSuperAdmin() || $admin->role === 'admin')) {
-            // Prefer cached/stale Mevon data — never block the dashboard on live /V1/exchange.
-            $mevonBalance = app(MevonPayBalanceSnapshotService::class)->forDashboard(allowStale: true);
+            // Never block dashboard on live Mevon /V1/balance — async refresh via dashboard.mevon-balances.
+            $mevonBalance = app(MevonPayBalanceSnapshotService::class)->forDashboard(allowStale: true, cachedOnly: true);
             $cardFx = app(VirtualCardFxService::class);
             $cachedMevonRate = Cache::get(MevonPayExchangeRateService::CACHE_KEY)
                 ?? Cache::get(MevonPayExchangeRateService::STALE_CACHE_KEY);
@@ -233,6 +234,32 @@ class DashboardController extends Controller
             'mevonTodayStats',
             'imunify360Ops',
         ));
+    }
+
+    public function mevonBalances(Request $request): JsonResponse
+    {
+        $admin = $request->user('admin');
+        abort_unless($admin && ($admin->isSuperAdmin() || $admin->role === 'admin'), 403);
+
+        $mevonBalance = app(MevonPayBalanceSnapshotService::class)->forDashboard(allowStale: true);
+        $cardFx = app(VirtualCardFxService::class);
+        $cachedMevonRate = Cache::get(MevonPayExchangeRateService::CACHE_KEY)
+            ?? Cache::get(MevonPayExchangeRateService::STALE_CACHE_KEY);
+
+        return response()->json([
+            'success' => true,
+            'mevon_balance' => $mevonBalance,
+            'mevon_today' => [
+                'configured' => $mevonBalance['configured'],
+                'ok' => $mevonBalance['ok'],
+                'message' => $mevonBalance['message'],
+                'stale' => (bool) ($mevonBalance['stale'] ?? false),
+                'naira_balance' => $mevonBalance['naira_balance'],
+                'usd_balance' => $mevonBalance['usd_balance'],
+                'mevon_ngn_per_usd' => is_numeric($cachedMevonRate) ? (float) $cachedMevonRate : $cardFx->midUsdNgnRate(),
+                'fetched_at' => $mevonBalance['fetched_at'],
+            ],
+        ]);
     }
 
     /**

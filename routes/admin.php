@@ -45,6 +45,7 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
     // Protected admin routes (tax-role admins use NigTax /admin only)
     Route::middleware(['auth:admin', 'tax_admin_redirect', 'restrict_wallet_support'])->group(function () {
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+        Route::get('/dashboard/mevon-balances', [DashboardController::class, 'mevonBalances'])->name('dashboard.mevon-balances');
         Route::put('sidebar-menu-order', [AdminSidebarMenuController::class, 'update'])->name('sidebar-menu-order.update');
         Route::delete('sidebar-menu-order', [AdminSidebarMenuController::class, 'reset'])->name('sidebar-menu-order.reset');
         Route::post('/extract-missing-names', [DashboardController::class, 'extractMissingNames'])->name('extract-missing-names');

@@ -33,7 +33,7 @@ final class MevonPayBalanceSnapshotService
      *   stale?: bool
      * }
      */
-    public function forDashboard(bool $allowStale = true): array
+    public function forDashboard(bool $allowStale = true, bool $cachedOnly = false): array
     {
         if (! $this->http->isConfigured()) {
             return [
@@ -52,6 +52,31 @@ final class MevonPayBalanceSnapshotService
         $cached = Cache::get(self::CACHE_KEY);
         if (is_array($cached) && ($cached['ok'] ?? false)) {
             return $cached;
+        }
+
+        if ($cachedOnly) {
+            $stale = Cache::get(self::STALE_CACHE_KEY);
+            if (is_array($stale) && (($stale['naira_balance'] ?? null) !== null || ($stale['usd_balance'] ?? null) !== null)) {
+                $stale['ok'] = true;
+                $stale['stale'] = true;
+                $stale['deferred'] = true;
+                $stale['message'] = (string) ($stale['message'] ?? 'Showing last known balance — refreshing live…');
+
+                return $stale;
+            }
+
+            return [
+                'configured' => true,
+                'ok' => false,
+                'deferred' => true,
+                'message' => 'Loading live balances…',
+                'naira_balance' => null,
+                'usd_balance' => null,
+                'naira_ledger' => null,
+                'usd_ledger' => null,
+                'fetched_at' => null,
+                'stale' => false,
+            ];
         }
 
         $api = $this->http->getBalance();

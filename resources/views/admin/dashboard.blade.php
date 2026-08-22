@@ -100,9 +100,11 @@
                         MevonPay &amp; card FX
                     </h3>
                     @if($mevonTodayStats['fetched_at'] ?? null)
-                        <span class="text-xs text-gray-500">
+                        <span class="text-xs text-gray-500" id="mevon-today-fetched-at">
                             Balances {{ \Carbon\Carbon::parse($mevonTodayStats['fetched_at'])->timezone(config('app.timezone'))->format('g:i A') }}
                         </span>
+                    @else
+                        <span class="text-xs text-gray-500" id="mevon-today-fetched-at"></span>
                     @endif
                 </div>
                 @if(!($mevonTodayStats['configured'] ?? false))
@@ -153,16 +155,20 @@
                         </div>
                         <div class="bg-white rounded-lg shadow-sm p-4 border border-emerald-100">
                             <p class="text-xs text-gray-600 mb-1">Mevon balances</p>
-                            <p class="text-lg font-bold text-gray-900">
+                            <p class="text-lg font-bold text-gray-900" id="mevon-today-usd-balance">
                                 @if(($mevonTodayStats['ok'] ?? false) && $mevonTodayStats['usd_balance'] !== null)
                                     ${{ number_format($mevonTodayStats['usd_balance'], 2) }} USD
+                                @elseif($mevonBalance['deferred'] ?? false)
+                                    <span class="text-gray-400"><i class="fas fa-spinner fa-spin mr-1"></i> Loading…</span>
                                 @else
                                     — USD
                                 @endif
                             </p>
-                            <p class="text-lg font-bold text-gray-900">
+                            <p class="text-lg font-bold text-gray-900" id="mevon-today-ngn-balance">
                                 @if(($mevonTodayStats['ok'] ?? false) && $mevonTodayStats['naira_balance'] !== null)
                                     ₦{{ number_format($mevonTodayStats['naira_balance'], 2) }} NGN
+                                @elseif($mevonBalance['deferred'] ?? false)
+                                    <span class="text-gray-400"><i class="fas fa-spinner fa-spin mr-1"></i> Loading…</span>
                                 @else
                                     — NGN
                                 @endif
@@ -211,9 +217,9 @@
                             <p class="text-xs text-teal-700 mt-1">You keep <strong>₦{{ number_format($mevonTodayStats['buy_profit_ngn'] ?? 0, 2) }}</strong> per $1 withdrawn</p>
                         </div>
                     </div>
-                    @if(!($mevonTodayStats['ok'] ?? false))
-                        <p class="text-xs text-red-600 mt-2">{{ $mevonTodayStats['message'] ?? 'Could not refresh MevonPay balances.' }}</p>
-                    @endif
+                    <p class="text-xs text-red-600 mt-2 {{ (($mevonTodayStats['ok'] ?? false) || ($mevonBalance['deferred'] ?? false)) ? 'hidden' : '' }}" id="mevon-today-error">
+                        {{ $mevonTodayStats['message'] ?? 'Could not refresh MevonPay balances.' }}
+                    </p>
                 @endif
             </div>
         @endif
@@ -565,48 +571,44 @@
             </div>
         </div>
 
-        <!-- MevonPay live balances -->
-        <div class="col-span-full bg-gradient-to-br from-slate-50 to-indigo-50 rounded-lg shadow-sm p-6 border-2 border-indigo-200">
+        <!-- MevonPay live balances (refreshed async — does not block page load) -->
+        <div class="col-span-full bg-gradient-to-br from-slate-50 to-indigo-50 rounded-lg shadow-sm p-6 border-2 border-indigo-200" id="mevon-live-balances-root">
             <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
                 <div>
                     <h3 class="text-lg font-bold text-gray-900 flex items-center">
                         <i class="fas fa-wallet text-indigo-600 mr-2"></i>
                         MevonPay live balances
                     </h3>
-                    <p class="text-sm text-gray-600 mt-1">Provider wallet snapshot (cached ~2 min; last good value kept if Mevon is unreachable).
+                    <p class="text-sm text-gray-600 mt-1">Provider wallet snapshot (refreshes in background every ~2 min).
                         <a href="{{ route('admin.audits.index') }}" class="text-indigo-600 hover:underline ml-1">Open audits</a>
                     </p>
                 </div>
-                @if(($mevonBalance['fetched_at'] ?? null))
-                    <span class="text-xs text-gray-500">
+                <span class="text-xs text-gray-500" id="mevon-live-fetch-status"></span>
+                <span class="text-xs text-gray-500" id="mevon-live-updated">
+                    @if(($mevonBalance['fetched_at'] ?? null))
                         Updated {{ \Carbon\Carbon::parse($mevonBalance['fetched_at'])->timezone(config('app.timezone'))->format('M j, Y g:i A') }}
                         @if($mevonBalance['stale'] ?? false)
                             · <span class="text-amber-700 font-semibold">stale</span>
                         @endif
-                    </span>
-                @endif
+                    @endif
+                </span>
             </div>
 
-            @if(!($mevonBalance['configured'] ?? false))
-                <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-                    {{ $mevonBalance['message'] ?? 'MevonPay is not configured.' }}
-                </p>
-            @elseif(!($mevonBalance['ok'] ?? false))
-                <p class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-                    {{ $mevonBalance['message'] ?? 'Could not load balance.' }}
-                </p>
-            @else
-                @if($mevonBalance['stale'] ?? false)
-                    <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
-                        {{ $mevonBalance['message'] }}
-                    </p>
-                @endif
+            <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4 {{ ($mevonBalance['configured'] ?? false) ? 'hidden' : '' }}" id="mevon-live-not-configured">
+                {{ $mevonBalance['message'] ?? 'MevonPay is not configured.' }}
+            </p>
+            <p class="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-4 hidden" id="mevon-live-error"></p>
+            <p class="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4 hidden" id="mevon-live-stale-note"></p>
+
+            <div id="mevon-live-balances-grid" class="{{ ($mevonBalance['configured'] ?? false) ? '' : 'hidden' }}">
                 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
                     <div class="bg-white rounded-lg p-4 border border-indigo-100 shadow-sm">
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Naira balance</p>
-                        <p class="text-2xl font-bold text-gray-900">
+                        <p class="text-2xl font-bold text-gray-900" id="mevon-live-naira">
                             @if($mevonBalance['naira_balance'] !== null)
                                 ₦{{ number_format($mevonBalance['naira_balance'], 2) }}
+                            @elseif($mevonBalance['deferred'] ?? false)
+                                <span class="text-gray-400 text-lg"><i class="fas fa-spinner fa-spin"></i></span>
                             @else
                                 —
                             @endif
@@ -615,9 +617,11 @@
                     </div>
                     <div class="bg-white rounded-lg p-4 border border-emerald-100 shadow-sm">
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Dollar balance</p>
-                        <p class="text-2xl font-bold text-gray-900">
+                        <p class="text-2xl font-bold text-gray-900" id="mevon-live-usd">
                             @if($mevonBalance['usd_balance'] !== null)
                                 ${{ number_format($mevonBalance['usd_balance'], 2) }}
+                            @elseif($mevonBalance['deferred'] ?? false)
+                                <span class="text-gray-400 text-lg"><i class="fas fa-spinner fa-spin"></i></span>
                             @else
                                 —
                             @endif
@@ -626,9 +630,11 @@
                     </div>
                     <div class="bg-white rounded-lg p-4 border border-violet-100 shadow-sm">
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Naira ledger</p>
-                        <p class="text-2xl font-bold text-gray-900">
+                        <p class="text-2xl font-bold text-gray-900" id="mevon-live-naira-ledger">
                             @if($mevonBalance['naira_ledger'] !== null)
                                 ₦{{ number_format($mevonBalance['naira_ledger'], 2) }}
+                            @elseif($mevonBalance['deferred'] ?? false)
+                                <span class="text-gray-400 text-lg"><i class="fas fa-spinner fa-spin"></i></span>
                             @else
                                 —
                             @endif
@@ -637,9 +643,11 @@
                     </div>
                     <div class="bg-white rounded-lg p-4 border border-sky-100 shadow-sm">
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Dollar ledger</p>
-                        <p class="text-2xl font-bold text-gray-900">
+                        <p class="text-2xl font-bold text-gray-900" id="mevon-live-usd-ledger">
                             @if($mevonBalance['usd_ledger'] !== null)
                                 ${{ number_format($mevonBalance['usd_ledger'], 2) }}
+                            @elseif($mevonBalance['deferred'] ?? false)
+                                <span class="text-gray-400 text-lg"><i class="fas fa-spinner fa-spin"></i></span>
                             @else
                                 —
                             @endif
@@ -647,7 +655,7 @@
                         <p class="text-xs text-gray-500 mt-1">Ledger USD (usd_ledger_bal)</p>
                     </div>
                 </div>
-            @endif
+            </div>
         </div>
         @endif
     </div>
@@ -1827,6 +1835,133 @@ function resendWebhook(paymentId) {
         btn.innerHTML = originalText;
     });
 }
+
+@if(isset($mevonTodayStats) && $mevonTodayStats)
+(function () {
+    const root = document.getElementById('mevon-live-balances-root');
+    if (!root) return;
+
+    const url = @json(route('admin.dashboard.mevon-balances'));
+    const refreshMs = Math.max(60000, {{ (int) config('services.mevonpay.balance_cache_seconds', 120) }} * 1000);
+    const tz = @json(config('app.timezone'));
+
+    function fmtNgn(v) {
+        if (v === null || v === undefined || !Number.isFinite(Number(v))) return '—';
+        return '₦' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function fmtUsd(v) {
+        if (v === null || v === undefined || !Number.isFinite(Number(v))) return '—';
+        return '$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    function setHtml(id, html) {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = html;
+    }
+    function setText(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+    function toggle(id, show) {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('hidden', !show);
+    }
+    function formatFetchedAt(iso) {
+        if (!iso) return '';
+        try {
+            const d = new Date(iso);
+            return d.toLocaleString('en-US', { timeZone: tz, month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+        } catch (e) {
+            return iso;
+        }
+    }
+    function formatTodayTime(iso) {
+        if (!iso) return '';
+        try {
+            const d = new Date(iso);
+            return d.toLocaleString('en-US', { timeZone: tz, hour: 'numeric', minute: '2-digit' });
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function applyPayload(data) {
+        const bal = data.mevon_balance || {};
+        const today = data.mevon_today || {};
+
+        toggle('mevon-live-not-configured', !bal.configured);
+        toggle('mevon-live-balances-grid', !!bal.configured);
+
+        if (!bal.configured) {
+            setText('mevon-live-not-configured', bal.message || 'MevonPay is not configured.');
+            return;
+        }
+
+        if (bal.ok) {
+            toggle('mevon-live-error', false);
+            setHtml('mevon-live-naira', fmtNgn(bal.naira_balance));
+            setHtml('mevon-live-usd', fmtUsd(bal.usd_balance));
+            setHtml('mevon-live-naira-ledger', fmtNgn(bal.naira_ledger));
+            setHtml('mevon-live-usd-ledger', fmtUsd(bal.usd_ledger));
+
+            const staleNote = document.getElementById('mevon-live-stale-note');
+            if (bal.stale) {
+                toggle('mevon-live-stale-note', true);
+                setText('mevon-live-stale-note', bal.message || 'Showing last known balance.');
+            } else {
+                toggle('mevon-live-stale-note', false);
+            }
+
+            const updated = formatFetchedAt(bal.fetched_at);
+            let updatedHtml = updated ? 'Updated ' + updated : '';
+            if (bal.stale) {
+                updatedHtml += ' · <span class="text-amber-700 font-semibold">stale</span>';
+            }
+            setHtml('mevon-live-updated', updatedHtml);
+
+            const usdLine = bal.usd_balance !== null ? fmtUsd(bal.usd_balance) + ' USD' : '— USD';
+            const ngnLine = bal.naira_balance !== null ? fmtNgn(bal.naira_balance) + ' NGN' : '— NGN';
+            setText('mevon-today-usd-balance', usdLine);
+            setText('mevon-today-ngn-balance', ngnLine);
+            toggle('mevon-today-error', false);
+
+            const todayTime = formatTodayTime(today.fetched_at || bal.fetched_at);
+            setText('mevon-today-fetched-at', todayTime ? 'Balances ' + todayTime : '');
+        } else {
+            toggle('mevon-live-error', true);
+            setText('mevon-live-error', bal.message || 'Could not load balance.');
+            toggle('mevon-today-error', true);
+            setText('mevon-today-error', today.message || bal.message || 'Could not refresh MevonPay balances.');
+        }
+    }
+
+    function loadMevonBalances() {
+        const status = document.getElementById('mevon-live-fetch-status');
+        if (status) status.innerHTML = '<i class="fas fa-sync fa-spin mr-1"></i> Refreshing…';
+
+        fetch(url, {
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data && data.success) {
+                    applyPayload(data);
+                }
+            })
+            .catch(function (err) {
+                console.error('Mevon balance refresh failed', err);
+            })
+            .finally(function () {
+                if (status) status.textContent = '';
+            });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        loadMevonBalances();
+        setInterval(loadMevonBalances, refreshMs);
+    });
+})();
+@endif
 
 </script>
 @endsection
