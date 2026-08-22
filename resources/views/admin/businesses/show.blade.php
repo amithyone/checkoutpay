@@ -45,16 +45,13 @@
             </div>
         </div>
 
-        @php $registeredApi = $business->registeredApiAddress(); @endphp
+        @php $registrationIp = trim((string) ($business->registration_ip ?? '')); @endphp
         <div class="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-            <p class="text-xs font-semibold uppercase tracking-wide text-indigo-800">Registered API / website address</p>
-            @if($registeredApi)
-                <a href="{{ $registeredApi }}" target="_blank" rel="noopener"
-                   class="mt-1 inline-block text-sm font-mono text-indigo-900 break-all hover:underline">
-                    {{ $registeredApi }} <i class="fas fa-external-link-alt text-xs"></i>
-                </a>
+            <p class="text-xs font-semibold uppercase tracking-wide text-indigo-800">Registration IP address</p>
+            @if($registrationIp !== '')
+                <p class="mt-1 text-sm font-mono text-indigo-900">{{ $registrationIp }}</p>
             @else
-                <p class="mt-1 text-sm text-indigo-700">Not provided at registration</p>
+                <p class="mt-1 text-sm text-indigo-700">Not recorded (legacy or admin-created account)</p>
             @endif
         </div>
 
@@ -72,7 +69,7 @@
                 <p class="text-sm font-medium text-gray-900 mt-1">{{ $business->address ?? 'N/A' }}</p>
             </div>
             <div>
-                <label class="text-xs text-gray-600">Website (profile)</label>
+                <label class="text-xs text-gray-600">Website</label>
                 @if($business->website)
                     <p class="text-sm font-medium text-gray-900 mt-1">
                         <a href="{{ $business->website }}" target="_blank" class="text-primary hover:underline">
@@ -80,7 +77,7 @@
                         </a>
                     </p>
                 @else
-                    <p class="text-sm text-gray-500 mt-1">Not set on profile</p>
+                    <p class="text-sm text-gray-500 mt-1">Not provided</p>
                 @endif
             </div>
             <div>

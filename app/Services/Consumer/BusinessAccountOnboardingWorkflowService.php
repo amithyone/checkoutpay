@@ -104,6 +104,7 @@ final class BusinessAccountOnboardingWorkflowService
                     'phone' => $row->phone,
                     'address' => $row->address,
                     'website' => $row->website_url,
+                    'registration_ip' => $row->registrationIp(),
                     'service_categories' => $categories,
                     'is_active' => true,
                     'email_verified_at' => null,

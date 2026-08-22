@@ -110,6 +110,7 @@ class BusinessController extends Controller
         $validated['payout_api_enabled'] = $request->has('payout_api_enabled');
         $validated['card_payments_enabled'] = $request->has('card_payments_enabled');
         $validated['broadcast_pay_at_shop_enabled'] = $request->has('broadcast_pay_at_shop_enabled');
+        $validated['registration_ip'] = $request->ip();
 
         $business = Business::create($validated);
         $business->forceFill(['use_own_cac_for_temp_va' => $useOwnCac])->saveQuietly();

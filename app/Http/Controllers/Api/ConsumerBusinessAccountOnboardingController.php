@@ -64,6 +64,7 @@ class ConsumerBusinessAccountOnboardingController extends Controller
             $wallet,
             $validated,
             $request->file('cac_document'),
+            $request->ip(),
         );
 
         return response()->json([

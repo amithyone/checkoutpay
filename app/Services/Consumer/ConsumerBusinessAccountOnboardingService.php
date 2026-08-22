@@ -100,7 +100,7 @@ final class ConsumerBusinessAccountOnboardingService
      * @param  array<string, mixed>  $input
      * @return array{ok: bool, message: string, data?: array<string, mixed>, http_status?: int}
      */
-    public function submit(WhatsappWallet $wallet, array $input, ?UploadedFile $cacDocument = null): array
+    public function submit(WhatsappWallet $wallet, array $input, ?UploadedFile $cacDocument = null, ?string $registrationIp = null): array
     {
         if (! $this->isLive()) {
             return [
@@ -160,6 +160,7 @@ final class ConsumerBusinessAccountOnboardingService
         $publicId = 'baa_'.Str::lower((string) Str::ulid());
         $cacPath = null;
         $application = null;
+        $clientIp = trim((string) ($registrationIp ?? ''));
 
         try {
             DB::transaction(function () use (
@@ -176,6 +177,7 @@ final class ConsumerBusinessAccountOnboardingService
                 $reference,
                 $publicId,
                 $cacDocument,
+                $clientIp,
                 &$cacPath,
                 &$application,
             ) {
@@ -252,6 +254,7 @@ final class ConsumerBusinessAccountOnboardingService
                     'fee_currency' => $currency,
                     'fee_transaction_id' => $txnId,
                     'submitted_at' => now(),
+                    'meta' => $clientIp !== '' ? ['registration_ip' => $clientIp] : null,
                 ]);
 
                 if ($cacDocument instanceof UploadedFile) {
@@ -377,6 +380,7 @@ final class ConsumerBusinessAccountOnboardingService
             'phone' => $row->phone,
             'address' => $row->address,
             'website_url' => $row->website_url,
+            'registration_ip' => $row->registrationIp(),
             'status' => (string) $row->status,
             'progress_percent' => (int) $row->progress_percent,
             'status_label' => $row->statusDisplayLabel(),

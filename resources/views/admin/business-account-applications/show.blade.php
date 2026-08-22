@@ -73,18 +73,13 @@
                         <dt class="text-gray-500">Address</dt>
                         <dd>{{ $application->address }}</dd>
                     </div>
+                    <div class="sm:col-span-2">
+                        <dt class="text-gray-500">Website</dt>
+                        <dd>{{ $application->website_url ?: '—' }}</dd>
+                    </div>
                     <div class="sm:col-span-2 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-                        <dt class="text-xs font-semibold uppercase tracking-wide text-indigo-800">Registered API / website address</dt>
-                        <dd class="mt-1 text-sm">
-                            @php $apiAddr = $application->registeredApiAddress(); @endphp
-                            @if($apiAddr)
-                                <a href="{{ $apiAddr }}" target="_blank" rel="noopener" class="font-mono text-indigo-900 break-all hover:underline">
-                                    {{ $apiAddr }} <i class="fas fa-external-link-alt text-xs"></i>
-                                </a>
-                            @else
-                                <span class="text-indigo-700">Not provided (payments-only plan or pending)</span>
-                            @endif
-                        </dd>
+                        <dt class="text-xs font-semibold uppercase tracking-wide text-indigo-800">Registration IP address</dt>
+                        <dd class="mt-1 text-sm font-mono text-indigo-900">{{ $application->registrationIp() ?: 'Not recorded' }}</dd>
                     </div>
                     <div class="sm:col-span-2">
                         <dt class="text-gray-500">Service categories</dt>

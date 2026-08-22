@@ -71,7 +71,8 @@
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Business</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">API / site</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Website</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reg. IP</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Balance</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Permanent Account</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -104,21 +105,23 @@
                         </td>
                         <td class="px-6 py-4 text-sm text-gray-600">{{ $business->email }}</td>
                         <td class="px-6 py-4">
-                            @php $apiSite = $business->registeredApiAddress(); @endphp
-                            @if($apiSite)
+                            @if($business->website)
                                 <div class="flex items-center space-x-2">
-                                    <a href="{{ $apiSite }}" target="_blank" class="text-sm text-primary hover:underline truncate max-w-xs" title="{{ $apiSite }}">
-                                        {{ Str::limit($apiSite, 30) }}
+                                    <a href="{{ $business->website }}" target="_blank" class="text-sm text-primary hover:underline truncate max-w-xs">
+                                        {{ Str::limit($business->website, 30) }}
                                     </a>
                                     @if($business->website_approved)
                                         <span class="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-800 rounded-full">Approved</span>
-                                    @elseif($business->website)
+                                    @else
                                         <span class="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-800 rounded-full">Pending</span>
                                     @endif
                                 </div>
                             @else
-                                <span class="text-xs text-gray-400">Not provided</span>
+                                <span class="text-xs text-gray-400">No website</span>
                             @endif
+                        </td>
+                        <td class="px-6 py-4 text-xs font-mono text-gray-700">
+                            {{ $business->registration_ip ?: '—' }}
                         </td>
                         <td class="px-6 py-4 text-sm font-medium text-gray-900">₦{{ number_format($business->balance, 2) }}</td>
                         <td class="px-6 py-4">

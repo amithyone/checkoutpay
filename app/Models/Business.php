@@ -610,41 +610,6 @@ class Business extends Authenticatable implements CanResetPasswordContract
         return null;
     }
 
-    /** Website / API URL from registration (profile, websites, or onboarding application). */
-    public function registeredApiAddress(): ?string
-    {
-        $site = trim((string) ($this->website ?? ''));
-        if ($site !== '') {
-            return $site;
-        }
-
-        $sites = $this->relationLoaded('websites')
-            ? $this->websites
-            : $this->websites()->get(['id', 'website_url']);
-
-        foreach ($sites as $website) {
-            $url = trim((string) ($website->website_url ?? ''));
-            if ($url !== '') {
-                return $url;
-            }
-        }
-
-        $fromApplication = BusinessAccountApplication::query()
-            ->where('linked_business_id', $this->id)
-            ->whereNotNull('website_url')
-            ->where('website_url', '!=', '')
-            ->orderByDesc('id')
-            ->value('website_url');
-
-        if (is_string($fromApplication) && trim($fromApplication) !== '') {
-            return trim($fromApplication);
-        }
-
-        $hook = $this->displayWebhookUrl();
-
-        return $hook !== null && $hook !== '' ? $hook : null;
-    }
-
     /**
      * Normalize CAC RC / BN registration numbers for Mevon `cac`.
      */
