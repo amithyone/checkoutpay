@@ -67,7 +67,8 @@ final class LiveSyncTransmitterClient
             $path = '/api/v1/sync/live/probe';
         }
 
-        $chunkSize = max(50, min(500, (int) config('live_sync.batch.probe_chunk', 100)));
+        $chunkSize = max(25, min(500, (int) config('live_sync.batch.probe_chunk', 50)));
+        $probeTimeout = max(15, (int) config('live_sync.batch.probe_timeout_seconds', 60));
         $missing = [];
         $present = [];
 
@@ -75,7 +76,7 @@ final class LiveSyncTransmitterClient
             $result = $this->signedPost($url, $path, [
                 'entity' => $entity,
                 'keys' => $chunk,
-            ]);
+            ], $probeTimeout);
 
             if (! ($result['ok'] ?? false)) {
                 $detail = (string) ($result['message'] ?? 'Probe failed');
@@ -174,7 +175,7 @@ final class LiveSyncTransmitterClient
      * @param  array<string, mixed>  $payload
      * @return array{ok: bool, status?: int, body?: mixed, message: string}
      */
-    private function signedPost(string $url, string $path, array $payload): array
+    private function signedPost(string $url, string $path, array $payload, ?int $timeoutSeconds = null): array
     {
         if (! $this->isConfigured()) {
             return [
@@ -193,11 +194,12 @@ final class LiveSyncTransmitterClient
         }
 
         $maxAttempts = 3;
+        $timeout = $timeoutSeconds ?? max(3, (int) config('services.live_sync.timeout_seconds', 15));
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
             $auth = $this->signRequest($path, $body);
 
             try {
-                $response = Http::timeout((int) config('services.live_sync.timeout_seconds', 15))
+                $response = Http::timeout($timeout)
                     ->withHeaders([
                         'Content-Type' => 'application/json',
                         'Accept' => 'application/json',

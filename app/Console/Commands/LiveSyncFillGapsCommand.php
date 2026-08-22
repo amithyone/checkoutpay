@@ -231,27 +231,21 @@ class LiveSyncFillGapsCommand extends Command
 
             $probe = $client->probeMissing($entity, array_keys($keyMap));
             if (! ($probe['ok'] ?? false)) {
-                $this->error('  Probe failed: '.($probe['message'] ?? 'unknown'));
+                $this->warn('  Probe failed: '.($probe['message'] ?? 'unknown').' — falling back to insert-only for this page');
 
-                return [
-                    'pushed' => 0,
-                    'skipped_present' => 0,
-                    'fail' => 1,
-                    'candidates' => $rows->count(),
-                    'next_cursor' => $cursor,
-                    'has_more' => false,
-                ];
-            }
+                $rowsToPush = $rows->all();
+                $skippedPresent = 0;
+            } else {
+                $missing = $probe['missing'] ?? [];
+                $skippedPresent = count($probe['present'] ?? []);
+                $this->line("  id ≤ {$lastId}: candidates {$rows->count()} · present {$skippedPresent} · missing ".count($missing));
 
-            $missing = $probe['missing'] ?? [];
-            $skippedPresent = count($probe['present'] ?? []);
-            $this->line("  id ≤ {$lastId}: candidates {$rows->count()} · present {$skippedPresent} · missing ".count($missing));
-
-            $rowsToPush = [];
-            foreach ($missing as $key) {
-                $row = $keyMap[$key] ?? null;
-                if ($row) {
-                    $rowsToPush[] = $row;
+                $rowsToPush = [];
+                foreach ($missing as $key) {
+                    $row = $keyMap[$key] ?? null;
+                    if ($row) {
+                        $rowsToPush[] = $row;
+                    }
                 }
             }
         } else {

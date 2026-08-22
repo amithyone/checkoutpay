@@ -204,10 +204,60 @@ final class LiveSyncGenericEngine
      */
     public function probe(string $entity, array $keys): array
     {
+        if ($keys === []) {
+            return ['missing' => [], 'present' => []];
+        }
+
+        $presentSet = [];
+        $originIds = [];
+        $naturalKeys = [];
+
+        foreach ($keys as $key) {
+            if (str_starts_with($key, 'origin:')) {
+                $originIds[] = (int) substr($key, 7);
+            } else {
+                $naturalKeys[] = $key;
+            }
+        }
+
+        if ($originIds !== []) {
+            $mappedOrigins = LiveSyncRowMap::query()
+                ->where('entity', $entity)
+                ->whereIn('origin_id', array_values(array_unique(array_filter($originIds))))
+                ->pluck('origin_id');
+            foreach ($mappedOrigins as $originId) {
+                $presentSet['origin:'.(int) $originId] = true;
+            }
+        }
+
+        $naturalKeys = array_values(array_unique(array_filter(
+            $naturalKeys,
+            static fn ($k) => ! isset($presentSet[$k]),
+        )));
+
+        if ($naturalKeys !== []) {
+            $mappedNatural = LiveSyncRowMap::query()
+                ->where('entity', $entity)
+                ->whereIn('natural_key', $naturalKeys)
+                ->pluck('natural_key');
+            foreach ($mappedNatural as $nk) {
+                $presentSet[(string) $nk] = true;
+            }
+        }
+
+        $stillMissing = array_values(array_filter(
+            $naturalKeys,
+            static fn ($k) => ! isset($presentSet[$k]),
+        ));
+
+        foreach ($this->findNaturalKeysBulk($entity, $stillMissing) as $nk) {
+            $presentSet[$nk] = true;
+        }
+
         $missing = [];
         $present = [];
         foreach ($keys as $key) {
-            if ($this->findLocal($entity, ['_probe_key' => $key]) !== null) {
+            if (isset($presentSet[$key])) {
                 $present[] = $key;
             } else {
                 $missing[] = $key;
@@ -215,6 +265,81 @@ final class LiveSyncGenericEngine
         }
 
         return ['missing' => $missing, 'present' => $present];
+    }
+
+    /**
+     * @param  list<string>  $naturalKeys
+     * @return list<string> keys confirmed present in the target table
+     */
+    private function findNaturalKeysBulk(string $entity, array $naturalKeys): array
+    {
+        if ($naturalKeys === []) {
+            return [];
+        }
+
+        $cfg = $this->entityConfig($entity);
+        /** @var class-string<Model> $class */
+        $class = $cfg['model'];
+
+        if ($entity === 'mevon_pay_ledger_entry') {
+            $present = [];
+            $extRefs = [];
+            $payRefs = [];
+            foreach ($naturalKeys as $key) {
+                if (str_starts_with($key, 'ext:')) {
+                    $extRefs[] = substr($key, 4);
+                } elseif (str_starts_with($key, 'pay:')) {
+                    $payRefs[] = substr($key, 4);
+                }
+            }
+            if ($extRefs !== []) {
+                foreach ($class::query()->whereIn('external_reference', $extRefs)->pluck('external_reference') as $v) {
+                    $present[] = 'ext:'.(string) $v;
+                }
+            }
+            if ($payRefs !== []) {
+                foreach ($class::query()->whereIn('payout_reference', $payRefs)->pluck('payout_reference') as $v) {
+                    $present[] = 'pay:'.(string) $v;
+                }
+            }
+
+            return $present;
+        }
+
+        foreach ([(array) ($cfg['natural_key'] ?? []), (array) ($cfg['fallback_natural_key'] ?? [])] as $cols) {
+            if ($cols === [] || $cols === ['id'] || count($cols) !== 1) {
+                continue;
+            }
+
+            $col = $cols[0];
+            $lookupKeys = $naturalKeys;
+            if ($col === 'email') {
+                $lookupKeys = array_map('strtolower', $naturalKeys);
+            }
+
+            $values = $class::query()
+                ->whereIn($col, array_values(array_unique($lookupKeys)))
+                ->pluck($col);
+
+            $present = [];
+            foreach ($values as $value) {
+                $present[] = $col === 'email'
+                    ? strtolower((string) $value)
+                    : (string) $value;
+            }
+
+            return $present;
+        }
+
+        // Fallback for uncommon multi-column keys: row-at-a-time (rare path).
+        $present = [];
+        foreach ($naturalKeys as $key) {
+            if ($this->findByNaturalKeyColumns($entity, $key) !== null) {
+                $present[] = $key;
+            }
+        }
+
+        return $present;
     }
 
     /**
