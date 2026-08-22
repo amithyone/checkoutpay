@@ -45,6 +45,19 @@
             </div>
         </div>
 
+        @php $registeredApi = $business->registeredApiAddress(); @endphp
+        <div class="mb-6 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+            <p class="text-xs font-semibold uppercase tracking-wide text-indigo-800">Registered API / website address</p>
+            @if($registeredApi)
+                <a href="{{ $registeredApi }}" target="_blank" rel="noopener"
+                   class="mt-1 inline-block text-sm font-mono text-indigo-900 break-all hover:underline">
+                    {{ $registeredApi }} <i class="fas fa-external-link-alt text-xs"></i>
+                </a>
+            @else
+                <p class="mt-1 text-sm text-indigo-700">Not provided at registration</p>
+            @endif
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
                 <label class="text-xs text-gray-600">Email</label>
@@ -59,7 +72,7 @@
                 <p class="text-sm font-medium text-gray-900 mt-1">{{ $business->address ?? 'N/A' }}</p>
             </div>
             <div>
-                <label class="text-xs text-gray-600">Website</label>
+                <label class="text-xs text-gray-600">Website (profile)</label>
                 @if($business->website)
                     <p class="text-sm font-medium text-gray-900 mt-1">
                         <a href="{{ $business->website }}" target="_blank" class="text-primary hover:underline">
@@ -67,7 +80,7 @@
                         </a>
                     </p>
                 @else
-                    <p class="text-sm text-gray-500 mt-1">Not provided</p>
+                    <p class="text-sm text-gray-500 mt-1">Not set on profile</p>
                 @endif
             </div>
             <div>
@@ -282,6 +295,8 @@
         </div>
 
         <div class="mt-6 pt-6 border-t border-gray-200">
+            <label class="text-sm text-gray-600 mb-2 block">Merchant API base URL</label>
+            <p class="text-sm font-mono text-gray-900 break-all mb-4">{{ url('/api/v1') }}</p>
             <label class="text-sm text-gray-600 mb-2 block">API Key</label>
             <div class="flex items-center space-x-2">
                 <input type="text" value="{{ $business->api_key }}" readonly
