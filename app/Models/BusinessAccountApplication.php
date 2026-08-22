@@ -140,6 +140,29 @@ class BusinessAccountApplication extends Model
         };
     }
 
+    /** Website / API URL captured at registration (payments + web plan). */
+    public function registeredApiAddress(): ?string
+    {
+        $url = trim((string) ($this->website_url ?? ''));
+        if ($url !== '') {
+            return $url;
+        }
+
+        $business = $this->relationLoaded('linkedBusiness') ? $this->linkedBusiness : $this->linkedBusiness()->first(['id', 'website', 'webhook_url']);
+        if ($business) {
+            $site = trim((string) ($business->website ?? ''));
+            if ($site !== '') {
+                return $site;
+            }
+            $hook = trim((string) ($business->webhook_url ?? ''));
+            if ($hook !== '') {
+                return $hook;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * @param  Builder<self>  $query
      * @return Builder<self>

@@ -245,6 +245,8 @@ class LiveSyncPushCommand extends Command
     {
         return match ($entity) {
             'whatsapp_wallet' => ['renter', 'linkedBusiness'],
+            'business_account_application' => ['wallet', 'linkedBusiness'],
+            'business_name_registration' => ['wallet'],
             'whatsapp_wallet_transaction', 'virtual_card_request', 'wallet_savings_setting', 'wallet_savings_goal', 'wallet_savings_lock' => ['wallet'],
             'withdrawal_request', 'business_activity_log', 'business_withdrawal_account', 'business_employee', 'business_disbursement_batch', 'business_website' => ['business'],
             'business_transaction' => ['business', 'payment'],

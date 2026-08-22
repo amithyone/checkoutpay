@@ -2,6 +2,7 @@
 
 use App\Models\AccountNumber;
 use App\Models\Business;
+use App\Models\BusinessAccountApplication;
 use App\Models\BusinessActivityLog;
 use App\Models\BusinessDisbursementBatch;
 use App\Models\BusinessDisbursementItem;
@@ -9,6 +10,7 @@ use App\Models\BusinessEmployee;
 use App\Models\BusinessTransaction;
 use App\Models\BusinessWebsite;
 use App\Models\BusinessWithdrawalAccount;
+use App\Models\BusinessNameRegistration;
 use App\Models\MevonPayLedgerEntry;
 use App\Models\Payment;
 use App\Models\Renter;
@@ -36,6 +38,8 @@ return [
         'payment',
         'account_number',
         'whatsapp_wallet',
+        'business_account_application',
+        'business_name_registration',
         'whatsapp_wallet_transaction',
         'withdrawal_request',
         'business_transaction',
@@ -110,6 +114,40 @@ return [
             'resolve' => [
                 'renter_id' => ['entity' => 'renter', 'via' => 'renter_email', 'attr' => 'email'],
                 'linked_business_id' => ['entity' => 'business', 'via' => 'linked_business_code', 'attr' => 'business_id'],
+                'active_business_account_application_id' => ['entity' => 'business_account_application', 'via' => 'active_business_account_application_id', 'origin' => true],
+                'active_business_name_registration_id' => ['entity' => 'business_name_registration', 'via' => 'active_business_name_registration_id', 'origin' => true],
+            ],
+            'observe' => true,
+        ],
+        'business_account_application' => [
+            'model' => BusinessAccountApplication::class,
+            'natural_key' => ['reference'],
+            'fallback_natural_key' => ['public_id'],
+            'exclude' => ['id', 'cac_document_path', 'fee_transaction_id', 'linked_business_id', 'whatsapp_wallet_id'],
+            'extras' => [
+                'wallet_phone' => 'wallet.phone_e164',
+                'linked_business_code' => 'linkedBusiness.business_id',
+                'fee_transaction_origin_id' => 'fee_transaction_id',
+            ],
+            'resolve' => [
+                'whatsapp_wallet_id' => ['entity' => 'whatsapp_wallet', 'via' => 'wallet_phone', 'attr' => 'phone_e164'],
+                'linked_business_id' => ['entity' => 'business', 'via' => 'linked_business_code', 'attr' => 'business_id'],
+                'fee_transaction_id' => ['entity' => 'whatsapp_wallet_transaction', 'via' => 'fee_transaction_origin_id', 'origin' => true],
+            ],
+            'observe' => true,
+        ],
+        'business_name_registration' => [
+            'model' => BusinessNameRegistration::class,
+            'natural_key' => ['reference'],
+            'fallback_natural_key' => ['public_id'],
+            'exclude' => ['id', 'id_document_path', 'fee_transaction_id', 'whatsapp_wallet_id'],
+            'extras' => [
+                'wallet_phone' => 'wallet.phone_e164',
+                'fee_transaction_origin_id' => 'fee_transaction_id',
+            ],
+            'resolve' => [
+                'whatsapp_wallet_id' => ['entity' => 'whatsapp_wallet', 'via' => 'wallet_phone', 'attr' => 'phone_e164'],
+                'fee_transaction_id' => ['entity' => 'whatsapp_wallet_transaction', 'via' => 'fee_transaction_origin_id', 'origin' => true],
             ],
             'observe' => true,
         ],
@@ -244,10 +282,12 @@ return [
         'wallet_savings_lock' => [
             'model' => WalletSavingsLock::class,
             'natural_key' => [],
-            'exclude' => ['id', 'whatsapp_wallet_id'],
+            'exclude' => ['id', 'whatsapp_wallet_id', 'wallet_savings_goal_id', 'source_transaction_id'],
             'extras' => ['wallet_phone' => 'wallet.phone_e164'],
             'resolve' => [
                 'whatsapp_wallet_id' => ['entity' => 'whatsapp_wallet', 'via' => 'wallet_phone', 'attr' => 'phone_e164'],
+                'wallet_savings_goal_id' => ['entity' => 'wallet_savings_goal', 'via' => 'wallet_savings_goal_id', 'origin' => true],
+                'source_transaction_id' => ['entity' => 'whatsapp_wallet_transaction', 'via' => 'source_transaction_id', 'origin' => true],
             ],
             'observe' => true,
         ],

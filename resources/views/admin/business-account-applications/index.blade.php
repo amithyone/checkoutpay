@@ -74,6 +74,7 @@
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Reference</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Business</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Plan</th>
+                    <th class="px-4 py-3 text-left font-medium text-gray-600">Registered API / site</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Wallet</th>
                     <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
                     <th class="px-4 py-3 text-right font-medium text-gray-600"></th>
@@ -88,6 +89,9 @@
                             <div class="text-xs text-gray-500">{{ $row->email }}</div>
                         </td>
                         <td class="px-4 py-3 capitalize">{{ str_replace('_', ' ', $row->account_plan) }}</td>
+                        <td class="px-4 py-3 text-xs font-mono max-w-[200px] truncate" title="{{ $row->registeredApiAddress() ?? 'Not provided' }}">
+                            {{ $row->registeredApiAddress() ?: '—' }}
+                        </td>
                         <td class="px-4 py-3 font-mono text-xs">{{ $row->wallet?->phone_e164 ?? '—' }}</td>
                         <td class="px-4 py-3">
                             <span class="inline-flex px-2 py-1 rounded-full text-xs font-medium {{ $statusBadge($row->status) }}">
@@ -100,7 +104,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-4 py-10 text-center text-gray-500">No applications found.</td>
+                        <td colspan="7" class="px-4 py-10 text-center text-gray-500">No applications found.</td>
                     </tr>
                 @endforelse
             </tbody>
