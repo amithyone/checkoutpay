@@ -22,7 +22,8 @@ class LiveSyncPushCommand extends Command
         {--limit=200 : Max candidate rows per entity}
         {--force-all : Allow scan without a since/watermark window (still capped by --limit)}
         {--dry-run : Count / probe only, do not send upserts}
-        {--sync : Send inline (ignore LIVE_SYNC_QUEUE)}';
+        {--sync : Send inline (ignore LIVE_SYNC_QUEUE)}
+        {--delay-ms=0 : Pause between upserts (helps avoid receiver rate limits)}';
 
     protected $description = 'Push common money-path data Namecheap → Contabo (use --entity=float --mode=recent for bank float)';
 
@@ -105,6 +106,7 @@ class LiveSyncPushCommand extends Command
             config(['services.live_sync.queue' => false]);
         }
         $singleId = $this->option('id') !== null ? (int) $this->option('id') : null;
+        $delayMs = max(0, min(5000, (int) $this->option('delay-ms')));
 
         $ok = 0;
         $fail = 0;
@@ -164,7 +166,7 @@ class LiveSyncPushCommand extends Command
 
                         continue;
                     }
-                    $result = $outbound->pushNow($e, 'upsert', $engine->serialize($e, $row));
+                    $result = $this->pushRow($outbound, $engine, $client, $e, $row, $delayMs);
                     if ($result['ok'] ?? false) {
                         $ok++;
                     } else {
@@ -180,7 +182,7 @@ class LiveSyncPushCommand extends Command
 
                         continue;
                     }
-                    $result = $outbound->pushNow($e, 'upsert', $engine->serialize($e, $row));
+                    $result = $this->pushRow($outbound, $engine, $client, $e, $row, $delayMs);
                     if ($result['ok'] ?? false) {
                         $ok++;
                     } else {
@@ -199,6 +201,25 @@ class LiveSyncPushCommand extends Command
         $this->info(($dryRun ? '[dry-run] ' : '')."candidates={$candidates} pushed_or_would={$ok} skipped_present={$skippedPresent} fail={$fail}");
 
         return $fail > 0 ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * @return array{ok: bool, message?: string}
+     */
+    private function pushRow(
+        LiveSyncOutboundService $outbound,
+        LiveSyncGenericEngine $engine,
+        LiveSyncTransmitterClient $client,
+        string $entity,
+        Model $row,
+        int $delayMs,
+    ): array {
+        $result = $outbound->pushNow($entity, 'upsert', $engine->serialize($entity, $row));
+        if ($delayMs > 0) {
+            usleep($delayMs * 1000);
+        }
+
+        return $result;
     }
 
     private function resolveSinceDefault(): ?Carbon

@@ -30,6 +30,8 @@ php artisan live-sync:push --entity=float --mode=recent --force-all --limit=500 
 
 Then re-check Contabo `/enter0/audits` (site float should track live).
 
+**Rate limits:** Contabo sync uses a dedicated `live_sync` limiter (600/min by HMAC key), not the generic API 60/min. If you still see `Too Many Attempts`, wait 1 minute and re-run, or use `--delay-ms=100`.
+
 ## Contabo (receiver)
 
 ```env

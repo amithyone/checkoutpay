@@ -79,6 +79,20 @@ final class LiveSyncGenericEngine
         $exclude = array_merge(['id'], (array) ($cfg['exclude'] ?? []));
         $attrs = Arr::except($model->getAttributes(), $exclude);
 
+        // Use cast values for JSON/array columns (raw DB strings can be double-encoded).
+        foreach ($model->getCasts() as $column => $cast) {
+            if (! array_key_exists($column, $attrs)) {
+                continue;
+            }
+            if (in_array($cast, ['array', 'json', 'object', 'collection'], true)
+                || (is_string($cast) && str_starts_with($cast, 'AsArray'))) {
+                $attrs[$column] = $model->getAttribute($column);
+            }
+        }
+        if ($entity === 'payment' && array_key_exists('webhook_urls_sent', $attrs)) {
+            $attrs['webhook_urls_sent'] = $model->webhook_urls_sent;
+        }
+
         // Cast dates to ISO strings for JSON transport
         foreach ($attrs as $k => $v) {
             if ($v instanceof \DateTimeInterface) {
@@ -375,6 +389,39 @@ final class LiveSyncGenericEngine
         }
 
         // Never overwrite local pin hashes from sync unless explicitly present (we exclude them)
+        return $this->normalizeJsonCastAttributes($entity, $attrs);
+    }
+
+    /**
+     * @param  array<string, mixed>  $attrs
+     * @return array<string, mixed>
+     */
+    private function normalizeJsonCastAttributes(string $entity, array $attrs): array
+    {
+        $class = $this->modelClass($entity);
+        $casts = (new $class)->getCasts();
+
+        foreach ($casts as $column => $cast) {
+            if (! array_key_exists($column, $attrs)) {
+                continue;
+            }
+            if (! in_array($cast, ['array', 'json', 'object', 'collection'], true)
+                && ! (is_string($cast) && str_starts_with($cast, 'AsArray'))) {
+                continue;
+            }
+            if ($class === \App\Models\Payment::class && $column === 'webhook_urls_sent') {
+                $attrs[$column] = \App\Models\Payment::decodeJsonList($attrs[$column]);
+
+                continue;
+            }
+            if (is_string($attrs[$column])) {
+                $decoded = json_decode($attrs[$column], true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    $attrs[$column] = $decoded;
+                }
+            }
+        }
+
         return $attrs;
     }
 }

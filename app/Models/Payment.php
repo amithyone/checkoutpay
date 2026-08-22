@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -70,7 +71,6 @@ class Payment extends Model
         'business_receives' => 'decimal:2',
         'charges_paid_by_customer' => 'boolean',
         'email_data' => 'array',
-        'webhook_urls_sent' => 'array',
         'matched_at' => 'datetime',
         'expires_at' => 'datetime',
         'checkout_pay_code_expires_at' => 'datetime',
@@ -686,6 +686,32 @@ class Payment extends Model
     public function matchedEmail()
     {
         return $this->hasOne(ProcessedEmail::class, 'matched_payment_id');
+    }
+
+    /**
+     * Normalize webhook URL list (handles live-sync double-encoded JSON strings).
+     *
+     * @return list<mixed>
+     */
+    public static function decodeJsonList(mixed $value): array
+    {
+        while (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                return [$value];
+            }
+            $value = $decoded;
+        }
+
+        return is_array($value) ? array_values($value) : [];
+    }
+
+    protected function webhookUrlsSent(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value) => self::decodeJsonList($value),
+            set: fn ($value) => json_encode(self::decodeJsonList($value)),
+        );
     }
 
     /**

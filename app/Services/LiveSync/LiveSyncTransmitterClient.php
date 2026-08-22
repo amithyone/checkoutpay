@@ -138,48 +138,63 @@ final class LiveSyncTransmitterClient
         $canonical = implode("\n", ['POST', $path, $timestamp, $nonce, $bodyHash]);
         $signature = hash_hmac('sha256', $canonical, (string) config('services.live_sync.secret'));
 
-        try {
-            $response = Http::timeout((int) config('services.live_sync.timeout_seconds', 15))
-                ->withHeaders([
-                    'Content-Type' => 'application/json',
-                    'Accept' => 'application/json',
-                    'X-LiveSync-Key' => (string) config('services.live_sync.key_id'),
-                    'X-LiveSync-Timestamp' => $timestamp,
-                    'X-LiveSync-Nonce' => $nonce,
-                    'X-LiveSync-Signature' => $signature,
-                ])
-                ->withBody($body, 'application/json')
-                ->post($url);
+        $maxAttempts = 3;
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            try {
+                $response = Http::timeout((int) config('services.live_sync.timeout_seconds', 15))
+                    ->withHeaders([
+                        'Content-Type' => 'application/json',
+                        'Accept' => 'application/json',
+                        'X-LiveSync-Key' => (string) config('services.live_sync.key_id'),
+                        'X-LiveSync-Timestamp' => $timestamp,
+                        'X-LiveSync-Nonce' => $nonce,
+                        'X-LiveSync-Signature' => $signature,
+                    ])
+                    ->withBody($body, 'application/json')
+                    ->post($url);
 
-            $json = $response->json();
-            $ok = $response->successful() && (($json['success'] ?? true) !== false);
-            if (! $ok) {
-                Log::warning('live_sync.transmit_failed', [
-                    'url' => $url,
-                    'http_status' => $response->status(),
-                    'body' => Str::limit($response->body(), 500),
-                ]);
+                if ($response->status() === 429 && $attempt < $maxAttempts) {
+                    $retryAfter = (int) ($response->header('Retry-After') ?: 5);
+                    usleep(max(1, $retryAfter) * 1_000_000);
+
+                    continue;
+                }
+
+                $json = $response->json();
+                $ok = $response->successful() && (($json['success'] ?? true) !== false);
+                if (! $ok) {
+                    Log::warning('live_sync.transmit_failed', [
+                        'url' => $url,
+                        'http_status' => $response->status(),
+                        'body' => Str::limit($response->body(), 500),
+                    ]);
+                }
+
+                return [
+                    'ok' => $ok,
+                    'status' => $response->status(),
+                    'body' => $json ?? $response->body(),
+                    'message' => $ok
+                        ? (string) ($json['message'] ?? 'OK')
+                        : (string) ($json['message'] ?? $response->reason() ?: 'Receiver rejected request'),
+                ];
+            } catch (\Throwable $e) {
+                if ($attempt >= $maxAttempts) {
+                    Log::warning('live_sync.transmit_exception', [
+                        'url' => $url,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    return [
+                        'ok' => false,
+                        'message' => $e->getMessage(),
+                    ];
+                }
+                usleep(2_000_000);
             }
-
-            return [
-                'ok' => $ok,
-                'status' => $response->status(),
-                'body' => $json ?? $response->body(),
-                'message' => $ok
-                    ? (string) ($json['message'] ?? 'OK')
-                    : (string) ($json['message'] ?? 'Receiver rejected request'),
-            ];
-        } catch (\Throwable $e) {
-            Log::warning('live_sync.transmit_exception', [
-                'url' => $url,
-                'error' => $e->getMessage(),
-            ]);
-
-            return [
-                'ok' => false,
-                'message' => $e->getMessage(),
-            ];
         }
+
+        return ['ok' => false, 'message' => 'Transmit failed after retries'];
     }
 
     private function receiverUrl(): string

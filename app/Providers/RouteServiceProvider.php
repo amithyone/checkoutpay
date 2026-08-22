@@ -100,6 +100,15 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by('ops-monitor:'.sha1($key));
         });
 
+        /** Namecheap → Contabo bulk sync (HMAC key bucket, not shared api:60/min). */
+        RateLimiter::for('live_sync', function (Request $request) {
+            $keyId = trim((string) $request->header('X-LiveSync-Key', ''));
+            $bucket = $keyId !== '' ? 'key:'.$keyId : 'ip:'.($request->ip() ?? '0');
+            $perMinute = max(120, (int) config('services.live_sync.rate_limit_per_minute', 600));
+
+            return Limit::perMinute($perMinute)->by('live-sync:'.$bucket);
+        });
+
         $this->routes(function () {
             Route::middleware(['api', 'ops.monitor', 'throttle:ops_monitor'])
                 ->prefix('ops/v1')

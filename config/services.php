@@ -177,6 +177,7 @@ return [
         'queue' => (bool) env('LIVE_SYNC_QUEUE', true),
         'queue_connection' => env('LIVE_SYNC_QUEUE_CONNECTION'),
         'queue_name' => env('LIVE_SYNC_QUEUE_NAME', 'default'),
+        'rate_limit_per_minute' => max(120, (int) env('LIVE_SYNC_RATE_LIMIT_PER_MINUTE', 600)),
     ],
 
 ];
