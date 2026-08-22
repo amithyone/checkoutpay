@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\LiveSync\LiveSyncCursorService;
 use App\Services\LiveSync\LiveSyncGenericEngine;
 use App\Services\LiveSync\LiveSyncOutboundService;
 use App\Services\LiveSync\LiveSyncTransmitterClient;
@@ -12,26 +13,29 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * Manual additive sync: push rows Contabo does not have yet (never overwrite existing).
  *
- * Faster than live-sync:push because it uses batch HTTP and id-cursor pagination.
+ * Uses persisted per-entity cursors so re-runs continue from the last synced id.
  */
 class LiveSyncFillGapsCommand extends Command
 {
     protected $signature = 'live-sync:fill-gaps
         {--entity=common : Entity name, common, or a single entity (not float)}
         {--since= : Optional lower bound on created_at/updated_at}
-        {--cursor=0 : Start after this primary key id (resume a previous run)}
+        {--cursor= : Override saved cursor (start after this id)}
         {--batch-size=500 : Candidate rows scanned per page}
         {--chunk= : Events per HTTP batch (default from config, max 50)}
         {--until-done : Keep paging until no more candidates}
+        {--reset-cursor : Reset saved cursor for selected entity/entities before run}
+        {--no-probe : Skip Contabo probe (insert_only batches only; faster backfill)}
         {--dry-run : Probe/count only, do not send}
         {--sync : Send inline (required on Namecheap; ignores LIVE_SYNC_QUEUE)}';
 
-    protected $description = 'Manually push missing rows to Contabo only (insert-only, batch HTTP, cursor pagination)';
+    protected $description = 'Manually push missing rows to Contabo only (insert-only, batch HTTP, persisted cursors)';
 
     public function handle(
         LiveSyncOutboundService $outbound,
         LiveSyncTransmitterClient $client,
         LiveSyncGenericEngine $engine,
+        LiveSyncCursorService $cursors,
     ): int {
         if (! $client->isConfigured() && ! $this->option('dry-run')) {
             $this->error('Transmitter not configured. Run on Namecheap with LIVE_SYNC_TRANSMIT_ENABLED=true.');
@@ -82,6 +86,13 @@ class LiveSyncFillGapsCommand extends Command
             }
         }
 
+        if ((bool) $this->option('reset-cursor')) {
+            foreach ($entities as $entity) {
+                $cursors->reset($entity);
+                $this->info("Reset cursor for {$entity}.");
+            }
+        }
+
         $since = null;
         if ($this->option('since')) {
             try {
@@ -92,8 +103,6 @@ class LiveSyncFillGapsCommand extends Command
                 return self::FAILURE;
             }
             $this->info('Optional window since: '.$since->toDateTimeString().' UTC');
-        } else {
-            $this->info('Full-table scan (id cursor). Use --since= to narrow.');
         }
 
         $batchSize = max(50, min(2000, (int) $this->option('batch-size')));
@@ -102,14 +111,19 @@ class LiveSyncFillGapsCommand extends Command
             : max(1, min(50, (int) config('live_sync.batch.chunk_size', 25)));
         $dryRun = (bool) $this->option('dry-run');
         $untilDone = (bool) $this->option('until-done');
+        $noProbe = (bool) $this->option('no-probe');
+        $cursorOverride = $this->option('cursor') !== null ? max(0, (int) $this->option('cursor')) : null;
 
         $this->info('fill-gaps · entities='.count($entities)." · batch-size={$batchSize} · chunk={$chunkSize}".($untilDone ? ' · until-done' : ''));
 
         $totals = ['pushed' => 0, 'skipped_present' => 0, 'fail' => 0, 'candidates' => 0];
 
         foreach ($entities as $entity) {
-            $cursor = max(0, (int) $this->option('cursor'));
-            $this->info("Entity: {$entity} (cursor start > {$cursor})");
+            $savedCursor = $cursors->cursorFor($entity);
+            $cursor = $cursorOverride ?? (int) $savedCursor->last_origin_id;
+            $caughtUp = $savedCursor->isCaughtUp() && $cursorOverride === null;
+
+            $this->info("Entity: {$entity} (cursor > {$cursor}".($caughtUp ? ', caught_up — no probe' : ', backfill').')');
 
             do {
                 $page = $this->scanPage(
@@ -122,6 +136,7 @@ class LiveSyncFillGapsCommand extends Command
                     $batchSize,
                     $chunkSize,
                     $dryRun,
+                    $caughtUp || $noProbe,
                 );
 
                 $totals['pushed'] += $page['pushed'];
@@ -130,13 +145,26 @@ class LiveSyncFillGapsCommand extends Command
                 $totals['candidates'] += $page['candidates'];
 
                 if ($page['fail'] > 0) {
-                    $this->error("Stopped {$entity} after batch failure. Resume with --cursor={$cursor}");
+                    $this->error("Stopped {$entity} after batch failure. Resume with --entity={$entity} --cursor={$cursor}");
 
                     return self::FAILURE;
                 }
 
+                if (! $dryRun && $page['next_cursor'] > $cursor) {
+                    $cursors->advance($entity, $page['next_cursor'], $page['pushed']);
+                }
+
+        if (! $dryRun && ! $page['has_more']) {
+                    $maxId = $cursors->maxOriginIdForEntity($entity, $engine);
+                    $cursors->markCaughtUp($entity, $maxId > 0 ? $maxId : $page['next_cursor']);
+                    $this->line("  {$entity} marked caught_up (cursor={$page['next_cursor']}).");
+                }
+
                 $cursor = $page['next_cursor'];
                 $hasMore = $page['has_more'];
+                if ($page['candidates'] === 0 && ! $page['has_more']) {
+                    $caughtUp = true;
+                }
             } while ($untilDone && $hasMore);
         }
 
@@ -161,6 +189,7 @@ class LiveSyncFillGapsCommand extends Command
         int $batchSize,
         int $chunkSize,
         bool $dryRun,
+        bool $skipProbe,
     ): array {
         /** @var class-string<Model> $class */
         $class = $engine->modelClass($entity);
@@ -186,41 +215,53 @@ class LiveSyncFillGapsCommand extends Command
         }
 
         $rows->loadMissing($this->eagerRelations($entity));
-
-        $keyMap = [];
-        foreach ($rows as $row) {
-            $key = $engine->probeKeyLightForModel($entity, $row);
-            if ($key !== '') {
-                $keyMap[$key] = $row;
-            }
-        }
-
-        $probe = $client->probeMissing($entity, array_keys($keyMap));
-        if (! ($probe['ok'] ?? false)) {
-            $this->error('  Probe failed: '.($probe['message'] ?? 'unknown'));
-
-            return [
-                'pushed' => 0,
-                'skipped_present' => 0,
-                'fail' => 1,
-                'candidates' => $rows->count(),
-                'next_cursor' => $cursor,
-                'has_more' => false,
-            ];
-        }
-
-        $missing = $probe['missing'] ?? [];
-        $skipped = count($probe['present'] ?? []);
         $lastId = (int) $rows->last()->getKey();
-        $this->line("  id ≤ {$lastId}: candidates {$rows->count()} · present {$skipped} · missing ".count($missing));
 
-        $pushed = 0;
-        $fail = 0;
+        $rowsToPush = $rows->all();
+        $skippedPresent = 0;
+
+        if (! $skipProbe) {
+            $keyMap = [];
+            foreach ($rows as $row) {
+                $key = $engine->probeKeyLightForModel($entity, $row);
+                if ($key !== '') {
+                    $keyMap[$key] = $row;
+                }
+            }
+
+            $probe = $client->probeMissing($entity, array_keys($keyMap));
+            if (! ($probe['ok'] ?? false)) {
+                $this->error('  Probe failed: '.($probe['message'] ?? 'unknown'));
+
+                return [
+                    'pushed' => 0,
+                    'skipped_present' => 0,
+                    'fail' => 1,
+                    'candidates' => $rows->count(),
+                    'next_cursor' => $cursor,
+                    'has_more' => false,
+                ];
+            }
+
+            $missing = $probe['missing'] ?? [];
+            $skippedPresent = count($probe['present'] ?? []);
+            $this->line("  id ≤ {$lastId}: candidates {$rows->count()} · present {$skippedPresent} · missing ".count($missing));
+
+            $rowsToPush = [];
+            foreach ($missing as $key) {
+                $row = $keyMap[$key] ?? null;
+                if ($row) {
+                    $rowsToPush[] = $row;
+                }
+            }
+        } else {
+            $this->line("  id ≤ {$lastId}: candidates {$rows->count()} · incremental (no probe)");
+        }
 
         if ($dryRun) {
             return [
-                'pushed' => count($missing),
-                'skipped_present' => $skipped,
+                'pushed' => count($rowsToPush),
+                'skipped_present' => $skippedPresent,
                 'fail' => 0,
                 'candidates' => $rows->count(),
                 'next_cursor' => $lastId,
@@ -228,15 +269,10 @@ class LiveSyncFillGapsCommand extends Command
             ];
         }
 
-        $missingRows = [];
-        foreach ($missing as $key) {
-            $row = $keyMap[$key] ?? null;
-            if ($row) {
-                $missingRows[] = $row;
-            }
-        }
+        $pushed = 0;
+        $fail = 0;
 
-        foreach (array_chunk($missingRows, $chunkSize) as $chunk) {
+        foreach (array_chunk($rowsToPush, $chunkSize) as $chunk) {
             $items = [];
             foreach ($chunk as $row) {
                 $items[] = [
@@ -244,6 +280,10 @@ class LiveSyncFillGapsCommand extends Command
                     'operation' => 'upsert',
                     'data' => $engine->serialize($entity, $row),
                 ];
+            }
+
+            if ($items === []) {
+                continue;
             }
 
             $result = $outbound->pushBatchNow($items, insertOnly: true);
@@ -256,9 +296,14 @@ class LiveSyncFillGapsCommand extends Command
             }
         }
 
+        // Incremental mode: advance through all scanned rows even if receiver skipped them.
+        if ($skipProbe && $fail === 0 && $pushed === 0 && $rows->isNotEmpty()) {
+            $skippedPresent = $rows->count();
+        }
+
         return [
             'pushed' => $pushed,
-            'skipped_present' => $skipped,
+            'skipped_present' => $skippedPresent,
             'fail' => $fail,
             'candidates' => $rows->count(),
             'next_cursor' => $lastId,

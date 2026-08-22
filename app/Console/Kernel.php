@@ -77,6 +77,14 @@ class Kernel extends ConsoleKernel
                 ->timezone('Africa/Lagos')
                 ->withoutOverlapping(10);
         }
+
+        if ((bool) config('live_sync.incremental_cron', false)
+            && (bool) config('services.live_sync.transmit_enabled', false)) {
+            $minutes = max(1, (int) config('live_sync.incremental_cron_minutes', 5));
+            $schedule->command('live-sync:incremental --sync')
+                ->cron("*/{$minutes} * * * *")
+                ->withoutOverlapping(10);
+        }
     }
 
     /**

@@ -15,65 +15,79 @@ Namecheap is the **live source of truth**. Contabo receives signed upserts for t
 
 Still **not** synced: admins, sessions, cache, jobs, nigtax, rentals catalog, desktop telemetry, chat, etc.
 
-## Two commands (pick the right one)
+## Three workflows
 
 | Goal | Command |
 |------|---------|
-| **Missing rows only** (manual gap-fill, never overwrite Contabo) | `live-sync:fill-gaps` |
-| **Recent changes / balance refresh** (upsert, including float) | `live-sync:push` |
+| **One-time backfill** (first run / re-sync entity) | `live-sync:fill-gaps --until-done --sync` |
+| **Incremental** (new rows only, uses saved cursor) | `live-sync:incremental --sync` or cron |
+| **Balance refresh** (overwrite float) | `live-sync:push --entity=float --mode=recent` |
 
-### Manual gap-fill — `live-sync:fill-gaps` (recommended for “data on live not on Contabo”)
+### Per-table checkpoints
 
-Insert-only: probes Contabo, pushes rows that are **absent**, skips everything already there. Uses **batch HTTP** (25 events/request by default) and **id cursor** pagination so you do not re-run the same command 50 times.
+Namecheap stores **`live_sync_outbound_cursors`** — one row per entity with `last_origin_id` and `status` (`backfill` \| `caught_up`).
 
-`--entity=common` syncs the money path **except** renter/business/whatsapp_wallet balances (run `live-sync:push --entity=float` for those first).
+- **First backfill**: scans from id 0, probes Contabo for missing rows, saves cursor after each page.
+- **After `caught_up`**: next run starts at saved cursor, **no probe**, pushes only `id > cursor` (insert-only on Contabo).
+- **Real-time observers** also advance the cursor when a row is pushed.
 
-Run on **Namecheap** only:
+Check progress:
 
 ```bash
-# Full money-path gap scan (safe, insert-only)
-php artisan live-sync:fill-gaps --entity=common --until-done --sync
-
-# One entity, optional date window
-php artisan live-sync:fill-gaps --entity=payment --since=2026-01-01 --until-done --sync
-
-# Resume after interrupt (use last id from output)
-php artisan live-sync:fill-gaps --entity=payment --cursor=12000 --until-done --sync
-
-# Dry-run: count missing without sending
-php artisan live-sync:fill-gaps --entity=common --until-done --dry-run
+php artisan live-sync:status
 ```
 
-Options:
+### One-time backfill — `live-sync:fill-gaps`
 
-| Flag | Default | Meaning |
-|------|---------|---------|
-| `--batch-size` | 500 | Rows scanned per page |
-| `--chunk` | 25 | Events per HTTP batch (max 50) |
-| `--cursor` | 0 | Start after this id |
-| `--until-done` | off | Keep paging until exhausted |
-| `--since` | (none) | Optional time filter; omit = full table |
+Run on **Namecheap** only. `--entity=common` skips float balance tables (use `live-sync:push --entity=float` first).
 
-**Does not** refresh balances. For float, use `live-sync:push` below.
+```bash
+php artisan live-sync:push --entity=float --mode=recent --force-all --limit=500 --sync --chunk=25
+php artisan live-sync:fill-gaps --entity=common --until-done --sync
+```
+
+| Flag | Meaning |
+|------|---------|
+| `--until-done` | Page until table end; marks entity `caught_up` |
+| `--reset-cursor` | Restart entity from id 0 |
+| `--cursor=N` | Override saved cursor for this run |
+| `--no-probe` | Skip Contabo probe (faster backfill; receiver insert-only skips dupes) |
+| `--batch-size` | Rows per page (default 500) |
+| `--chunk` | Events per HTTP batch (default 25) |
+
+Re-backfill one entity:
+
+```bash
+php artisan live-sync:fill-gaps --entity=payment --reset-cursor --until-done --sync
+```
+
+### Incremental — `live-sync:incremental`
+
+For cron or quick manual runs after backfill:
+
+```bash
+php artisan live-sync:incremental --sync
+```
+
+Only processes rows with `id > saved cursor`. No full-table re-scan.
+
+Enable cron on Namecheap:
+
+```env
+LIVE_SYNC_INCREMENTAL_CRON=true
+LIVE_SYNC_INCREMENTAL_CRON_MINUTES=5
+```
 
 ### Push / refresh — `live-sync:push`
 
 Catch-up for **recent window** (48h/watermark) or **balance upserts**:
 
 ```bash
-# Bank float first (required for Ops site-float ≈ live)
 php artisan live-sync:push --entity=float --mode=recent --force-all --limit=500 --sync --chunk=25
-
-# Recent missing rows (48h window, batch HTTP)
 php artisan live-sync:push --entity=common --mode=missing --sync --chunk=25
-
-# Large backlog with pagination
-php artisan live-sync:push --entity=payment --mode=missing --force-all --until-done --sync --chunk=25
 ```
 
-`--mode=missing` skips rows Contabo already has. `--mode=recent` **overwrites** (needed for balances).
-
-**Rate limits:** Contabo sync uses a dedicated `live_sync` limiter (600/min by HMAC key). Batch mode sends up to 25 rows per request, so effective throughput is much higher than row-by-row.
+`--mode=recent` **overwrites** existing rows (needed for balances). Id-cursor incremental does **not** re-push updated old rows — use `--mode=recent --since=` for that.
 
 ## Contabo (receiver)
 
@@ -102,6 +116,8 @@ LIVE_SYNC_KEY_ID=live-site-1
 LIVE_SYNC_SECRET=<same-secret>
 LIVE_SYNC_SOURCE_NAME=namecheap-live
 LIVE_SYNC_QUEUE=true
+LIVE_SYNC_INCREMENTAL_CRON=true
+LIVE_SYNC_INCREMENTAL_CRON_MINUTES=5
 ```
 
 Optional batch tuning:
@@ -116,9 +132,7 @@ php artisan migrate --force
 php artisan config:clear
 php artisan queue:work   # if QUEUE=true
 
-# Typical manual run after deploy:
-php artisan live-sync:push --entity=float --mode=recent --force-all --limit=500 --sync --chunk=25
-php artisan live-sync:fill-gaps --entity=common --until-done --sync
+php artisan live-sync:status
 ```
 
 Ongoing: configured models auto-push single-row changes when saved/deleted on Namecheap.

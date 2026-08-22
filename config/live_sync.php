@@ -38,6 +38,12 @@ return [
     ],
 
     /**
+     * Incremental cron on Namecheap (live-sync:incremental).
+     */
+    'incremental_cron' => (bool) env('LIVE_SYNC_INCREMENTAL_CRON', false),
+    'incremental_cron_minutes' => max(1, min(60, (int) env('LIVE_SYNC_INCREMENTAL_CRON_MINUTES', 5))),
+
+    /**
      * Push order for --entity=common / all (dependencies first).
      */
     'common_order' => [

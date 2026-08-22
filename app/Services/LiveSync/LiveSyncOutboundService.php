@@ -17,6 +17,7 @@ final class LiveSyncOutboundService
     public function __construct(
         private LiveSyncTransmitterClient $client,
         private LiveSyncGenericEngine $engine,
+        private LiveSyncCursorService $cursors,
     ) {}
 
     /**
@@ -87,7 +88,12 @@ final class LiveSyncOutboundService
             'data' => $data,
         ];
 
-        return $this->client->send($payload);
+        $result = $this->client->send($payload);
+        if ($result['ok'] ?? false) {
+            $this->recordCursorFromData($entity, $data);
+        }
+
+        return $result;
     }
 
     /**
@@ -115,7 +121,17 @@ final class LiveSyncOutboundService
             ];
         }
 
-        return $this->client->sendBatch($events);
+        $result = $this->client->sendBatch($events);
+        if ($result['ok'] ?? false) {
+            foreach ($items as $item) {
+                $this->recordCursorFromData(
+                    (string) $item['entity'],
+                    (array) ($item['data'] ?? []),
+                );
+            }
+        }
+
+        return $result;
     }
 
     /**
@@ -147,12 +163,29 @@ final class LiveSyncOutboundService
         }
 
         $result = $this->client->send($payload);
-        if (! ($result['ok'] ?? false)) {
+        if ($result['ok'] ?? false) {
+            $this->recordCursorFromData($entity, $data);
+        } elseif (! ($result['ok'] ?? false)) {
             Log::warning('live_sync.outbound_sync_failed', [
                 'entity' => $entity,
                 'operation' => $operation,
                 'message' => $result['message'] ?? null,
             ]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function recordCursorFromData(string $entity, array $data): void
+    {
+        if (! $this->client->isConfigured()) {
+            return;
+        }
+
+        $originId = (int) ($data['_origin_id'] ?? 0);
+        if ($originId > 0) {
+            $this->cursors->advanceIfHigher($entity, $originId);
         }
     }
 }

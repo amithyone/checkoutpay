@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\LiveSync\LiveSyncCursorService;
 use App\Services\LiveSync\LiveSyncTransmitterClient;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -26,7 +27,7 @@ class LiveSyncPushJob implements ShouldQueue
         public array $payload,
     ) {}
 
-    public function handle(LiveSyncTransmitterClient $client): void
+    public function handle(LiveSyncTransmitterClient $client, LiveSyncCursorService $cursors): void
     {
         $result = $client->send($this->payload);
         if (! ($result['ok'] ?? false)) {
@@ -38,6 +39,12 @@ class LiveSyncPushJob implements ShouldQueue
             ]);
 
             throw new \RuntimeException('Live sync push failed: '.((string) ($result['message'] ?? 'unknown')));
+        }
+
+        $entity = (string) ($this->payload['entity'] ?? '');
+        $originId = (int) (($this->payload['data'] ?? [])['_origin_id'] ?? 0);
+        if ($entity !== '' && $originId > 0) {
+            $cursors->advanceIfHigher($entity, $originId);
         }
     }
 }
