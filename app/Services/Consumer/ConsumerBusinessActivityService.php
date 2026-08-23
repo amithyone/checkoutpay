@@ -103,7 +103,7 @@ final class ConsumerBusinessActivityService
             ? max(60, (int) config('consumer_wallet.business_activity_cache_ttl_account', 600))
             : max(60, (int) config('consumer_wallet.business_activity_cache_ttl_full', 1800));
 
-        return Cache::remember($key, $ttlSeconds, function () use ($wallet, $business, $from, $to, $view) {
+        $compute = function () use ($wallet, $business, $from, $to, $view): array {
             $tz = (string) config('app.timezone', 'Africa/Lagos');
             $fromAt = $this->parseBoundary($from, $tz, startOfDay: true);
             $toAt = $this->parseBoundary($to, $tz, startOfDay: false);
@@ -117,7 +117,13 @@ final class ConsumerBusinessActivityService
                         : null,
                 ];
             }, $merged);
-        });
+        };
+
+        try {
+            return Cache::remember($key, $ttlSeconds, $compute);
+        } catch (\Throwable) {
+            return $compute();
+        }
     }
 
     /**
@@ -201,6 +207,19 @@ final class ConsumerBusinessActivityService
         }
 
         $payments = Payment::query()
+            ->select([
+                'id',
+                'business_id',
+                'business_website_id',
+                'amount',
+                'business_receives',
+                'status',
+                'payment_source',
+                'payer_name',
+                'transaction_id',
+                'matched_at',
+                'created_at',
+            ])
             ->where('business_id', $business->id)
             ->with('website:id,website_url')
             ->where(function ($query) use ($fromAt, $toAt) {
@@ -254,6 +273,22 @@ final class ConsumerBusinessActivityService
         }
 
         $withdrawals = WithdrawalRequest::query()
+            ->select([
+                'id',
+                'business_id',
+                'amount',
+                'status',
+                'bank_name',
+                'account_name',
+                'account_number',
+                'payout_reference',
+                'payout_status',
+                'bank_narration',
+                'payout_raw_response',
+                'processed_at',
+                'updated_at',
+                'created_at',
+            ])
             ->where('business_id', $business->id)
             ->whereBetween('created_at', [$fromAt, $toAt])
             ->orderByDesc('id')
