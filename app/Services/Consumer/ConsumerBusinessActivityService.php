@@ -25,9 +25,24 @@ final class ConsumerBusinessActivityService
     /** History — business account inflows, app bank sends, and merchant withdrawals. */
     public const VIEW_ACCOUNT = 'account';
 
+    private const WALLET_CACHE_GEN_PREFIX = 'consumer_biz_activity_wallet_gen:';
+
     public function __construct(
         private ConsumerBusinessWalletLedgerService $businessLedger,
     ) {}
+
+    /** Invalidate merged-activity cache for a wallet (e.g. after link/unlink). */
+    public function forgetWalletCaches(WhatsappWallet $wallet): void
+    {
+        $key = self::WALLET_CACHE_GEN_PREFIX.(int) $wallet->id;
+        $generation = (int) Cache::get($key, 0) + 1;
+        Cache::put($key, $generation, now()->addDays(30));
+    }
+
+    private function walletCacheGeneration(WhatsappWallet $wallet): int
+    {
+        return (int) Cache::get(self::WALLET_CACHE_GEN_PREFIX.(int) $wallet->id, 0);
+    }
 
     public static function normalizeView(?string $view): string
     {
@@ -71,9 +86,10 @@ final class ConsumerBusinessActivityService
         bool $refresh,
     ): array {
         $key = sprintf(
-            'consumer_biz_activity:v1:%d:%d:%s:%s:%s',
+            'consumer_biz_activity:v2:%d:%d:%d:%s:%s:%s',
             (int) $wallet->id,
             (int) $business->id,
+            $this->walletCacheGeneration($wallet),
             $from,
             $to,
             $view,

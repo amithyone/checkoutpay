@@ -44,8 +44,16 @@ class ConsumerAppSessionService
         }
 
         $lastSeen = $session->last_seen_at ?? $session->started_at;
-        if ($lastSeen === null) {
+        if ($lastSeen === null || $lastSeen === false) {
             return false;
+        }
+
+        if (! $lastSeen instanceof \DateTimeInterface) {
+            try {
+                $lastSeen = Carbon::parse($lastSeen);
+            } catch (\Throwable) {
+                return false;
+            }
         }
 
         return $lastSeen->lt(now()->subMinutes($this->idleTimeoutMinutes()));
@@ -55,8 +63,16 @@ class ConsumerAppSessionService
     {
         // Sliding idle: only inactivity matters. Absolute expires_at is extended on touch.
         $reference = $token->last_used_at ?? $token->created_at;
-        if ($reference === null) {
+        if ($reference === null || $reference === false) {
             return false;
+        }
+
+        if (! $reference instanceof \DateTimeInterface) {
+            try {
+                $reference = Carbon::parse($reference);
+            } catch (\Throwable) {
+                return false;
+            }
         }
 
         return $reference->lt(now()->subMinutes($this->idleTimeoutMinutes()));
@@ -245,7 +261,7 @@ class ConsumerAppSessionService
 
         // Keep Sanctum token valid while the user is active (prevents fixed-clock logout).
         $token = $account->currentAccessToken();
-        if ($token instanceof PersonalAccessToken) {
+        if ($token instanceof PersonalAccessToken && $token->exists) {
             $token->forceFill([
                 'last_used_at' => $now,
                 'expires_at' => now()->addMinutes($this->tokenAbsoluteLifetimeMinutes()),

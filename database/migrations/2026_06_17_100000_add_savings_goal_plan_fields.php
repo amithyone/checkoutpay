@@ -63,30 +63,32 @@ return new class extends Migration
             }
         });
 
-        $hasComposite = collect(DB::select("SHOW INDEX FROM wallet_savings_locks WHERE Key_name = 'wallet_savings_locks_source_goal_unique'"))->isNotEmpty();
-        if (! $hasComposite) {
-            try {
-                DB::statement('ALTER TABLE wallet_savings_locks DROP FOREIGN KEY wallet_savings_locks_source_transaction_id_foreign');
-            } catch (\Throwable) {
-                // FK may already be absent during partial reruns.
-            }
+        if (DB::getDriverName() !== 'sqlite') {
+            $hasComposite = collect(DB::select("SHOW INDEX FROM wallet_savings_locks WHERE Key_name = 'wallet_savings_locks_source_goal_unique'"))->isNotEmpty();
+            if (! $hasComposite) {
+                try {
+                    DB::statement('ALTER TABLE wallet_savings_locks DROP FOREIGN KEY wallet_savings_locks_source_transaction_id_foreign');
+                } catch (\Throwable) {
+                    // FK may already be absent during partial reruns.
+                }
 
-            try {
-                DB::statement('ALTER TABLE wallet_savings_locks DROP INDEX wallet_savings_locks_source_transaction_id_unique');
-            } catch (\Throwable) {
-                // Index may already be absent during partial reruns.
-            }
+                try {
+                    DB::statement('ALTER TABLE wallet_savings_locks DROP INDEX wallet_savings_locks_source_transaction_id_unique');
+                } catch (\Throwable) {
+                    // Index may already be absent during partial reruns.
+                }
 
-            Schema::table('wallet_savings_locks', function (Blueprint $table) {
-                $table->unique(
-                    ['source_transaction_id', 'wallet_savings_goal_id'],
-                    'wallet_savings_locks_source_goal_unique',
-                );
-                $table->foreign('source_transaction_id')
-                    ->references('id')
-                    ->on('whatsapp_wallet_transactions')
-                    ->nullOnDelete();
-            });
+                Schema::table('wallet_savings_locks', function (Blueprint $table) {
+                    $table->unique(
+                        ['source_transaction_id', 'wallet_savings_goal_id'],
+                        'wallet_savings_locks_source_goal_unique',
+                    );
+                    $table->foreign('source_transaction_id')
+                        ->references('id')
+                        ->on('whatsapp_wallet_transactions')
+                        ->nullOnDelete();
+                });
+            }
         }
     }
 

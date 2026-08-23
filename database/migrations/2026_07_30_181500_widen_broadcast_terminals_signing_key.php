@@ -12,8 +12,10 @@ return new class extends Migration
             return;
         }
 
-        // Encrypted Ed25519 private keys exceed varchar(256); HMAC secrets still fit in TEXT.
-        DB::statement('ALTER TABLE broadcast_terminals MODIFY signing_key TEXT NOT NULL');
+        if (DB::getDriverName() !== 'sqlite') {
+            // Encrypted Ed25519 private keys exceed varchar(256); HMAC secrets still fit in TEXT.
+            DB::statement('ALTER TABLE broadcast_terminals MODIFY signing_key TEXT NOT NULL');
+        }
     }
 
     public function down(): void

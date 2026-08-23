@@ -10,6 +10,7 @@ storage/app/fcm-checkoutnow.json
 /storage/framework/cache/*
 /storage/framework/sessions/*
 /storage/framework/views/*
+/storage/framework/testing/*
 /vendor
 .env
 .env.backup

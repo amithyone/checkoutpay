@@ -4,6 +4,7 @@ namespace App\Services\Business;
 
 use App\Models\Business;
 use App\Models\WhatsappWallet;
+use App\Services\Consumer\ConsumerBusinessActivityService;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Whatsapp\PhoneNormalizer;
@@ -68,13 +69,22 @@ final class BusinessWhatsappWalletLinkService
      */
     public function unlink(Business $business): array
     {
-        $updated = WhatsappWallet::query()
+        $linkedWallets = WhatsappWallet::query()
             ->where('linked_business_id', $business->id)
-            ->update(['linked_business_id' => null]);
+            ->get();
 
-        if ($updated === 0) {
+        if ($linkedWallets->isEmpty()) {
             return ['ok' => false, 'message' => 'No CheckoutNow wallet is linked to this business.'];
         }
+
+        $activity = app(ConsumerBusinessActivityService::class);
+        foreach ($linkedWallets as $wallet) {
+            $activity->forgetWalletCaches($wallet);
+        }
+
+        WhatsappWallet::query()
+            ->where('linked_business_id', $business->id)
+            ->update(['linked_business_id' => null]);
 
         return ['ok' => true, 'message' => 'CheckoutNow wallet unlinked.'];
     }

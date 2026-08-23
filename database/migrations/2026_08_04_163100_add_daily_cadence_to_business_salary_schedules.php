@@ -12,8 +12,10 @@ return new class extends Migration
             return;
         }
 
-        // MySQL enum: allow daily trickle schedules.
-        DB::statement("ALTER TABLE business_salary_schedules MODIFY COLUMN cadence ENUM('daily', 'weekly', 'biweekly', 'monthly') NOT NULL DEFAULT 'weekly'");
+        if (DB::getDriverName() !== 'sqlite') {
+            // MySQL enum: allow daily trickle schedules.
+            DB::statement("ALTER TABLE business_salary_schedules MODIFY COLUMN cadence ENUM('daily', 'weekly', 'biweekly', 'monthly') NOT NULL DEFAULT 'weekly'");
+        }
     }
 
     public function down(): void

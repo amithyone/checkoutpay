@@ -402,6 +402,27 @@ class ConsumerWalletApiController extends Controller
                 ]);
             }
 
+            if ($wallet->linked_business_id !== null) {
+                return response()->json([
+                    'success' => true,
+                    'data' => [],
+                    'meta' => [
+                        'current_page' => $page,
+                        'last_page' => 1,
+                        'per_page' => $perPage,
+                        'total' => 0,
+                        'scope' => $scope,
+                        'from' => $from,
+                        'to' => $to,
+                        'timezone' => $tz,
+                        'includes_merchant_activity' => false,
+                        'merchant_link_broken' => true,
+                        'business_view' => $businessView,
+                        'message' => 'Linked merchant account could not be loaded. Contact support or re-link in admin.',
+                    ],
+                ]);
+            }
+
             $walletBusinessQuery = WhatsappWalletTransaction::query()
                 ->where('whatsapp_wallet_id', $wallet->id)
                 ->where('ledger_scope', ConsumerWalletTransactionScope::SCOPE_BUSINESS)
@@ -409,10 +430,13 @@ class ConsumerWalletApiController extends Controller
                 ->where('created_at', '<=', $toAt);
 
             if ($businessView === ConsumerBusinessActivityService::VIEW_ACCOUNT) {
-                $walletBusinessQuery->where('type', WhatsappWalletTransaction::TYPE_BUSINESS_RUBIES_IN);
+                $walletBusinessQuery->whereIn('type', [
+                    WhatsappWalletTransaction::TYPE_BUSINESS_RUBIES_IN,
+                    WhatsappWalletTransaction::TYPE_BANK_TRANSFER_OUT,
+                ]);
             }
 
-            $walletBusinessPaginator = $walletBusinessQuery->orderByDesc('id')->paginate($perPage);
+            $walletBusinessPaginator = $walletBusinessQuery->orderByDesc('id')->paginate($perPage, ['*'], 'page', $page);
 
             return response()->json([
                 'success' => true,

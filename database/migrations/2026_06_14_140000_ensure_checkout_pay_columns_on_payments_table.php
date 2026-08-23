@@ -60,17 +60,34 @@ return new class extends Migration
         }
 
         $connection = Schema::getConnection();
-        $indexes = $connection->select(
-            'SHOW INDEX FROM payments WHERE Column_name = ? AND Non_unique = 0',
-            ['checkout_pay_code']
-        );
+        if ($connection->getDriverName() === 'sqlite') {
+            try {
+                $indexes = Schema::getIndexes('payments');
+                foreach ($indexes as $index) {
+                    if (! empty($index['unique']) && in_array('checkout_pay_code', $index['columns'] ?? [], true)) {
+                        return;
+                    }
+                }
+            } catch (\Throwable) {
+                // fallback
+            }
+        } else {
+            $indexes = $connection->select(
+                'SHOW INDEX FROM payments WHERE Column_name = ? AND Non_unique = 0',
+                ['checkout_pay_code']
+            );
 
-        if ($indexes !== []) {
-            return;
+            if ($indexes !== []) {
+                return;
+            }
         }
 
-        Schema::table('payments', function (Blueprint $table) {
-            $table->unique('checkout_pay_code');
-        });
+        try {
+            Schema::table('payments', function (Blueprint $table) {
+                $table->unique('checkout_pay_code');
+            });
+        } catch (\Throwable) {
+            // Index might already exist
+        }
     }
 };

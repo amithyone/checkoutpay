@@ -240,6 +240,8 @@ final class ConsumerBusinessWalletLedgerService
             'linked_business_id' => $business->id,
             'business_balance' => round((float) $business->balance, 2),
         ]);
+
+        app(ConsumerBusinessActivityService::class)->forgetWalletCaches($wallet->fresh() ?? $wallet);
     }
 
     /**

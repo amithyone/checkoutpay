@@ -24,7 +24,7 @@ return new class extends Migration
             }
         });
 
-        if (Schema::hasColumn('wallet_savings_locks', 'matures_at')) {
+        if (Schema::hasColumn('wallet_savings_locks', 'matures_at') && DB::getDriverName() !== 'sqlite') {
             DB::statement('ALTER TABLE wallet_savings_locks MODIFY matures_at TIMESTAMP NULL');
         }
     }

@@ -557,6 +557,7 @@ class WhatsappWalletAdminController extends Controller
             $business = Business::query()->findOrFail((int) $linkedBusinessId);
             $this->businessLedger->syncBalanceFromLinkedBusiness($wallet, $business);
         } else {
+            app(\App\Services\Consumer\ConsumerBusinessActivityService::class)->forgetWalletCaches($wallet);
             $wallet->update(['linked_business_id' => null]);
         }
 
