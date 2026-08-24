@@ -296,32 +296,54 @@
                         </p>
                     @endif
 
+                    @php
+                        $provisionInProgress = in_array($provisionStatus, ['queued', 'processing'], true);
+                        $kycFieldGaps = array_values(array_filter(
+                            $kycMissing,
+                            static fn (string $item): bool => ! in_array($item, [
+                                'Account creation is already in progress.',
+                                'Permanent account already exists.',
+                                'Tier 2 provisioning is not configured.',
+                            ], true)
+                        ));
+                        $kycFieldsReady = $kycFieldGaps === [];
+                    @endphp
                     @if($canQueuePayIn)
                         <div class="flex flex-wrap gap-2 pt-2 border-t border-black/5">
-                            @if($provisionStatus === 'failed')
+                            @if($provisionStatus === 'failed' || ($provisionInProgress && ! $hasPayIn))
                                 <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.retry-pay-in-account', $wallet) }}">
                                     @csrf
                                     <button type="submit"
                                         class="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        @disabled(! ($kycProvisionConfigured ?? false) || ! $kycReady)
-                                        onclick="return confirm('Retry Mevon verify + permanent account for {{ $wallet->phone_e164 }}?')">
-                                        <i class="fas fa-redo mr-1"></i> Retry account creation
+                                        @disabled(! ($kycProvisionConfigured ?? false) || ! $kycFieldsReady)
+                                        onclick="return confirm('{{ $provisionInProgress ? 'Provision looks stuck (no account yet). Re-queue' : 'Retry' }} Mevon verify + permanent account for {{ $wallet->phone_e164 }}?')">
+                                        <i class="fas fa-redo mr-1"></i> {{ $provisionInProgress ? 'Re-queue account creation' : 'Retry account creation' }}
                                     </button>
                                 </form>
                             @endif
-                            @if(! in_array($provisionStatus, ['queued', 'processing'], true))
+                            @if(! $provisionInProgress)
                                 <form method="POST" action="{{ route('admin.whatsapp-wallet.wallets.queue-pay-in-account', $wallet) }}">
                                     @csrf
                                     <button type="submit"
                                         class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        @disabled(! ($kycProvisionConfigured ?? false) || ! $kycReady || $provisionStatus === 'failed')
-                                        title="{{ $kycReady ? 'Queue permanent pay-in account' : 'Complete missing KYC fields first (see list above)' }}"
+                                        @disabled(! ($kycProvisionConfigured ?? false) || ! $kycFieldsReady || $provisionStatus === 'failed')
+                                        title="{{ $kycFieldsReady ? 'Queue permanent pay-in account' : 'Complete missing KYC fields first (see list above)' }}"
                                         onclick="return confirm('Queue Mevon verify + permanent {{ $isBusinessPayIn ? 'business' : 'personal' }} pay-in account for {{ $wallet->phone_e164 }}?')">
                                         <i class="fas fa-paper-plane mr-1"></i> Queue pay-in account
                                     </button>
                                 </form>
                             @endif
-                            @if(! ($kycProvisionConfigured ?? false) || ! $kycReady)
+                            @if($provisionInProgress)
+                                <p class="w-full text-xs text-blue-800">
+                                    Account creation is marked in progress
+                                    @if($wallet->private_account_provision_queued_at)
+                                        (queued {{ $wallet->private_account_provision_queued_at->diffForHumans() }})
+                                    @endif.
+                                    Process the KYC queue via
+                                    <a href="{{ url('/cron/process-kyc-queue') }}" target="_blank" rel="noopener" class="underline font-medium">/cron/process-kyc-queue</a>,
+                                    or use <strong>Re-queue</strong> if it is stuck with no account number.
+                                </p>
+                            @elseif(! ($kycProvisionConfigured ?? false) || ! $kycFieldsReady)
                                 <p class="w-full text-xs text-amber-800">
                                     @if(! ($kycProvisionConfigured ?? false))
                                         Buttons stay disabled until Mevon private-account API is configured.

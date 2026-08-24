@@ -355,11 +355,16 @@ final class PrivateAccountProvisionService
     {
         $readiness = $this->personalReadiness($wallet, $input);
         if (! $readiness['ready']) {
-            if ($forceRetry && $wallet->private_account_provision_status === self::STATUS_FAILED) {
-                $blocking = array_filter(
+            $status = (string) ($wallet->private_account_provision_status ?? '');
+            $allowStuckRequeue = $forceRetry
+                && trim((string) $wallet->mevon_virtual_account_number) === ''
+                && in_array($status, [self::STATUS_FAILED, self::STATUS_QUEUED, self::STATUS_PROCESSING], true);
+
+            if ($allowStuckRequeue) {
+                $blocking = array_values(array_filter(
                     $readiness['missing'],
                     fn (string $item) => $item !== 'Account creation is already in progress.'
-                );
+                ));
                 if ($blocking !== []) {
                     return [
                         'dispatched' => false,
@@ -523,7 +528,11 @@ final class PrivateAccountProvisionService
 
         if ($missing !== []) {
             $blocking = $missing;
-            if ($forceRetry && $wallet->private_account_provision_status === self::STATUS_FAILED) {
+            $status = (string) ($wallet->private_account_provision_status ?? '');
+            $allowStuckRequeue = $forceRetry
+                && trim((string) $wallet->mevon_virtual_account_number) === ''
+                && in_array($status, [self::STATUS_FAILED, self::STATUS_QUEUED, self::STATUS_PROCESSING], true);
+            if ($allowStuckRequeue) {
                 $blocking = array_values(array_filter(
                     $missing,
                     fn (string $item) => $item !== 'Account creation is already in progress.'
