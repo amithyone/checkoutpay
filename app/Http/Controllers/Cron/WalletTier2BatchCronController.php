@@ -17,6 +17,16 @@ class WalletTier2BatchCronController extends Controller
     {
         $start = microtime(true);
 
+        if (! (bool) config('services.mevonpay.tier2_batch_enabled', false)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tier-2 import batch is disabled (WALLET_TIER2_BATCH_ENABLED=false). Only users who submit Tier-2 KYC in the app/WhatsApp are queued. Enable the env flag only for intentional backfill.',
+                'method' => 'wallet_tier2_batch',
+                'timestamp' => now()->toDateTimeString(),
+                'execution_time_seconds' => round(microtime(true) - $start, 2),
+            ], 503);
+        }
+
         $limit = (int) $request->query('limit', 8);
         $limit = max(1, min(50, $limit));
 

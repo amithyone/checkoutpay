@@ -63,11 +63,15 @@ final class FormCsvTier2BatchProvisionService
             }
 
             $status = (string) ($wallet->private_account_provision_status ?? '');
-            if (in_array($status, [
+            $inFlight = [
                 PrivateAccountProvisionService::STATUS_QUEUED,
                 PrivateAccountProvisionService::STATUS_PROCESSING,
                 PrivateAccountProvisionService::STATUS_COMPLETED,
-            ], true)) {
+            ];
+            if (! (bool) config('services.mevonpay.tier2_batch_include_failed', false)) {
+                $inFlight[] = PrivateAccountProvisionService::STATUS_FAILED;
+            }
+            if (in_array($status, $inFlight, true)) {
                 $stats['skipped_in_flight']++;
                 continue;
             }

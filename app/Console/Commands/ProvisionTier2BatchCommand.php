@@ -17,6 +17,14 @@ class ProvisionTier2BatchCommand extends Command
 
     public function handle(FormCsvTier2BatchProvisionService $batch): int
     {
+        if (! (bool) config('services.mevonpay.tier2_batch_enabled', false)) {
+            $this->error('Tier-2 import batch is disabled (WALLET_TIER2_BATCH_ENABLED=false).');
+            $this->line('Only users who submit Tier-2 KYC in the app/WhatsApp are queued.');
+            $this->line('Set WALLET_TIER2_BATCH_ENABLED=true only for intentional backfill.');
+
+            return self::FAILURE;
+        }
+
         $limit = (int) $this->option('limit');
         $apply = (bool) $this->option('apply');
         $jsonl = $this->option('jsonl') ? (string) $this->option('jsonl') : null;

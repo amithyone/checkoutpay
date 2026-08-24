@@ -586,7 +586,18 @@ final class PrivateAccountProvisionService
             'business_count' => 0,
             'wallets' => [],
             'businesses' => [],
+            'skipped_stale' => 0,
+            'disabled' => false,
         ];
+
+        if (! (bool) config('services.mevonpay.kyc_redispatch_orphans', true)) {
+            $out['disabled'] = true;
+
+            return $out;
+        }
+
+        $maxAgeHours = max(1, (int) config('services.mevonpay.kyc_redispatch_max_age_hours', 6));
+        $freshAfter = now()->subHours($maxAgeHours);
 
         if (Schema::hasColumn('whatsapp_wallets', 'private_account_provision_status')) {
             WhatsappWallet::query()
@@ -594,6 +605,10 @@ final class PrivateAccountProvisionService
                 ->where(function ($q): void {
                     $q->whereNull('mevon_virtual_account_number')
                         ->orWhere('mevon_virtual_account_number', '');
+                })
+                ->where(function ($q) use ($freshAfter): void {
+                    // Only re-queue recent submissions (or missing timestamp treated as stale → skip).
+                    $q->where('private_account_provision_queued_at', '>=', $freshAfter);
                 })
                 ->orderBy('id')
                 ->each(function (WhatsappWallet $wallet) use (&$out): void {
@@ -606,6 +621,18 @@ final class PrivateAccountProvisionService
                         ];
                     }
                 });
+
+            $out['skipped_stale'] = (int) WhatsappWallet::query()
+                ->where('private_account_provision_status', self::STATUS_QUEUED)
+                ->where(function ($q): void {
+                    $q->whereNull('mevon_virtual_account_number')
+                        ->orWhere('mevon_virtual_account_number', '');
+                })
+                ->where(function ($q) use ($freshAfter): void {
+                    $q->whereNull('private_account_provision_queued_at')
+                        ->orWhere('private_account_provision_queued_at', '<', $freshAfter);
+                })
+                ->count();
         }
 
         if (Schema::hasColumn('businesses', 'rubies_account_provision_status')) {
@@ -614,6 +641,9 @@ final class PrivateAccountProvisionService
                 ->where(function ($q): void {
                     $q->whereNull('rubies_business_account_number')
                         ->orWhere('rubies_business_account_number', '');
+                })
+                ->where(function ($q) use ($freshAfter): void {
+                    $q->where('rubies_account_provision_queued_at', '>=', $freshAfter);
                 })
                 ->orderBy('id')
                 ->each(function (Business $business) use (&$out): void {

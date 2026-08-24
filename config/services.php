@@ -67,6 +67,18 @@ return [
         /** Permanent account creation (replaces sync createrubies for new provisioning). */
         'private_account_path' => env('MEVONPAY_PRIVATE_ACCOUNT_PATH', '/V1/pivateaccount'),
         'private_account_timeout_seconds' => (int) env('MEVONPAY_PRIVATE_ACCOUNT_TIMEOUT_SECONDS', 90),
+        /**
+         * KYC cron may re-dispatch orphaned “queued” rows when the jobs table was cleared.
+         * Only recent queues (hours) are re-dispatched so old backlog does not re-burn BVN/NIN fees.
+         */
+        'kyc_redispatch_orphans' => filter_var(env('MEVONPAY_KYC_REDISPATCH_ORPHANS', true), FILTER_VALIDATE_BOOL),
+        'kyc_redispatch_max_age_hours' => max(1, min(168, (int) env('MEVONPAY_KYC_REDISPATCH_MAX_AGE_HOURS', 6))),
+        /**
+         * Mass Tier-2 batch for import CSV cohort. Keep false so only users who just submitted
+         * Tier-2 KYC (app/WhatsApp) get queued; enable only for intentional backfill.
+         */
+        'tier2_batch_enabled' => filter_var(env('WALLET_TIER2_BATCH_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'tier2_batch_include_failed' => filter_var(env('WALLET_TIER2_BATCH_INCLUDE_FAILED', false), FILTER_VALIDATE_BOOL),
         /** bearer (default for /V1/tsk), token (same as payout), or raw */
         'transfer_status_auth' => env('MEVONPAY_TRANSFER_STATUS_AUTH', 'bearer'),
         /** Merchant card checkout (Paga) — POST /V1/card_checkout */

@@ -972,7 +972,9 @@
                 </div>
                 <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['kyc-queue'] }}</code>
                 <p class="text-xs text-gray-600 mt-2">
-                    <strong>Runs only Tier 2 KYC jobs</strong> (Mevon verify + Rubies account). Re-queues wallets stuck as “queued” with no job in the database, then processes the <code class="bg-gray-100 px-1 rounded">kyc-provision</code> queue.
+                    <strong>Processes jobs already on the <code class="bg-gray-100 px-1 rounded">kyc-provision</code> queue</strong>
+                    (users who just submitted Tier-2 KYC in the app/WhatsApp). May re-queue only <em>recent</em> orphaned “queued” rows
+                    (default last {{ (int) config('services.mevonpay.kyc_redispatch_max_age_hours', 6) }} hours) — not the old import backlog.
                 </p>
                 @php
                     $kycPending = (int) ($stats['kyc_provision']['pending_total'] ?? 0);
@@ -985,7 +987,7 @@
                     @endif
                 </p>
                 <p class="text-xs text-gray-500 mt-1">
-                    <strong>Frequency:</strong> Every 1–5 minutes when KYC is active, or ~2 minutes after Tier-2 batch cron below.
+                    <strong>Frequency:</strong> Every 1–5 minutes when Tier-2 KYC is active.
                 </p>
             </div>
 
@@ -1001,11 +1003,14 @@
                     </button>
                 </div>
                 <code class="text-xs text-gray-700 break-all block bg-gray-50 p-2 rounded">{{ $adminCronUrls['tier2-batch'] }}</code>
-                <p class="text-xs text-gray-600 mt-2">
-                    <strong>Queues up to 8 Mevon Tier-2 personal VAs per run</strong> for sterilized-import wallets with BVN. Schedule twice daily (09:00 and 18:00 Africa/Lagos), then run the KYC queue URL above.
+                <p class="text-xs text-amber-900 mt-2 bg-amber-50 border border-amber-100 rounded px-2 py-1.5">
+                    <strong>Disabled by default</strong> (<code class="bg-amber-100 px-1 rounded">WALLET_TIER2_BATCH_ENABLED=false</code>).
+                    Do <strong>not</strong> schedule this unless you intentionally backfill old imported wallets — it costs BVN/NIN fees.
+                    New users are queued when they submit Tier-2 KYC; use the KYC queue cron above only.
                 </p>
                 <p class="text-xs text-gray-500 mt-1">
-                    <strong>Dry-run:</strong> change <code class="bg-gray-100 px-1 rounded">apply=1</code> to <code class="bg-gray-100 px-1 rounded">apply=0</code> in the URL.
+                    To enable backfill: set <code class="bg-gray-100 px-1 rounded">WALLET_TIER2_BATCH_ENABLED=true</code> in <code class="bg-gray-100 px-1 rounded">.error</code>, then
+                    <code class="bg-gray-100 px-1 rounded">php artisan config:clear</code>. Dry-run: <code class="bg-gray-100 px-1 rounded">apply=0</code>.
                 </p>
             </div>
 

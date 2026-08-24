@@ -299,6 +299,7 @@ class PrivateAccountJobTest extends TestCase
             'kyc_bvn' => '55667788990',
             'kyc_gender' => 'male',
             'private_account_provision_status' => PrivateAccountProvisionService::STATUS_QUEUED,
+            'private_account_provision_queued_at' => now(),
         ]);
 
         $mock = Mockery::mock(MevonPrivateAccountService::class);
@@ -309,6 +310,36 @@ class PrivateAccountJobTest extends TestCase
 
         $this->assertSame(1, $out['wallet_count']);
         Queue::assertPushed(CreatePersonalPrivateAccountJob::class);
+    }
+
+    public function test_redispatch_skips_stale_queued_wallets(): void
+    {
+        Queue::fake();
+
+        WhatsappWallet::query()->create([
+            'phone_e164' => '+2348022334466',
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+            'balance' => 0,
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'kyc_fname' => 'Stale',
+            'kyc_lname' => 'User',
+            'kyc_dob' => '1989-04-12',
+            'kyc_email' => 'stale@gmail.com',
+            'kyc_bvn' => '55667788991',
+            'kyc_gender' => 'male',
+            'private_account_provision_status' => PrivateAccountProvisionService::STATUS_QUEUED,
+            'private_account_provision_queued_at' => now()->subDays(2),
+        ]);
+
+        $mock = Mockery::mock(MevonPrivateAccountService::class);
+        $mock->shouldReceive('isConfigured')->andReturn(true);
+        $this->app->instance(MevonPrivateAccountService::class, $mock);
+
+        $out = app(PrivateAccountProvisionService::class)->redispatchOrphanedQueued();
+
+        $this->assertSame(0, $out['wallet_count']);
+        $this->assertGreaterThanOrEqual(1, $out['skipped_stale']);
+        Queue::assertNothingPushed();
     }
 
     public function test_personal_job_permanent_failure_resets_tier_for_app_retry(): void
