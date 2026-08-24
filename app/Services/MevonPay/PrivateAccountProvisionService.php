@@ -222,7 +222,8 @@ final class PrivateAccountProvisionService
     {
         $wallet->refresh();
 
-        if (($wallet->rubies_account_type ?? 'personal') === 'business') {
+        $accountType = strtolower(trim((string) ($wallet->rubies_account_type ?? 'personal')));
+        if ($accountType === 'business') {
             return $this->personalBusinessReadiness($wallet);
         }
 

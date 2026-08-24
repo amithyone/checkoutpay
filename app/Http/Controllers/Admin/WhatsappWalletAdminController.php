@@ -299,14 +299,23 @@ class WhatsappWalletAdminController extends Controller
             $updates['rubies_account_type'] = in_array($type, ['personal', 'business'], true) ? $type : 'personal';
         }
 
-        if ($request->has('kyc_cac')) {
-            $cac = \App\Models\Business::normalizeCacRegistrationNumber((string) $request->input('kyc_cac'));
-            $updates['kyc_cac'] = $cac !== '' ? $cac : null;
-        }
+        $accountType = $updates['rubies_account_type']
+            ?? strtolower((string) ($wallet->rubies_account_type ?? 'personal'));
 
-        if ($request->has('kyc_business_name')) {
-            $bizName = trim((string) $request->input('kyc_business_name'));
-            $updates['kyc_business_name'] = $bizName !== '' ? $bizName : null;
+        if ($accountType === 'personal') {
+            // Personal permanent accounts never use CAC / company name — clear so UI & readiness stay clean.
+            $updates['kyc_cac'] = null;
+            $updates['kyc_business_name'] = null;
+        } else {
+            if ($request->has('kyc_cac')) {
+                $cac = \App\Models\Business::normalizeCacRegistrationNumber((string) $request->input('kyc_cac'));
+                $updates['kyc_cac'] = $cac !== '' ? $cac : null;
+            }
+
+            if ($request->has('kyc_business_name')) {
+                $bizName = trim((string) $request->input('kyc_business_name'));
+                $updates['kyc_business_name'] = $bizName !== '' ? $bizName : null;
+            }
         }
 
         if ($request->has('kyc_dob')) {

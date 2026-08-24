@@ -193,7 +193,7 @@
                             <dt class="text-gray-500">KYC verified at</dt>
                             <dd>{{ $wallet->kyc_verified_at?->format('M j, Y H:i') ?? '—' }}</dd>
                         </div>
-                        @if(filled($wallet->kyc_cac) || ($wallet->rubies_account_type ?? 'personal') === 'business')
+                        @if($isBusinessPayIn)
                             <div class="sm:col-span-2">
                                 <dt class="text-gray-500">CAC / business registration</dt>
                                 <dd class="font-mono">{{ $wallet->kyc_cac ?: '—' }}</dd>
@@ -323,8 +323,15 @@
                             @endif
                             @if(! ($kycProvisionConfigured ?? false) || ! $kycReady)
                                 <p class="w-full text-xs text-amber-800">
-                                    Buttons stay disabled until Mevon is configured and missing KYC items above are saved
-                                    (for business: CAC with RC/BN prefix + registered company name).
+                                    @if(! ($kycProvisionConfigured ?? false))
+                                        Buttons stay disabled until Mevon private-account API is configured.
+                                    @elseif($isBusinessPayIn)
+                                        Buttons stay disabled until missing business KYC above is saved
+                                        (CAC with RC/BN prefix + registered company name, plus signatory BVN/name/DOB/email).
+                                    @else
+                                        Buttons stay disabled until missing personal KYC above is saved
+                                        (first/last name, DOB, gender, email, and BVN or NIN). CAC / company name is not required for personal.
+                                    @endif
                                 </p>
                             @endif
                         </div>
@@ -349,23 +356,28 @@
                                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                                     <div>
                                         <label class="block text-gray-600 mb-1">Account type</label>
-                                        <select name="rubies_account_type" class="w-full rounded-lg border border-gray-300 px-3 py-2">
+                                        <select name="rubies_account_type" id="wallet-rubies-account-type"
+                                                class="w-full rounded-lg border border-gray-300 px-3 py-2"
+                                                onchange="(function(sel){ var biz = sel.value === 'business'; document.querySelectorAll('[data-business-kyc]').forEach(function(el){ el.classList.toggle('hidden', !biz); el.querySelectorAll('input').forEach(function(inp){ inp.disabled = !biz; }); }); })(this)">
                                             <option value="personal" @selected(old('rubies_account_type', $wallet->rubies_account_type ?? 'personal') === 'personal')>Personal</option>
                                             <option value="business" @selected(old('rubies_account_type', $wallet->rubies_account_type ?? 'personal') === 'business')>Business</option>
                                         </select>
+                                        <p class="text-xs text-gray-500 mt-1">Personal permanent accounts only need personal KYC (no CAC).</p>
                                     </div>
-                                    <div>
+                                    <div data-business-kyc @class(['hidden' => ! $isBusinessPayIn])>
                                         <label class="block text-gray-600 mb-1">CAC / business registration (RC/BN)</label>
                                         <input type="text" name="kyc_cac" value="{{ old('kyc_cac', $wallet->kyc_cac) }}"
                                                maxlength="100" placeholder="e.g. RC1234567 or BN1234567"
-                                               class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono uppercase">
+                                               class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono uppercase"
+                                               @disabled(! $isBusinessPayIn)>
                                     </div>
-                                    <div class="sm:col-span-2">
+                                    <div class="sm:col-span-2" data-business-kyc @class(['hidden' => ! $isBusinessPayIn])>
                                         <label class="block text-gray-600 mb-1">Registered business name (Mevon company name)</label>
                                         <input type="text" name="kyc_business_name" value="{{ old('kyc_business_name', $wallet->kyc_business_name) }}"
                                                maxlength="255" placeholder="Company name on CAC — not the RC/BN number"
-                                               class="w-full rounded-lg border border-gray-300 px-3 py-2">
-                                        <p class="text-xs text-gray-500 mt-1">Required for account type <strong>business</strong>. Same field merchants use for permanent pay-in.</p>
+                                               class="w-full rounded-lg border border-gray-300 px-3 py-2"
+                                               @disabled(! $isBusinessPayIn)>
+                                        <p class="text-xs text-gray-500 mt-1">Required only for account type <strong>business</strong>.</p>
                                     </div>
                                     <div>
                                         <label class="block text-gray-600 mb-1">First name</label>
