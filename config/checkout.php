@@ -82,7 +82,7 @@ return [
         'trim',
         explode(',', (string) env(
             'LEGACY_HOST_REDIRECT_SKIP_PREFIXES',
-            '/api/,/cron/,/internal/,/mevon-egress,/enter0'
+            '/api/,/cron/,/internal/,/mevon-egress,/enter0,/investor'
         ))
     ))),
 

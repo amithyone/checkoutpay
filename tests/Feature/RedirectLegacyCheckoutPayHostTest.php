@@ -52,4 +52,23 @@ class RedirectLegacyCheckoutPayHostTest extends TestCase
         $this->assertNotEquals(301, $response->status());
         $this->assertNotEquals(308, $response->status());
     }
+
+    public function test_investor_paths_are_not_redirected(): void
+    {
+        config([
+            'checkout.legacy_host_redirect_enabled' => true,
+            'checkout.legacy_host_redirect_force_in_tests' => true,
+            'checkout.legacy_host_redirect_to' => 'https://check-outnow.com',
+            'checkout.legacy_hosts' => ['check-outpay.com'],
+            'checkout.legacy_host_redirect_skip_prefixes' => ['/api/', '/cron/', '/enter0', '/investor'],
+        ]);
+
+        $gate = $this->get('https://check-outpay.com/investor/access/abc123token');
+        $this->assertNotEquals(301, $gate->status());
+        $this->assertNotEquals(308, $gate->status());
+
+        $lookup = $this->get('https://check-outpay.com/investor/access');
+        $this->assertNotEquals(301, $lookup->status());
+        $this->assertNotEquals(308, $lookup->status());
+    }
 }
