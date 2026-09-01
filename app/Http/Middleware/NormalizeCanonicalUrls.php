@@ -32,15 +32,19 @@ final class NormalizeCanonicalUrls
         $preferredHost = strtolower((string) ($preferredParts['host'] ?? ''));
         $preferredScheme = (string) ($preferredParts['scheme'] ?? 'https');
         $currentHost = strtolower($request->getHost());
+        $aliasHosts = array_map('strtolower', (array) config('checkout.canonical_alias_hosts', []));
+        $isAliasHost = $currentHost !== '' && in_array($currentHost, $aliasHosts, true);
 
         $normalizedPath = $this->normalizePath($path);
         $needsPathFix = $normalizedPath !== $path;
         $needsHostFix = ! app()->environment('testing')
             && $preferredHost !== ''
-            && $currentHost !== $preferredHost;
+            && $currentHost !== $preferredHost
+            && ! $isAliasHost;
         $needsSchemeFix = ! app()->environment('testing')
             && $request->getScheme() !== $preferredScheme
-            && app()->environment('production');
+            && app()->environment('production')
+            && ! $isAliasHost;
 
         if ($needsPathFix || $needsHostFix || $needsSchemeFix) {
             $target = $preferredScheme.'://'.$preferredHost.$normalizedPath;
@@ -65,6 +69,7 @@ final class NormalizeCanonicalUrls
             || str_starts_with($path, '/wallet/')
             || str_starts_with($path, '/my-account')
             || str_starts_with($path, '/cron/')
+            || str_starts_with($path, '/investor')
             || str_starts_with($path, '/storage/')
             || str_starts_with($path, '/download/')
         ) {

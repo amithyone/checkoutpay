@@ -87,6 +87,18 @@ return [
         ))
     ))),
 
+    /**
+     * Hosts that may serve this app without 301 to APP_URL (NormalizeCanonicalUrls).
+     * Without this, APP_URL=https://check-outnow.com would still send check-outpay.com → check-outnow.com.
+     */
+    'canonical_alias_hosts' => array_values(array_filter(array_map(
+        'strtolower',
+        array_map('trim', explode(',', (string) env(
+            'CANONICAL_ALIAS_HOSTS',
+            'check-outpay.com,www.check-outpay.com,check-outnow.com,www.check-outnow.com'
+        )))
+    ))),
+
     /*
     | Contabo → Namecheap merchant webhook egress (IP allowlists that only trust check-outpay.com).
     | Contabo: RELAY_CLIENT_ENABLED=true + RELAY_URL=https://check-outpay.com/api/v1/internal/webhook-egress
