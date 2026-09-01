@@ -32,7 +32,7 @@ class RedirectLegacyCheckoutPayHost
 
     private function shouldRedirect(Request $request): bool
     {
-        if (! (bool) config('checkout.legacy_host_redirect_enabled', true)) {
+        if (! (bool) config('checkout.legacy_host_redirect_enabled', false)) {
             return false;
         }
 

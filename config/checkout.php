@@ -66,9 +66,10 @@ return [
     'setup_complete' => filter_var(env('APP_SETUP_COMPLETE', false), FILTER_VALIDATE_BOOLEAN),
 
     /*
-    | Legacy domain redirect: check-outpay.com → check-outnow.com (Contabo cutover).
+    | Legacy domain redirect: check-outpay.com → check-outnow.com.
+    | Off by default — both domains serve locally. Set LEGACY_HOST_REDIRECT_ENABLED=true only if you want browsers sent to Contabo.
     */
-    'legacy_host_redirect_enabled' => filter_var(env('LEGACY_HOST_REDIRECT_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+    'legacy_host_redirect_enabled' => filter_var(env('LEGACY_HOST_REDIRECT_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
     'legacy_host_redirect_to' => rtrim((string) env('LEGACY_HOST_REDIRECT_TO', 'https://check-outnow.com'), '/'),
     'legacy_hosts' => array_values(array_filter(array_map(
         'strtolower',
