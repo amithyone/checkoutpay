@@ -1030,24 +1030,39 @@
                 <div class="grid-2" style="margin-top: 2rem;">
                     <div class="panel">
                         <h3>Innocent Amithy Solomon — Founder &amp; Principal Engineer</h3>
-                        <p>29 years old. Based in Abuja, Nigeria. BSc Computer Science (University of the People, 2023). Background across software engineering, fintech architecture, and creative media. Former IT Consultant at Radio Nigeria (FRCN), Web Developer at OrbitNews, Front-End Designer at Xtratech, and Digital Media Trainer at Voice of Nigeria.</p>
-                        <p style="margin-top: 0.75rem;">Innocent is both the engineer who wrote the system and the person who identified the gap it fills — not a business-side founder waiting for a tech team. Everything in Checkout Now LTD was designed, architected, and shipped by him: from the payment routing and split-settlement engine to the Cheko Windows POS, the Proximity Pay Bluetooth protocol, and the iOS/Android apps.</p>
-                        <p style="margin-top: 0.75rem; font-size: 0.85rem; color: var(--ink-soft);">Also founder of AmithyOne Media — cinematic production, DOP, colour grading. He builds the same way on both sides: from first principles, to completion, without compromise.</p>
+                        <p>29 years old. Based in Abuja, Nigeria. BSc Computer Science (University of the People, 2023). Background across software engineering, fintech architecture, and creative media. Former IT Consultant at Radio Nigeria (FRCN), Web Developer at OrbitNews, Full-Stack Developer &amp; Front-End Designer at Xtratech, and Digital Media Trainer at Voice of Nigeria.</p>
+                        <p style="margin-top: 0.75rem;">Innocent has always been deeply passionate about how financial systems work and driven to solve systemic transaction bottlenecks. Technology is his hands-on tool to turn high-impact financial solutions into reality. Everything in Checkout Now LTD was designed, architected, and shipped by him: from the payment routing and split-settlement engine to the Cheko Windows POS, the Proximity Pay Bluetooth protocol, and the iOS/Android apps.</p>
+                        <p style="margin-top: 0.75rem; font-size: 0.85rem; color: var(--ink-soft);">Also founder of AmithyOne Media (2020 – present) — documentary and visual productions with PU Prime, Aquari, SeedWorld, ECOWAS, USAID, Helen Keller Foundation, and more. He builds the same way on both sides: from first principles, to completion, without compromise.</p>
                     </div>
                     <div class="panel">
                         <h3>Two reasons this company exists</h3>
-                        <p><strong style="color:var(--ink);">① The counter problem.</strong> Innocent watched Nigerian merchants lose sales and shoppers lose patience because typing account numbers is slow and card machines are expensive per counter. Nobody had solved "phone near the counter, payment done" without POS hardware investment. That gap became <strong style="color:var(--ink);">Proximity Pay</strong> — a signed Bluetooth contactless session that works with any CheckoutNow wallet near any Cheko counter. We are pushing the boundary of a true contactless payment experience.</p>
+                        <p><strong style="color:var(--ink);">① The counter &amp; terminal problem.</strong> Innocent watched Nigerian merchants lose sales and shoppers lose patience because typing account numbers is slow and card machines are expensive per counter. That gap became <strong style="color:var(--ink);">Proximity Pay</strong> — a signed Bluetooth contactless session that works with any CheckoutNow wallet near any Cheko counter. Beyond retail checkouts, the underlying contactless protocol is built for multiple financial adoption points — including <strong>cardless ATM cash withdrawals</strong> (walk up to an ATM, authorize the proximity session on your mobile wallet, and dispense cash without a physical card).</p>
                         <p style="margin-top: 0.85rem;"><strong style="color:var(--ink);">② The developer problem.</strong> Developers in Nigeria integrate payment gateways for clients for years — but the gateway keeps the long-term processing value while the developer is paid once and forgotten. CheckoutPay was built differently from the start: approved developers earn <strong style="color:var(--ink);">ongoing revenue share</strong> on qualifying production volume from integrations they build. We pay the engineers who make the ecosystem work — and that makes them our permanent distribution channel.</p>
                     </div>
                 </div>
 
                 <p class="section-label" style="margin-top: 2.5rem;">Timeline</p>
-                <h2 style="font-size:clamp(1.4rem,2.5vw,1.85rem);">From first line of code to ₦700M+ volume — self-funded, in under two years.</h2>
+                <h2 style="font-size:clamp(1.4rem,2.5vw,1.85rem);">Driven by passion for financial innovation — scaled to ₦700M+ volume self-funded.</h2>
                 <div class="origin-timeline" style="margin-top: 1.5rem;">
                     <div class="ot-item">
-                        <div class="ot-year">2022 – 2024</div>
+                        <div class="ot-year">2018 – 2020</div>
                         <strong>Engineering career in Abuja</strong>
-                        <span>IT Consulting at Radio Nigeria (FRCN) · Web development and content strategy at OrbitNews · Front-end design and media strategy at Xtratech · Digital media training at Voice of Nigeria. Building the technical depth that Checkout Now LTD now runs on.</span>
+                        <span>IT Consulting at Radio Nigeria (FRCN) · Web development and content strategy at OrbitNews.</span>
+                    </div>
+                    <div class="ot-item">
+                        <div class="ot-year">2019 – 2021</div>
+                        <strong>Full-stack Developer &amp; Media Strategy</strong>
+                        <span>Front-end design and media strategy at Xtratech · Digital media training at Voice of Nigeria. Building the technical depth that Checkout Now LTD now runs on.</span>
+                    </div>
+                    <div class="ot-item">
+                        <div class="ot-year">2020 – 2024</div>
+                        <strong>Freelance E-Commerce &amp; Business Development</strong>
+                        <span>Freelance full-stack developer building e-commerce websites and business development systems for merchants, especially restaurants and supermarkets.</span>
+                    </div>
+                    <div class="ot-item">
+                        <div class="ot-year">2020 – Current</div>
+                        <strong>AmithyOne Media</strong>
+                        <span>Founded and operates AmithyOne Media — produced high-impact documentaries and visual media for PU Prime, Aquari, SeedWorld, ECOWAS, USAID, Helen Keller Foundation, and more.</span>
                     </div>
                     <div class="ot-item">
                         <div class="ot-year">2025</div>
@@ -1762,13 +1777,13 @@
         <section id="product">
             <div class="wrap">
                 <p class="section-label">Contactless push</p>
-                <h2>Proximity Pay — pay at the counter without typing account numbers.</h2>
-                <p class="lede">The counter sends a signed pay request over Bluetooth. The customer’s phone checks it and pays into merchant settlement. Seed rolls this pay method out across more shops — and opens it to other banks and wallets via our open pay standard.</p>
+                <h2>Proximity Pay — contactless transactions without typing account numbers or inserting cards.</h2>
+                <p class="lede">The counter or terminal sends a signed pay request over Bluetooth. The customer’s phone checks it and authorizes the transaction instantly. Seed scales this contactless standard across retail shops while unlocking adoption points across cardless ATM cash withdrawals, hospitality, and open banking.</p>
 
                 <div class="flow" role="img" aria-label="Proximity Pay payment flow">
                     <div class="flow-node">
                         <div class="step">01</div>
-                        <strong>Cheko / counter</strong>
+                        <strong>Counter / ATM / POS</strong>
                         <span>Signed Bluetooth request</span>
                     </div>
                     <svg class="flow-arrow" viewBox="0 0 36 36" fill="none" aria-hidden="true"><path d="M8 18h18M20 10l8 8-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1780,24 +1795,25 @@
                     <svg class="flow-arrow" viewBox="0 0 36 36" fill="none" aria-hidden="true"><path d="M8 18h18M20 10l8 8-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     <div class="flow-node">
                         <div class="step">03</div>
-                        <strong>Pay</strong>
-                        <span>Wallet → merchant</span>
+                        <strong>Authorize</strong>
+                        <span>Wallet → terminal / merchant</span>
                     </div>
                     <svg class="flow-arrow" viewBox="0 0 36 36" fill="none" aria-hidden="true"><path d="M8 18h18M20 10l8 8-8 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     <div class="flow-node">
                         <div class="step">04</div>
-                        <strong>Settle</strong>
-                        <span>Banks · VA / transfer</span>
+                        <strong>Settle / Dispense</strong>
+                        <span>Instant settlement or cash out</span>
                     </div>
                 </div>
 
                 <div class="panel" style="margin-top: 2rem;">
-                    <h3>Trust &amp; security — what users feel</h3>
+                    <h3>Multi-point adoption &amp; security — where Proximity Pay scales</h3>
                     <ul>
-                        <li><strong>Shoppers:</strong> no account numbers to type; the phone only pays after the request is checked</li>
-                        <li><strong>Merchants:</strong> a signed counter session they can trust; money settles through licensed partners</li>
-                        <li><strong>Banks &amp; wallets:</strong> same open pay standard — verify before money moves</li>
-                        <li><strong>Built-in checks:</strong> signed sessions, short-lived requests (harder to replay), identity and fraud ops as we scale</li>
+                        <li><strong>Retail &amp; Supermarket Counters:</strong> no account numbers to type; phone connects to Cheko till, verifies request, and settles instantly</li>
+                        <li><strong>Cardless ATM Cash Dispense:</strong> walk up to an ATM, connect via signed proximity session, authorize withdrawal on mobile, and dispense cash without physical cards</li>
+                        <li><strong>Merchants &amp; Operators:</strong> signed terminal sessions they can trust; money settles instantly through licensed partners</li>
+                        <li><strong>Banks &amp; Wallets:</strong> open pay standard (Checkout Broadcast Protocol) — interop across institutions without rebuilding Bluetooth tech from scratch</li>
+                        <li><strong>Built-in Security:</strong> cryptographic signed sessions, short-lived tokens (immune to replay attacks), and device-level verification</li>
                     </ul>
                 </div>
 
@@ -1813,19 +1829,19 @@
             <div class="wrap">
                 <p class="section-label">Open pay standard</p>
                 <h2>Checkout Broadcast Protocol</h2>
-                <p class="lede">We are open-sourcing this pay standard so banks, wallets, and POS vendors can adopt the same in-store pay method — shared contactless pay without each bank rebuilding Bluetooth from scratch. Pioneer the category, stay interoperable.</p>
+                <p class="lede">We are open-sourcing this pay standard so banks, wallets, POS vendors, and ATM networks can adopt the same contactless method — shared proximity transactions without each institution rebuilding Bluetooth from scratch. Pioneer the category, stay interoperable.</p>
 
                 <div class="protocol">
                     <div class="hub">
                         <div style="font-size:0.72rem;letter-spacing:0.12em;text-transform:uppercase;opacity:0.8;">Open standard</div>
                         <strong>Checkout Broadcast Protocol</strong>
-                        <span style="opacity:0.85;font-size:0.9rem;">OSS · banks · wallets · POS</span>
+                        <span style="opacity:0.85;font-size:0.9rem;">OSS · banks · wallets · POS · ATMs</span>
                     </div>
                     <div class="spokes">
                         <div class="spoke">Cheko POS<span>First counter implementation</span></div>
                         <div class="spoke">CheckoutNow<span>First wallet that pays</span></div>
-                        <div class="spoke">Other POS<span>Vendors can implement</span></div>
-                        <div class="spoke">Banks &amp; wallets<span>More phones → more counters</span></div>
+                        <div class="spoke">Cardless ATMs<span>Proximity cash dispense</span></div>
+                        <div class="spoke">Banks &amp; POS vendors<span>Open contactless standard</span></div>
                     </div>
                 </div>
             </div>
