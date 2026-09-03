@@ -287,6 +287,40 @@ class SendWebhookNotification implements ShouldQueue
     }
 
     /**
+     * Pay at Shop sessions use session_uuid as the primary key — there is no id column.
+     */
+    protected function linkedBroadcastSession(): ?object
+    {
+        try {
+            if (! \Illuminate\Support\Facades\Schema::hasTable('broadcast_sessions')) {
+                return null;
+            }
+            if (! \Illuminate\Support\Facades\Schema::hasColumn('broadcast_sessions', 'payment_id')) {
+                return null;
+            }
+
+            $query = \Illuminate\Support\Facades\DB::table('broadcast_sessions')
+                ->where('payment_id', $this->payment->id);
+
+            if (\Illuminate\Support\Facades\Schema::hasColumn('broadcast_sessions', 'created_at')) {
+                $query->orderByDesc('created_at');
+            }
+            if (\Illuminate\Support\Facades\Schema::hasColumn('broadcast_sessions', 'opened_at')) {
+                $query->orderByDesc('opened_at');
+            }
+
+            return $query->first();
+        } catch (\Throwable $e) {
+            Log::warning('broadcast_session_lookup_for_webhook_failed', [
+                'payment_id' => $this->payment->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
      * Build webhook payload
      */
     protected function buildWebhookPayload(): array
@@ -297,10 +331,7 @@ class SendWebhookNotification implements ShouldQueue
         $payerAccount = $this->payment->payer_account_number ?? null;
         $payerBank = $this->payment->bank ?? null;
 
-        $broadcastSession = \Illuminate\Support\Facades\DB::table('broadcast_sessions')
-            ->where('payment_id', $this->payment->id)
-            ->orderByDesc('id')
-            ->first();
+        $broadcastSession = $this->linkedBroadcastSession();
 
         $totalCharges = (float) ($this->payment->total_charges ?? 0);
         $shareAmount = $this->payment->developer_program_partner_share_amount !== null
