@@ -34,7 +34,7 @@
                             <i class="fas fa-paper-plane mr-1"></i> Test
                         </button>
                     </div>
-                    <p id="webhook_test_result" class="mt-1 text-xs hidden" aria-live="polite"></p>
+                    <p id="webhook_test_result" class="mt-1 text-xs hidden whitespace-pre-wrap break-all" aria-live="polite"></p>
                     @error('webhook_url')
                         <p class="mt-1 text-xs sm:text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -119,7 +119,7 @@
                                                     <i class="fas fa-paper-plane mr-1"></i> Test
                                                 </button>
                                             </div>
-                                            <p class="webhook_test_result mt-1 text-xs hidden" aria-live="polite" data-for="webhook_url_{{ $website->id }}"></p>
+                                            <p class="webhook_test_result mt-1 text-xs hidden whitespace-pre-wrap break-all" aria-live="polite" data-for="webhook_url_{{ $website->id }}"></p>
                                             @error('webhook_url')
                                                 <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
                                             @enderror
@@ -188,7 +188,14 @@ document.querySelectorAll('.test-webhook-btn').forEach(function(btn) {
             if (resultEl) {
                 resultEl.classList.remove('text-gray-600');
                 resultEl.classList.add(ok ? 'text-green-600' : 'text-red-600');
-                resultEl.textContent = data.message || (ok ? 'Webhook delivered successfully.' : 'Request failed.');
+                var text = data.message || (ok ? 'Webhook delivered successfully.' : 'Request failed.');
+                if (data.http_status) {
+                    text += '\nHTTP ' + data.http_status;
+                }
+                if (data.response_body) {
+                    text += '\n' + data.response_body;
+                }
+                resultEl.textContent = text;
                 resultEl.classList.remove('hidden');
             } else {
                 alert(ok ? (data.message || 'Webhook delivered successfully.') : (data.message || 'Request failed.'));

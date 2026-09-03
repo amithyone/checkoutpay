@@ -655,8 +655,28 @@
                 </div>
             @endif
             @if($payment->webhook_last_error)
-                <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded text-xs text-red-800">
-                    <strong>Last Error:</strong> {{ Str::limit($payment->webhook_last_error, 200) }}
+                <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded text-xs text-red-900">
+                    <p class="font-semibold mb-2">Last webhook failure — full merchant response</p>
+                    @foreach($payment->webhookFailureDetails() as $failure)
+                        <div class="mb-3 last:mb-0 space-y-1">
+                            @if(!empty($failure['url']))
+                                <p class="font-mono break-all">{{ $failure['url'] }}</p>
+                            @endif
+                            @if($failure['http_status'] !== null && $failure['http_status'] !== '')
+                                <p><span class="font-semibold">HTTP status:</span> {{ $failure['http_status'] }}</p>
+                            @endif
+                            @if(!empty($failure['via']))
+                                <p><span class="font-semibold">Via:</span> {{ $failure['via'] }}</p>
+                            @endif
+                            @if(!empty($failure['error']))
+                                <pre class="whitespace-pre-wrap break-all bg-white border border-red-100 rounded p-2 max-h-48 overflow-auto text-red-900">{{ $failure['error'] }}</pre>
+                            @endif
+                            @if(!empty($failure['response_body']))
+                                <p class="font-semibold pt-1">Response body</p>
+                                <pre class="whitespace-pre-wrap break-all bg-white border border-red-100 rounded p-2 max-h-[28rem] overflow-auto font-mono text-[11px] leading-snug text-red-950">{{ $failure['response_body'] }}</pre>
+                            @endif
+                        </div>
+                    @endforeach
                 </div>
             @endif
         </div>

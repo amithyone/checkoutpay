@@ -649,6 +649,59 @@ class Payment extends Model
     }
 
     /**
+     * Parsed merchant webhook failure(s) stored on webhook_last_error.
+     *
+     * @return list<array{url: ?string, http_status: mixed, response_body: ?string, error: ?string, via: mixed}>
+     */
+    public function webhookFailureDetails(): array
+    {
+        $raw = trim((string) $this->webhook_last_error);
+        if ($raw === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) {
+            return [[
+                'url' => null,
+                'http_status' => null,
+                'response_body' => null,
+                'error' => $raw,
+                'via' => null,
+            ]];
+        }
+
+        if ($decoded === []) {
+            return [];
+        }
+
+        $rows = array_is_list($decoded) ? $decoded : [$decoded];
+        $out = [];
+        foreach ($rows as $row) {
+            if (! is_array($row)) {
+                $out[] = [
+                    'url' => null,
+                    'http_status' => null,
+                    'response_body' => null,
+                    'error' => is_scalar($row) ? (string) $row : json_encode($row),
+                    'via' => null,
+                ];
+                continue;
+            }
+
+            $out[] = [
+                'url' => isset($row['url']) ? (string) $row['url'] : null,
+                'http_status' => $row['http_status'] ?? $row['status'] ?? null,
+                'response_body' => isset($row['response_body']) ? (string) $row['response_body'] : null,
+                'error' => isset($row['error']) ? (string) $row['error'] : null,
+                'via' => $row['via'] ?? null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Get the rental this payment is for (when payment is for an approved rental)
      */
     public function rental()

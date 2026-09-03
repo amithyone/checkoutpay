@@ -957,6 +957,21 @@
                 <p class="text-xs text-gray-500 mt-1">
                     <strong>Frequency:</strong> Every 1-5 minutes
                 </p>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <span class="text-xs text-gray-600">Resend failed:</span>
+                    @foreach([6, 12, 24] as $hours)
+                        @php $count = (int) ($failedWebhookCounts[$hours] ?? 0); @endphp
+                        <button type="button" onclick="resendFailedWebhooksWindow({{ $hours }})"
+                            class="bg-orange-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-orange-700 text-xs"
+                            title="Queue a resend for every approved payment whose webhook failed in the last {{ $hours }} hours">
+                            {{ $hours }}h
+                            @if($count > 0)
+                                <span class="ml-1 bg-white text-orange-700 rounded-full px-1.5 py-0.5 text-[10px] font-bold">{{ $count }}</span>
+                            @endif
+                        </button>
+                    @endforeach
+                    <a href="{{ route('admin.payments.index', ['status' => 'approved']) }}" class="text-xs text-indigo-700 hover:underline">Payments</a>
+                </div>
             </div>
 
             <!-- KYC / Rubies account queue -->
@@ -1787,6 +1802,49 @@ function getCsrfToken() {
     }
     console.error('CSRF token meta tag not found');
     return null;
+}
+
+function resendFailedWebhooksWindow(hours) {
+    if (![6, 12, 24].includes(Number(hours))) {
+        return;
+    }
+    if (!confirm('Resend all failed webhooks from the last ' + hours + ' hours? This queues every approved payment whose webhook failed in that window.')) {
+        return;
+    }
+
+    const csrfToken = getCsrfToken();
+    if (!csrfToken) {
+        alert('Error: CSRF token not found. Please refresh the page.');
+        return;
+    }
+
+    const buttons = document.querySelectorAll('button[onclick^="resendFailedWebhooksWindow"]');
+    buttons.forEach(function (btn) { btn.disabled = true; });
+
+    fetch(window.__ADMIN_BASE__ + '/payments/resend-failed-webhooks', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({ hours: Number(hours) }),
+        credentials: 'same-origin'
+    })
+    .then(function (response) { return response.json(); })
+    .then(function (data) {
+        if (data.success) {
+            alert('✅ ' + data.message);
+            setTimeout(function () { window.location.reload(); }, 800);
+        } else {
+            alert('❌ ' + (data.message || 'Failed to resend webhooks'));
+            buttons.forEach(function (btn) { btn.disabled = false; });
+        }
+    })
+    .catch(function (error) {
+        alert('❌ Error: ' + (error.message || 'Failed to resend webhooks'));
+        buttons.forEach(function (btn) { btn.disabled = false; });
+    });
 }
 
 function resendWebhook(paymentId) {

@@ -101,10 +101,15 @@ class SendWebhookNotification implements ShouldQueue
                     $successCount++;
                     $sentUrls[] = $webhookUrl;
                 } else {
-                    $failedUrls[] = [
-                        'url' => $webhookUrl,
-                        'error' => $response['error'],
-                    ];
+                    $failedUrls[] = $this->formatHttpFailure($webhookUrl, $response);
+                    Log::warning('Webhook delivery failed', [
+                        'payment_id' => $this->payment->id,
+                        'transaction_id' => $this->payment->transaction_id,
+                        'webhook_url' => $webhookUrl,
+                        'http_status' => $response['status'] ?? null,
+                        'response_body' => $response['response_body'] ?? null,
+                        'error' => $response['error'] ?? null,
+                    ]);
                 }
             } catch (\Throwable $e) {
                 Log::error('Exception sending webhook', [
@@ -113,10 +118,12 @@ class SendWebhookNotification implements ShouldQueue
                     'error' => $e->getMessage(),
                 ]);
                 
-                $failedUrls[] = [
-                    'url' => $webhookUrl,
+                $failedUrls[] = $this->formatHttpFailure($webhookUrl, [
                     'error' => $this->formatFullError($e),
-                ];
+                    'status' => null,
+                    'response_body' => null,
+                    'via' => null,
+                ]);
 
                 self::$lastHttpDeliveryLog[] = [
                     'url' => $webhookUrl,
@@ -140,7 +147,12 @@ class SendWebhookNotification implements ShouldQueue
         ];
 
         if (!empty($failedUrls)) {
-            $updateData['webhook_last_error'] = json_encode($failedUrls, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $updateData['webhook_last_error'] = json_encode(
+                $failedUrls,
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+            );
+        } else {
+            $updateData['webhook_last_error'] = null;
         }
 
         $this->payment->update($updateData);
@@ -244,6 +256,21 @@ class SendWebhookNotification implements ShouldQueue
                 'response_body' => null,
             ];
         }
+    }
+
+    /**
+     * @param  array{error?: ?string, status?: ?int, response_body?: ?string, via?: ?string}  $response
+     * @return array{url: string, http_status: ?int, response_body: ?string, error: string, via: ?string}
+     */
+    protected function formatHttpFailure(string $webhookUrl, array $response): array
+    {
+        return [
+            'url' => $webhookUrl,
+            'http_status' => isset($response['status']) ? $response['status'] : null,
+            'response_body' => $response['response_body'] ?? null,
+            'error' => $response['error'] ?? 'Webhook delivery failed',
+            'via' => $response['via'] ?? null,
+        ];
     }
 
     /**

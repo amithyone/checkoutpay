@@ -123,4 +123,50 @@ class PendingWebhookDispatchService
 
         return $query->count();
     }
+
+    /**
+     * Approved payments whose merchant webhook failed in the last N hours.
+     *
+     * @return Collection<int, Payment>
+     */
+    public function collectFailedInHours(int $hours, int $limit = 1000): Collection
+    {
+        return $this->failedInHoursQuery($hours)
+            ->orderByDesc('webhook_sent_at')
+            ->orderByDesc('matched_at')
+            ->limit($limit)
+            ->get();
+    }
+
+    public function countFailedInHours(int $hours): int
+    {
+        return $this->failedInHoursQuery($hours)->count();
+    }
+
+    /**
+     * @param  array<int, int>  $windows
+     * @return array<int, int>
+     */
+    public function countFailedByHours(array $windows = [6, 12, 24]): array
+    {
+        $counts = [];
+        foreach ($windows as $hours) {
+            $counts[(int) $hours] = $this->countFailedInHours((int) $hours);
+        }
+
+        return $counts;
+    }
+
+    protected function failedInHoursQuery(int $hours)
+    {
+        $since = now()->subHours($hours);
+
+        return Payment::query()
+            ->where('status', Payment::STATUS_APPROVED)
+            ->where('webhook_status', 'failed')
+            ->where(function ($q) use ($since) {
+                $q->where('webhook_sent_at', '>=', $since)
+                    ->orWhere('matched_at', '>=', $since);
+            });
+    }
 }

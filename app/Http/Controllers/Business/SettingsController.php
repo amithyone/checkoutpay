@@ -249,12 +249,18 @@ class SettingsController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Webhook delivered successfully via '.($result['via'] ?? 'direct').'. Your endpoint responded with HTTP '.($result['status'] ?? '?').'.',
+                'http_status' => $result['status'] ?? null,
+                'response_body' => $result['response_body'] ?? null,
+                'via' => $result['via'] ?? null,
             ]);
         }
 
         return response()->json([
             'success' => false,
             'message' => $result['error'] ?? 'Could not reach webhook URL',
+            'http_status' => $result['status'] ?? null,
+            'response_body' => $result['response_body'] ?? null,
+            'via' => $result['via'] ?? null,
         ], 422);
     }
 

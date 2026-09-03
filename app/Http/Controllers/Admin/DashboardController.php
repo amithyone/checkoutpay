@@ -225,6 +225,12 @@ class DashboardController extends Controller
             'paths' => Imunify360Ops::pathsNeedingWafBypass(),
         ];
 
+        $failedWebhookCounts = [6 => 0, 12 => 0, 24 => 0];
+        if (Schema::hasColumn('payments', 'webhook_status')) {
+            $failedWebhookCounts = app(\App\Services\PendingWebhookDispatchService::class)
+                ->countFailedByHours([6, 12, 24]);
+        }
+
         return view('admin.dashboard', compact(
             'stats',
             'recentPayments',
@@ -233,6 +239,7 @@ class DashboardController extends Controller
             'mevonBalance',
             'mevonTodayStats',
             'imunify360Ops',
+            'failedWebhookCounts',
         ));
     }
 

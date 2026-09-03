@@ -16,9 +16,20 @@
                 <i class="fas fa-file-upload mr-2"></i> <span class="hidden sm:inline">Import</span><span class="sm:hidden">Import</span>
             </a>
             @if(request('status') === 'approved' || !request('status'))
-            <button onclick="resendFailedWebhooks()" class="bg-orange-600 text-white px-3 py-2 rounded-lg hover:bg-orange-700 flex items-center text-sm">
-                <i class="fas fa-redo mr-2"></i> <span class="hidden sm:inline">Resend Failed Webhooks</span><span class="sm:hidden">Resend</span>
-            </button>
+            <div class="flex flex-wrap items-center gap-1">
+                <span class="text-xs text-gray-500 mr-1 hidden sm:inline">Resend failed:</span>
+                @foreach([6, 12, 24] as $hours)
+                    @php $count = (int) ($failedWebhookCounts[$hours] ?? 0); @endphp
+                    <button type="button" onclick="resendFailedWebhooksWindow({{ $hours }})"
+                        class="bg-orange-600 text-white px-3 py-2 rounded-lg hover:bg-orange-700 flex items-center text-sm disabled:opacity-60"
+                        title="Queue a resend for every approved payment whose webhook failed in the last {{ $hours }} hours">
+                        <i class="fas fa-redo mr-1.5"></i>{{ $hours }}h
+                        @if($count > 0)
+                            <span class="ml-1.5 bg-white text-orange-700 rounded-full px-1.5 py-0.5 text-xs font-bold">{{ $count }}</span>
+                        @endif
+                    </button>
+                @endforeach
+            </div>
             @endif
             <a href="{{ route('admin.payments.expired') }}" class="bg-orange-600 text-white px-3 py-2 rounded-lg hover:bg-orange-700 flex items-center text-sm">
                 <i class="fas fa-clock mr-2"></i> <span class="hidden sm:inline">Expired</span><span class="sm:hidden">Expired</span>
@@ -526,6 +537,44 @@ function resendWebhook(paymentId) {
     .catch(error => {
         console.error('Error:', error);
         alert('❌ Error: ' + error.message);
+    });
+}
+
+function resendFailedWebhooksWindow(hours) {
+    if (![6, 12, 24].includes(Number(hours))) {
+        return;
+    }
+    if (!confirm('Resend all failed webhooks from the last ' + hours + ' hours? This queues every approved payment whose webhook failed in that window.')) {
+        return;
+    }
+
+    const buttons = document.querySelectorAll('button[onclick^="resendFailedWebhooksWindow"]');
+    buttons.forEach(function (btn) { btn.disabled = true; });
+
+    fetch(window.__ADMIN_BASE__ + '/payments/resend-failed-webhooks', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({ hours: Number(hours) }),
+        credentials: 'same-origin'
+    })
+    .then(function (response) { return response.json(); })
+    .then(function (data) {
+        if (data.success) {
+            alert('✅ ' + data.message);
+            setTimeout(function () { window.location.reload(); }, 800);
+        } else {
+            alert('❌ ' + (data.message || 'Failed to resend webhooks'));
+            buttons.forEach(function (btn) { btn.disabled = false; });
+        }
+    })
+    .catch(function (error) {
+        console.error('Error:', error);
+        alert('❌ Error: ' + (error.message || 'Failed to resend webhooks'));
+        buttons.forEach(function (btn) { btn.disabled = false; });
     });
 }
 

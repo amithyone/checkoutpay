@@ -13,6 +13,9 @@ use Illuminate\Support\Str;
  */
 class WebhookEgressRelay
 {
+    /** Keep within MySQL TEXT (~64KB) even when more than one URL fails. */
+    private const MAX_BODY_CHARS = 60000;
+
     public static function clientEnabled(): bool
     {
         return (bool) config('checkout.webhook_egress.relay_client_enabled', false)
@@ -48,10 +51,23 @@ class WebhookEgressRelay
         try {
             $response = Http::timeout(10)
                 ->withHeaders(self::merchantHeaders())
-                ->retry(2, 100)
+                ->retry(2, 100, null, false)
                 ->post($webhookUrl, $payload);
 
             return self::normalizeHttpResult($response->status(), $response->reason(), $response->body(), 'direct');
+        } catch (\Illuminate\Http\Client\RequestException $e) {
+            $response = $e->response;
+            if ($response) {
+                return self::normalizeHttpResult($response->status(), $response->reason(), $response->body(), 'direct');
+            }
+
+            return [
+                'success' => false,
+                'status' => null,
+                'response_body' => null,
+                'error' => $e->getMessage(),
+                'via' => 'direct',
+            ];
         } catch (\Throwable $e) {
             return [
                 'success' => false,
@@ -178,14 +194,25 @@ class WebhookEgressRelay
         ];
     }
 
+    public static function previewBody(string $rawBody): string
+    {
+        if ($rawBody === '') {
+            return '';
+        }
+
+        if (mb_strlen($rawBody) > self::MAX_BODY_CHARS) {
+            return mb_substr($rawBody, 0, self::MAX_BODY_CHARS).'…(truncated)';
+        }
+
+        return $rawBody;
+    }
+
     /**
      * @return array{success: bool, status: ?int, response_body: ?string, error?: string, via: string}
      */
     private static function normalizeHttpResult(int $status, string $reason, string $rawBody, string $via): array
     {
-        $bodyPreview = mb_strlen($rawBody) > 4000
-            ? mb_substr($rawBody, 0, 4000).'…(truncated)'
-            : $rawBody;
+        $bodyPreview = self::previewBody($rawBody);
 
         if ($status >= 200 && $status < 300) {
             return [
@@ -196,11 +223,16 @@ class WebhookEgressRelay
             ];
         }
 
+        $error = trim(sprintf('HTTP %d %s', $status, $reason));
+        if ($bodyPreview === '') {
+            $error .= "\nResponse body: (empty)";
+        }
+
         return [
             'success' => false,
             'status' => $status,
             'response_body' => $bodyPreview !== '' ? $bodyPreview : null,
-            'error' => trim(sprintf('HTTP %d %s\nResponse body: %s', $status, $reason, $rawBody !== '' ? $rawBody : '(empty)')),
+            'error' => $error,
             'via' => $via,
         ];
     }

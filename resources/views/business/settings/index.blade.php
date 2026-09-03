@@ -597,7 +597,7 @@
                         <i class="fas fa-paper-plane mr-2"></i> Test webhook
                     </button>
                 </div>
-                <p id="webhook_test_result" class="mt-1 text-xs hidden" aria-live="polite"></p>
+                    <p id="webhook_test_result" class="mt-1 text-xs hidden whitespace-pre-wrap break-all" aria-live="polite"></p>
                 <p class="mt-1 text-xs text-gray-500">Saved on your website records (each site can have its own webhook on the Websites page). This field copies onto matching website rows.</p>
                 @error('webhook_url')
                     <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
@@ -706,7 +706,14 @@ document.getElementById('test_webhook_btn').addEventListener('click', function()
         var ok = _ref.ok, data = _ref.data;
         resultEl.classList.remove('text-gray-600');
         resultEl.classList.add(ok ? 'text-green-600' : 'text-red-600');
-        resultEl.textContent = data.message || (ok ? 'Webhook delivered successfully.' : 'Request failed.');
+        var text = data.message || (ok ? 'Webhook delivered successfully.' : 'Request failed.');
+        if (data.http_status) {
+            text += '\nHTTP ' + data.http_status;
+        }
+        if (data.response_body) {
+            text += '\n' + data.response_body;
+        }
+        resultEl.textContent = text;
         resultEl.classList.remove('hidden');
     })
     .catch(function(err) {

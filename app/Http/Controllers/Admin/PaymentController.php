@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendWebhookNotification;
 use App\Models\Payment;
 use App\Models\MatchAttempt;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\View\View;
 use Illuminate\Http\RedirectResponse;
 
@@ -87,7 +89,13 @@ class PaymentController extends Controller
 
         $payments = $query->paginate(20)->withQueryString();
 
-        return view('admin.payments.index', compact('payments'));
+        $failedWebhookCounts = [6 => 0, 12 => 0, 24 => 0];
+        if (Schema::hasColumn('payments', 'webhook_status')) {
+            $failedWebhookCounts = app(\App\Services\PendingWebhookDispatchService::class)
+                ->countFailedByHours([6, 12, 24]);
+        }
+
+        return view('admin.payments.index', compact('payments', 'failedWebhookCounts'));
     }
 
     public function show(Payment $payment): View
@@ -757,6 +765,58 @@ class PaymentController extends Controller
             'success' => true,
             'message' => "Webhooks queued for {$queuedCount} payment(s).",
             'queued_count' => $queuedCount,
+        ]);
+    }
+
+    /**
+     * Queue webhook resends for all approved payments that failed in the last 6, 12, or 24 hours.
+     */
+    public function resendFailedWebhooksWindow(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'hours' => 'required|integer|in:6,12,24',
+        ]);
+        $hours = (int) $validated['hours'];
+        $limit = 1000;
+
+        $service = app(\App\Services\PendingWebhookDispatchService::class);
+        $total = $service->countFailedInHours($hours);
+        $payments = $service->collectFailedInHours($hours, $limit);
+
+        if ($payments->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'message' => "No failed webhooks in the last {$hours} hours.",
+                'queued_count' => 0,
+                'hours' => $hours,
+                'matched_count' => 0,
+            ]);
+        }
+
+        $queuedCount = 0;
+        foreach ($payments as $payment) {
+            SendWebhookNotification::dispatch($payment);
+            $queuedCount++;
+        }
+
+        \Illuminate\Support\Facades\Log::info('Failed webhooks queued for window resend', [
+            'hours' => $hours,
+            'queued_count' => $queuedCount,
+            'matched_count' => $total,
+            'admin_id' => auth('admin')->id(),
+        ]);
+
+        $message = "Queued {$queuedCount} failed webhook(s) from the last {$hours} hours.";
+        if ($total > $queuedCount) {
+            $message .= " {$total} matched; first {$queuedCount} were queued (cap {$limit}). Run again for the rest.";
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message,
+            'queued_count' => $queuedCount,
+            'matched_count' => $total,
+            'hours' => $hours,
         ]);
     }
 
