@@ -963,7 +963,7 @@
                         @php $count = (int) ($failedWebhookCounts[$hours] ?? 0); @endphp
                         <button type="button" onclick="resendFailedWebhooksWindow({{ $hours }})"
                             class="bg-orange-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-orange-700 text-xs"
-                            title="Queue a resend for every approved payment whose webhook failed in the last {{ $hours }} hours">
+                            title="Send now (not queued) every approved payment whose webhook failed in the last {{ $hours }} hours">
                             {{ $hours }}h
                             @if($count > 0)
                                 <span class="ml-1 bg-white text-orange-700 rounded-full px-1.5 py-0.5 text-[10px] font-bold">{{ $count }}</span>
@@ -972,6 +972,7 @@
                     @endforeach
                     <a href="{{ route('admin.payments.index', ['status' => 'approved']) }}" class="text-xs text-indigo-700 hover:underline">Payments</a>
                 </div>
+                <div id="failed-webhook-resend-result" class="hidden mt-3"></div>
             </div>
 
             <!-- KYC / Rubies account queue -->
@@ -1808,7 +1809,7 @@ function resendFailedWebhooksWindow(hours) {
     if (![6, 12, 24].includes(Number(hours))) {
         return;
     }
-    if (!confirm('Resend all failed webhooks from the last ' + hours + ' hours? This queues every approved payment whose webhook failed in that window.')) {
+    if (!confirm('Send all failed webhooks from the last ' + hours + ' hours now (not queued)? You will see delivery counts and merchant HTTP responses when they finish.')) {
         return;
     }
 
@@ -1821,6 +1822,13 @@ function resendFailedWebhooksWindow(hours) {
     const buttons = document.querySelectorAll('button[onclick^="resendFailedWebhooksWindow"]');
     buttons.forEach(function (btn) { btn.disabled = true; });
 
+    const resultEl = document.getElementById('failed-webhook-resend-result');
+    if (resultEl) {
+        resultEl.classList.remove('hidden');
+        resultEl.className = 'mt-3 p-3 rounded border text-xs bg-gray-50 border-gray-200 text-gray-700';
+        resultEl.textContent = 'Sending ' + hours + 'h failed webhooks now… this waits for each merchant response.';
+    }
+
     fetch(window.__ADMIN_BASE__ + '/payments/resend-failed-webhooks', {
         method: 'POST',
         headers: {
@@ -1831,20 +1839,65 @@ function resendFailedWebhooksWindow(hours) {
         body: JSON.stringify({ hours: Number(hours) }),
         credentials: 'same-origin'
     })
-    .then(function (response) { return response.json(); })
-    .then(function (data) {
-        if (data.success) {
-            alert('✅ ' + data.message);
-            setTimeout(function () { window.location.reload(); }, 800);
-        } else {
-            alert('❌ ' + (data.message || 'Failed to resend webhooks'));
-            buttons.forEach(function (btn) { btn.disabled = false; });
-        }
+    .then(function (response) { return response.json().then(function (data) { return { ok: response.ok, data: data }; }); })
+    .then(function (ref) {
+        const data = ref.data || {};
+        renderFailedWebhookWindowResult(resultEl, data, ref.ok);
+        buttons.forEach(function (btn) { btn.disabled = false; });
     })
     .catch(function (error) {
-        alert('❌ Error: ' + (error.message || 'Failed to resend webhooks'));
+        if (resultEl) {
+            resultEl.className = 'mt-3 p-3 rounded border text-xs bg-red-50 border-red-200 text-red-900';
+            resultEl.textContent = 'Request failed: ' + (error.message || 'network error');
+        } else {
+            alert('❌ Error: ' + (error.message || 'Failed to resend webhooks'));
+        }
         buttons.forEach(function (btn) { btn.disabled = false; });
     });
+}
+
+function renderFailedWebhookWindowResult(resultEl, data, httpOk) {
+    const message = (data && data.message) || 'Webhook send finished.';
+    if (!resultEl) {
+        alert((httpOk && data && data.success ? '✅ ' : '❌ ') + message);
+        return;
+    }
+    const failedCount = Number(data.failed_count || 0);
+    const deliveredCount = Number(data.delivered_count || 0);
+    resultEl.className = (!httpOk || (data && data.success === false) || failedCount > 0)
+        ? 'mt-3 p-3 rounded border text-xs bg-red-50 border-red-200 text-red-900'
+        : 'mt-3 p-3 rounded border text-xs bg-green-50 border-green-200 text-green-900';
+
+    let html = '<p class="font-semibold mb-2">' + escapeHtml(message) + '</p>';
+    html += '<p class="mb-2">Delivered: ' + deliveredCount + ' · Failed: ' + failedCount + '</p>';
+    const results = Array.isArray(data.results) ? data.results : [];
+    const failedRows = results.filter(function (row) { return !row.delivered; });
+    failedRows.slice(0, 50).forEach(function (row) {
+        html += '<div class="mb-2 last:mb-0 bg-white border border-gray-200 rounded p-2 text-gray-800">';
+        html += '<p class="font-mono">' + escapeHtml(String(row.transaction_id || row.payment_id || '')) + '</p>';
+        if (row.http_status != null) {
+            html += '<p><strong>HTTP:</strong> ' + escapeHtml(String(row.http_status)) + '</p>';
+        }
+        if (row.error) {
+            html += '<pre class="whitespace-pre-wrap break-all mt-1 max-h-24 overflow-auto">' + escapeHtml(String(row.error)) + '</pre>';
+        }
+        if (row.response_body) {
+            html += '<pre class="whitespace-pre-wrap break-all font-mono mt-1 max-h-32 overflow-auto">' + escapeHtml(String(row.response_body)) + '</pre>';
+        }
+        html += '</div>';
+    });
+    if (failedRows.length > 50) {
+        html += '<p>Showing 50 of ' + failedRows.length + ' failures.</p>';
+    }
+    resultEl.innerHTML = html;
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
 
 function resendWebhook(paymentId) {

@@ -61,6 +61,69 @@ class PendingWebhookDispatchService
     }
 
     /**
+     * Send immediately (not queued) and keep each merchant HTTP attempt.
+     *
+     * @return array{sent: int, delivered: int, failed: int, errors: array<int, string>, results: list<array<string, mixed>>}
+     */
+    public function dispatchSyncForPaymentsWithLog(Collection $payments): array
+    {
+        $delivered = 0;
+        $failed = 0;
+        $errors = [];
+        $results = [];
+
+        foreach ($payments as $payment) {
+            try {
+                SendWebhookNotification::$lastHttpDeliveryLog = [];
+                SendWebhookNotification::dispatchSync($payment);
+                $payment->refresh();
+                $attempts = SendWebhookNotification::$lastHttpDeliveryLog ?? [];
+                $ok = collect($attempts)->contains(fn ($row) => ! empty($row['success']));
+                if ($ok) {
+                    $delivered++;
+                } else {
+                    $failed++;
+                }
+
+                $first = $attempts[0] ?? [];
+                $results[] = [
+                    'payment_id' => $payment->id,
+                    'transaction_id' => $payment->transaction_id,
+                    'delivered' => $ok,
+                    'webhook_status' => $payment->webhook_status,
+                    'url' => $first['url'] ?? null,
+                    'http_status' => $first['http_status'] ?? null,
+                    'error' => $first['error'] ?? ($first['note'] ?? null),
+                    'response_body' => $first['response_body'] ?? null,
+                    'attempts' => $attempts,
+                ];
+            } catch (\Throwable $e) {
+                $failed++;
+                $errors[] = "Payment {$payment->id}: {$e->getMessage()}";
+                $results[] = [
+                    'payment_id' => $payment->id,
+                    'transaction_id' => $payment->transaction_id,
+                    'delivered' => false,
+                    'webhook_status' => 'failed',
+                    'url' => null,
+                    'http_status' => null,
+                    'error' => $e->getMessage(),
+                    'response_body' => null,
+                    'attempts' => SendWebhookNotification::$lastHttpDeliveryLog ?? [],
+                ];
+            }
+        }
+
+        return [
+            'sent' => count($results),
+            'delivered' => $delivered,
+            'failed' => $failed,
+            'errors' => $errors,
+            'results' => $results,
+        ];
+    }
+
+    /**
      * @return array{sent: int, errors: array<int, string>, batches: int, pending_after: int}
      */
     public function processUntilExhausted(int $batchSize, int $maxTotal, bool $ignoreRetryCooldown): array

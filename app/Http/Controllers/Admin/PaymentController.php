@@ -791,7 +791,7 @@ class PaymentController extends Controller
     }
 
     /**
-     * Queue webhook resends for all approved payments that failed in the last 6, 12, or 24 hours.
+     * Send failed merchant webhooks from the last 6, 12, or 24 hours immediately (not queued).
      */
     public function resendFailedWebhooksWindow(Request $request): \Illuminate\Http\JsonResponse
     {
@@ -801,6 +801,8 @@ class PaymentController extends Controller
         $hours = (int) $validated['hours'];
         $limit = 1000;
 
+        @set_time_limit(0);
+
         $service = app(\App\Services\PendingWebhookDispatchService::class);
         $total = $service->countFailedInHours($hours);
         $payments = $service->collectFailedInHours($hours, $limit);
@@ -809,36 +811,42 @@ class PaymentController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => "No failed webhooks in the last {$hours} hours.",
+                'sent_count' => 0,
+                'delivered_count' => 0,
+                'failed_count' => 0,
                 'queued_count' => 0,
                 'hours' => $hours,
                 'matched_count' => 0,
+                'results' => [],
             ]);
         }
 
-        $queuedCount = 0;
-        foreach ($payments as $payment) {
-            SendWebhookNotification::dispatch($payment);
-            $queuedCount++;
-        }
+        $outcome = $service->dispatchSyncForPaymentsWithLog($payments);
 
-        \Illuminate\Support\Facades\Log::info('Failed webhooks queued for window resend', [
+        \Illuminate\Support\Facades\Log::info('Failed webhooks sent immediately for window resend', [
             'hours' => $hours,
-            'queued_count' => $queuedCount,
+            'sent_count' => $outcome['sent'],
+            'delivered_count' => $outcome['delivered'],
+            'failed_count' => $outcome['failed'],
             'matched_count' => $total,
             'admin_id' => auth('admin')->id(),
         ]);
 
-        $message = "Queued {$queuedCount} failed webhook(s) from the last {$hours} hours.";
-        if ($total > $queuedCount) {
-            $message .= " {$total} matched; first {$queuedCount} were queued (cap {$limit}). Run again for the rest.";
+        $message = "Sent {$outcome['sent']} webhook(s) from the last {$hours} hours immediately: {$outcome['delivered']} delivered, {$outcome['failed']} failed.";
+        if ($total > $outcome['sent']) {
+            $message .= " {$total} matched; first {$outcome['sent']} were sent (cap {$limit}). Run again for the rest.";
         }
 
         return response()->json([
             'success' => true,
             'message' => $message,
-            'queued_count' => $queuedCount,
+            'sent_count' => $outcome['sent'],
+            'delivered_count' => $outcome['delivered'],
+            'failed_count' => $outcome['failed'],
+            'queued_count' => $outcome['sent'],
             'matched_count' => $total,
             'hours' => $hours,
+            'results' => $outcome['results'],
         ]);
     }
 

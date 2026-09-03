@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Admin;
 
-use App\Jobs\SendWebhookNotification;
 use App\Models\Admin;
 use App\Models\Business;
 use App\Models\Payment;
@@ -10,7 +9,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
@@ -52,10 +50,13 @@ class ResendFailedWebhooksWindowTest extends TestCase
         return $admin;
     }
 
-    public function test_six_hour_button_queues_only_recent_failed_webhooks(): void
+    public function test_six_hour_button_sends_only_recent_failed_webhooks(): void
     {
         $this->actingSuperAdmin();
-        Queue::fake();
+        config(['checkout.webhook_egress.relay_client_enabled' => false]);
+        Http::fake([
+            'https://example.com/*' => Http::response('OK', 200),
+        ]);
 
         $business = Business::create([
             'name' => 'Webhook Window Biz',
@@ -72,22 +73,23 @@ class ResendFailedWebhooksWindowTest extends TestCase
 
         $this->postJson(route('admin.payments.resend-failed-webhooks'), ['hours' => 6])
             ->assertOk()
-            ->assertJsonPath('queued_count', 1)
+            ->assertJsonPath('sent_count', 1)
+            ->assertJsonPath('delivered_count', 1)
+            ->assertJsonPath('failed_count', 0)
             ->assertJsonPath('hours', 6);
 
-        Queue::assertPushed(SendWebhookNotification::class, 1);
-        Queue::assertPushed(SendWebhookNotification::class, function (SendWebhookNotification $job) use ($recent) {
-            return $job->payment->is($recent);
-        });
-
-        $this->assertNotNull($mid->id);
-        $this->assertNotNull($old->id);
+        $this->assertSame('sent', $recent->fresh()->webhook_status);
+        $this->assertSame('failed', $mid->fresh()->webhook_status);
+        $this->assertSame('failed', $old->fresh()->webhook_status);
     }
 
     public function test_twenty_four_hour_button_excludes_older_failures(): void
     {
         $this->actingSuperAdmin();
-        Queue::fake();
+        config(['checkout.webhook_egress.relay_client_enabled' => false]);
+        Http::fake([
+            'https://example.com/*' => Http::response('OK', 200),
+        ]);
 
         $business = Business::create([
             'name' => 'Webhook Window Biz 24',
@@ -97,14 +99,16 @@ class ResendFailedWebhooksWindowTest extends TestCase
             'balance' => 0,
         ]);
 
-        $this->failedPayment($business->id, 'TXN-FAIL-20H', now()->subHours(20));
-        $this->failedPayment($business->id, 'TXN-FAIL-30H-B', now()->subHours(30));
+        $inWindow = $this->failedPayment($business->id, 'TXN-FAIL-20H', now()->subHours(20));
+        $tooOld = $this->failedPayment($business->id, 'TXN-FAIL-30H-B', now()->subHours(30));
 
         $this->postJson(route('admin.payments.resend-failed-webhooks'), ['hours' => 24])
             ->assertOk()
-            ->assertJsonPath('queued_count', 1);
+            ->assertJsonPath('sent_count', 1)
+            ->assertJsonPath('delivered_count', 1);
 
-        Queue::assertPushed(SendWebhookNotification::class, 1);
+        $this->assertSame('sent', $inWindow->fresh()->webhook_status);
+        $this->assertSame('failed', $tooOld->fresh()->webhook_status);
     }
 
     public function test_invalid_window_is_rejected(): void
@@ -157,7 +161,7 @@ class ResendFailedWebhooksWindowTest extends TestCase
             'amount' => 1000,
             'business_id' => $businessId,
             'status' => Payment::STATUS_APPROVED,
-            'webhook_url' => 'https://merchant.example/webhook',
+            'webhook_url' => 'https://example.com/ipn/checkoutnow',
             'email_data' => ['service' => 'general'],
             'webhook_status' => $status,
             'webhook_sent_at' => $when,
