@@ -90,7 +90,7 @@ class BroadcastSessionPaymentMatcher
                 continue;
             }
 
-            $this->applyCredit($session, $receivedKobo, (int) $payment->id, $sessionMode);
+            $this->applyCredit($session, $receivedKobo, $payment, $sessionMode);
 
             return;
         }
@@ -121,28 +121,36 @@ class BroadcastSessionPaymentMatcher
         return $updated > 0;
     }
 
-    private function applyCredit(object $session, int $receivedKobo, int $paymentId, string $settlementMode = 'permanent'): void
+    private function applyCredit(object $session, int $receivedKobo, Payment $payment, string $settlementMode = 'permanent'): void
     {
         $expectedKobo = (int) $session->amount_ngn;
         $alreadyReceived = (int) ($session->amount_received_ngn ?? 0);
         $totalReceived = $alreadyReceived + $receivedKobo;
         $nowMs = (int) (microtime(true) * 1000);
+        $paymentId = (int) $payment->id;
 
         $isPaid = $expectedKobo > 0 && $totalReceived >= $expectedKobo;
         if ($settlementMode === 'permanent' && $expectedKobo > 0) {
             $isPaid = $totalReceived === $expectedKobo;
         }
 
+        $payerUpdate = $this->sessions->payerColumnUpdate([
+            'payer_name' => $payment->payer_name,
+            'payer_account' => $payment->payer_account_number,
+            'payer_bank' => $payment->bank,
+            'payer_reference' => $payment->transaction_id ?? $payment->external_reference,
+        ]);
+
         if ($isPaid) {
             DB::table('broadcast_sessions')
                 ->where('session_uuid', $session->session_uuid)
-                ->update([
+                ->update(array_merge([
                     'status' => BroadcastSessionService::STATUS_PAID,
                     'amount_received_ngn' => $totalReceived,
                     'payment_id' => $paymentId,
                     'closed_at' => $nowMs,
                     'updated_at' => now(),
-                ]);
+                ], $payerUpdate));
 
             Log::info('broadcast.session.paid', [
                 'session_uuid' => $session->session_uuid,
@@ -157,12 +165,12 @@ class BroadcastSessionPaymentMatcher
 
         DB::table('broadcast_sessions')
             ->where('session_uuid', $session->session_uuid)
-            ->update([
+            ->update(array_merge([
                 'status' => self::STATUS_PARTIAL,
                 'amount_received_ngn' => $totalReceived,
                 'payment_id' => $paymentId,
                 'updated_at' => now(),
-            ]);
+            ], $payerUpdate));
 
         Log::info('broadcast.session.partial', [
             'session_uuid' => $session->session_uuid,

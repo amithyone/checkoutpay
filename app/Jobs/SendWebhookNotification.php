@@ -266,6 +266,15 @@ class SendWebhookNotification implements ShouldQueue
     {
         $emailData = $this->payment->email_data ?? [];
 
+        $payerName = $this->payment->payer_name ?? $emailData['name'] ?? $emailData['sender_name'] ?? null;
+        $payerAccount = $this->payment->payer_account_number ?? null;
+        $payerBank = $this->payment->bank ?? null;
+
+        $broadcastSession = \Illuminate\Support\Facades\DB::table('broadcast_sessions')
+            ->where('payment_id', $this->payment->id)
+            ->orderByDesc('id')
+            ->first();
+
         $totalCharges = (float) ($this->payment->total_charges ?? 0);
         $shareAmount = $this->payment->developer_program_partner_share_amount !== null
             ? (float) $this->payment->developer_program_partner_share_amount
@@ -274,16 +283,27 @@ class SendWebhookNotification implements ShouldQueue
             ? round(100 * $shareAmount / $totalCharges, 4)
             : null;
 
-        return [
+        $payload = [
             'event' => 'payment.approved',
             'transaction_id' => $this->payment->transaction_id,
             'external_reference' => $this->payment->external_reference,
             'status' => $this->payment->status,
             'amount' => (float) $this->payment->amount,
             'received_amount' => $this->payment->received_amount ? (float) $this->payment->received_amount : (float) $this->payment->amount,
-            'payer_name' => $this->payment->payer_name ?? $emailData['name'] ?? $emailData['sender_name'] ?? null,
-            'bank' => $this->payment->bank ?? null,
-            'payer_account_number' => $this->payment->payer_account_number ?? null,
+            'payer_name' => $payerName,
+            'payerName' => $payerName,
+            'sender_name' => $payerName,
+            'bank' => $payerBank,
+            'bank_name' => $payerBank,
+            'payer_bank' => $payerBank,
+            'payer_account' => $payerAccount,
+            'payer_account_number' => $payerAccount,
+            'sender_account' => $payerAccount,
+            'payer' => [
+                'name' => $payerName,
+                'account' => $payerAccount,
+                'bank' => $payerBank,
+            ],
             'account_number' => $this->payment->account_number ?? null,
             'is_mismatch' => $this->payment->is_mismatch ?? false,
             'mismatch_reason' => $this->payment->mismatch_reason ?? null,
@@ -303,5 +323,13 @@ class SendWebhookNotification implements ShouldQueue
             'developer_program_partner_share_percent_effective' => $sharePercentEffective,
             'developer_program_fee_share_base_description' => Setting::get('developer_program_fee_share_base_description'),
         ];
+
+        if ($broadcastSession) {
+            $payload['session_id'] = (string) $broadcastSession->session_uuid;
+            $payload['reference'] = $this->payment->transaction_id ?? $this->payment->external_reference;
+            $payload['broadcast_event'] = 'payment.confirmed';
+        }
+
+        return $payload;
     }
 }

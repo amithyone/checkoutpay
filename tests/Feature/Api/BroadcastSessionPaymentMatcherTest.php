@@ -42,6 +42,9 @@ class BroadcastSessionPaymentMatcherTest extends TestCase
             'received_amount' => 50.00,
             'account_number' => '1000004863',
             'webhook_url' => 'https://example.com/webhook',
+            'payer_name' => 'Jane Customer',
+            'payer_account_number' => '0123456789',
+            'bank' => 'GTBank',
         ]);
 
         app(BroadcastSessionPaymentMatcher::class)->handleApprovedPayment($payment);
@@ -50,6 +53,10 @@ class BroadcastSessionPaymentMatcherTest extends TestCase
             'session_uuid' => $sessionUuid,
             'status' => BroadcastSessionService::STATUS_PAID,
             'amount_received_ngn' => 5000,
+            'payer_name' => 'Jane Customer',
+            'payer_account' => '0123456789',
+            'payer_bank' => 'GTBank',
+            'payer_reference' => 'TXN-MATCH-1',
         ]);
     }
 

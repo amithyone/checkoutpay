@@ -740,6 +740,10 @@ class BroadcastVerifyBroadcastTest extends TestCase
             'amount_ngn' => 2500,
             'opened_at' => $paidAt - 60000,
             'closed_at' => $paidAt,
+            'payer_name' => 'Jane Customer',
+            'payer_account' => '0123456789',
+            'payer_bank' => 'GTBank',
+            'payer_reference' => 'TXN-CHEKO-1',
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -756,6 +760,16 @@ class BroadcastVerifyBroadcastTest extends TestCase
             'recipient_account_name' => 'Paid Poll Shop',
             'recipient_bank_code' => '090175',
             'paid_at_ms' => $paidAt,
+            'event' => 'payment.confirmed',
+            'session_id' => $sessionUuid,
+            'payer_name' => 'Jane Customer',
+            'payer_account' => '0123456789',
+            'payer_bank' => 'GTBank',
+            'payer' => [
+                'name' => 'Jane Customer',
+                'account' => '0123456789',
+                'bank' => 'GTBank',
+            ],
         ]);
     }
 

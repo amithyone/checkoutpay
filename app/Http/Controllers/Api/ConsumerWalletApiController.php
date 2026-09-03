@@ -1235,7 +1235,13 @@ class ConsumerWalletApiController extends Controller
             if ($request->filled('idempotency_key')) {
                 $broadcastSession = $this->broadcastSessions->find((string) $request->input('idempotency_key'));
                 if ($broadcastSession !== null && (int) $broadcastSession->amount_ngn > 0) {
-                    $this->broadcastSessions->markPaid((string) $request->input('idempotency_key'));
+                    $this->broadcastSessions->markPaid((string) $request->input('idempotency_key'), [
+                        'payer_name' => $wallet->displayName() ?: $wallet->mevon_account_name,
+                        'payer_account' => $wallet->mevon_virtual_account_number,
+                        'payer_bank' => $wallet->mevon_bank_name ?: 'RUBIES MFB',
+                        'payer_reference' => $result['data']['reference'] ?? null,
+                        'whatsapp_wallet_id' => $wallet->id,
+                    ]);
                 }
             }
 

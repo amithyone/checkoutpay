@@ -431,6 +431,7 @@ class BroadcastVerifyController extends Controller
             if (! empty($session->closed_at)) {
                 $payload['paid_at_ms'] = (int) $session->closed_at;
             }
+            $payload = array_merge($payload, $this->sessions->chekoPayerPayload($session));
         }
 
         return response()->json($payload);
