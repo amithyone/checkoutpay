@@ -9,6 +9,7 @@ use App\Models\Payment;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
@@ -27,6 +28,11 @@ class ResendFailedWebhooksWindowTest extends TestCase
                 $table->timestamp('webhook_sent_at')->nullable();
                 $table->unsignedInteger('webhook_attempts')->nullable();
                 $table->text('webhook_last_error')->nullable();
+            });
+        }
+        if (! Schema::hasColumn('payments', 'webhook_urls_sent')) {
+            Schema::table('payments', function (Blueprint $table) {
+                $table->text('webhook_urls_sent')->nullable();
             });
         }
     }
@@ -107,6 +113,41 @@ class ResendFailedWebhooksWindowTest extends TestCase
 
         $this->postJson(route('admin.payments.resend-failed-webhooks'), ['hours' => 48])
             ->assertStatus(422);
+    }
+
+    public function test_sync_resend_returns_merchant_http_response(): void
+    {
+        $this->actingSuperAdmin();
+        config(['checkout.webhook_egress.relay_client_enabled' => false]);
+
+        Http::fake([
+            'https://example.com/*' => Http::response('IPN parse error on line 12', 500),
+        ]);
+
+        $business = Business::create([
+            'name' => 'Sync Webhook Biz',
+            'email' => 'wh-sync-'.uniqid().'@test.com',
+            'api_key' => 'pk_whs_'.uniqid(),
+            'is_active' => true,
+            'balance' => 0,
+        ]);
+
+        $payment = Payment::create([
+            'transaction_id' => 'TXN-SYNC-WH',
+            'amount' => 1000,
+            'business_id' => $business->id,
+            'status' => Payment::STATUS_APPROVED,
+            'webhook_url' => 'https://example.com/ipn/checkoutnow',
+            'email_data' => [],
+            'webhook_status' => 'failed',
+        ]);
+
+        $this->postJson(route('admin.payments.resend-webhook', $payment), ['sync' => true])
+            ->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('delivered', false)
+            ->assertJsonPath('attempts.0.http_status', 500)
+            ->assertJsonPath('attempts.0.response_body', 'IPN parse error on line 12');
     }
 
     private function failedPayment(int $businessId, string $txn, $when, string $status = 'failed'): Payment

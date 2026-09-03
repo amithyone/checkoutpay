@@ -675,11 +675,11 @@ class PaymentController extends Controller
     }
 
     /**
-     * Resend webhook notification for an approved payment
+     * Resend webhook notification for an approved payment.
+     * Pass sync=1 (or JSON { "sync": true }) to send immediately and return the merchant HTTP response.
      */
-    public function resendWebhook(Payment $payment): \Illuminate\Http\JsonResponse
+    public function resendWebhook(Request $request, Payment $payment): \Illuminate\Http\JsonResponse
     {
-        // Only allow resending for approved payments
         if ($payment->status !== Payment::STATUS_APPROVED) {
             return response()->json([
                 'success' => false,
@@ -687,14 +687,39 @@ class PaymentController extends Controller
             ], 400);
         }
 
+        $sync = $request->boolean('sync');
+
         try {
-            // Reload payment with relationships
             $payment->load(['business', 'accountNumberDetails', 'website']);
 
-            // Dispatch webhook job (will send to all websites)
-            \App\Jobs\SendWebhookNotification::dispatch($payment);
+            if ($sync) {
+                SendWebhookNotification::$lastHttpDeliveryLog = [];
+                SendWebhookNotification::dispatchSync($payment);
+                $payment->refresh();
+                $attempts = SendWebhookNotification::$lastHttpDeliveryLog ?? [];
+                $delivered = collect($attempts)->contains(fn ($row) => ! empty($row['success']));
 
-            // Log the resend action
+                \Illuminate\Support\Facades\Log::info('Webhook resent by admin - sync', [
+                    'payment_id' => $payment->id,
+                    'transaction_id' => $payment->transaction_id,
+                    'delivered' => $delivered,
+                    'admin_id' => auth('admin')->id(),
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'delivered' => $delivered,
+                    'message' => $delivered
+                        ? 'Webhook delivered. Merchant HTTP response is below.'
+                        : 'Webhook attempt finished. Merchant did not return HTTP 2xx — see the live response below.',
+                    'webhook_status' => $payment->webhook_status,
+                    'attempts' => $attempts,
+                    'failures' => $payment->webhookFailureDetails(),
+                ]);
+            }
+
+            SendWebhookNotification::dispatch($payment);
+
             \Illuminate\Support\Facades\Log::info('Webhook resent by admin - queued', [
                 'payment_id' => $payment->id,
                 'transaction_id' => $payment->transaction_id,
@@ -703,25 +728,22 @@ class PaymentController extends Controller
 
             return response()->json([
                 'success' => true,
+                'delivered' => null,
                 'message' => 'Webhook notification has been queued for resending to all configured webhook URLs.',
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('Error resending webhook', [
                 'payment_id' => $payment->id,
                 'transaction_id' => $payment->transaction_id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-            
-            // Truncate error message for user display (prevent long SQL errors)
-            $errorMessage = $e->getMessage();
-            if (mb_strlen($errorMessage) > 200) {
-                $errorMessage = mb_substr($errorMessage, 0, 197) . '...';
-            }
-            
+
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to resend webhook: ' . $errorMessage,
+                'delivered' => false,
+                'message' => 'Failed to send webhook: '.$e->getMessage(),
+                'attempts' => SendWebhookNotification::$lastHttpDeliveryLog ?? [],
             ], 500);
         }
     }

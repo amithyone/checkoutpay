@@ -41,11 +41,11 @@
             <!-- Action Buttons - Mobile Stacked -->
             <div class="flex flex-col sm:flex-row sm:flex-wrap gap-2">
                 @if($payment->status === 'approved')
-                    <button onclick="resendWebhook({{ $payment->id }})" 
+                    <button onclick="resendWebhook({{ $payment->id }}, true)" 
                         id="resend-webhook-btn"
                         class="w-full sm:w-auto bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center justify-center text-sm"
-                        title="Resend webhook notification to business">
-                        <i class="fas fa-paper-plane mr-2"></i> <span>Resend Webhook</span>
+                        title="Send the webhook now (not queued) and show the merchant HTTP response">
+                        <i class="fas fa-bolt mr-2"></i> <span>Send webhook now</span>
                     </button>
                 @elseif($payment->status === 'pending')
                     <button onclick="checkMatchForPayment({{ $payment->id }})" 
@@ -94,6 +94,7 @@
                     <i class="fas fa-trash mr-2"></i> <span>Delete</span>
                 </button>
             </div>
+            <div id="webhook-live-result" class="hidden mt-4"></div>
         </div>
 
         <!-- Payment Details Grid -->
@@ -1034,18 +1035,29 @@ function closeManualApproveModal() {
     document.getElementById('manualApproveModal').classList.add('hidden');
 }
 
-function resendWebhook(paymentId) {
+function resendWebhook(paymentId, sync) {
     const btn = document.getElementById('resend-webhook-btn');
     if (!btn) return;
-    
-    if (!confirm('Are you sure you want to resend the webhook notification to the business?')) {
+
+    const sendNow = !!sync;
+    const confirmMsg = sendNow
+        ? 'Send this webhook now (not queued) and show the merchant HTTP response?'
+        : 'Queue this webhook for resending?';
+    if (!confirm(confirmMsg)) {
         return;
     }
-    
+
     const originalText = btn.innerHTML;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Sending...';
-    
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Sending…';
+
+    const resultEl = document.getElementById('webhook-live-result');
+    if (resultEl) {
+        resultEl.classList.remove('hidden');
+        resultEl.className = 'mt-4 p-3 rounded border text-xs bg-gray-50 border-gray-200 text-gray-700';
+        resultEl.textContent = 'Sending webhook now…';
+    }
+
     fetch(`${window.__ADMIN_BASE__}/payments/${paymentId}/resend-webhook`, {
         method: 'POST',
         headers: {
@@ -1053,29 +1065,84 @@ function resendWebhook(paymentId) {
             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}',
             'Accept': 'application/json'
         },
+        body: JSON.stringify({ sync: sendNow }),
         credentials: 'same-origin'
     })
-    .then(response => {
-        if (!response.ok) {
-            return response.json().then(data => Promise.reject(data));
+    .then(response => response.json().then(data => ({ ok: response.ok, data: data })))
+    .then(function (ref) {
+        const data = ref.data || {};
+        if (sendNow) {
+            renderWebhookLiveResult(resultEl, data, ref.ok);
+            return;
         }
-        return response.json();
-    })
-    .then(data => {
         if (data.success) {
-            alert('✅ Webhook notification has been queued for resending successfully!');
+            alert('✅ ' + (data.message || 'Webhook queued.'));
         } else {
-            alert('❌ Error: ' + (data.message || 'Failed to resend webhook'));
+            alert('❌ ' + (data.message || 'Failed to resend webhook'));
         }
     })
     .catch(error => {
         console.error('Error:', error);
-        alert('❌ Error: ' + (error.message || 'Failed to resend webhook. Please try again.'));
+        if (resultEl && sendNow) {
+            resultEl.className = 'mt-4 p-3 rounded border text-xs bg-red-50 border-red-200 text-red-900';
+            resultEl.textContent = 'Request failed: ' + (error.message || 'network error');
+        } else {
+            alert('❌ Error: ' + (error.message || 'Failed to resend webhook. Please try again.'));
+        }
     })
     .finally(() => {
         btn.disabled = false;
         btn.innerHTML = originalText;
     });
+}
+
+function renderWebhookLiveResult(resultEl, data, httpOk) {
+    if (!resultEl) {
+        alert((data && data.message) || 'Webhook attempt finished.');
+        return;
+    }
+    const delivered = !!(data && data.delivered);
+    resultEl.className = delivered
+        ? 'mt-4 p-3 rounded border text-xs bg-green-50 border-green-200 text-green-900'
+        : 'mt-4 p-3 rounded border text-xs bg-red-50 border-red-200 text-red-900';
+
+    let html = '<p class="font-semibold mb-2">' + escapeHtml(data.message || (delivered ? 'Delivered' : 'Not delivered')) + '</p>';
+    if (data.webhook_status) {
+        html += '<p class="mb-2">Stored status: <code>' + escapeHtml(String(data.webhook_status)) + '</code></p>';
+    }
+    const attempts = Array.isArray(data.attempts) ? data.attempts : [];
+    attempts.forEach(function (attempt) {
+        html += '<div class="mb-3 last:mb-0 bg-white border border-gray-200 rounded p-2">';
+        if (attempt.url) {
+            html += '<p class="font-mono break-all mb-1">' + escapeHtml(String(attempt.url)) + '</p>';
+        }
+        if (attempt.note) {
+            html += '<p>' + escapeHtml(String(attempt.note)) + '</p>';
+        }
+        if (attempt.http_status != null) {
+            html += '<p><strong>HTTP status:</strong> ' + escapeHtml(String(attempt.http_status)) + '</p>';
+        }
+        if (attempt.success === true) {
+            html += '<p>Delivered (HTTP 2xx)</p>';
+        }
+        if (attempt.error) {
+            html += '<pre class="whitespace-pre-wrap break-all mt-1 max-h-40 overflow-auto">' + escapeHtml(String(attempt.error)) + '</pre>';
+        }
+        if (attempt.response_body) {
+            html += '<p class="font-semibold mt-2">Response body</p>';
+            html += '<pre class="whitespace-pre-wrap break-all font-mono text-[11px] leading-snug max-h-96 overflow-auto">' + escapeHtml(String(attempt.response_body)) + '</pre>';
+        }
+        html += '</div>';
+    });
+    resultEl.innerHTML = html;
+}
+
+function escapeHtml(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
 }
 
 // Auto-check mismatch if amounts differ
