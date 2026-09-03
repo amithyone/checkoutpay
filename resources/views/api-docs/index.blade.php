@@ -63,6 +63,7 @@
                             <a href="#authentication" class="block text-sm text-slate-600 hover:text-brand-primary py-2 font-medium">Authentication</a>
                             <a href="#endpoints" class="block text-sm text-slate-600 hover:text-brand-primary py-2 font-medium">API Endpoints</a>
                             <a href="#payments" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Payments</a>
+                            <a href="#card-payments" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Card collection</a>
                             <a href="#whatsapp-pay-code" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">WhatsApp Pay Code</a>
                             <a href="#developer-program" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Developer program</a>
                             <a href="#update-amount" class="block text-sm text-gray-700 hover:text-primary py-2 ml-4">Update payment amount</a>
@@ -547,7 +548,160 @@ X-API-Key: pk_your_api_key_here</code></pre>
 }</code></pre>
                         </div>
 
-                        <p class="text-gray-700 text-sm">There is no <code class="bg-gray-100 px-1 rounded">account_number</code> on card payments. Poll <code class="bg-gray-100 px-1 rounded">GET /payment/{transactionId}</code> or wait for <code class="bg-gray-100 px-1 rounded">payment.approved</code>. Use <code class="bg-gray-100 px-1 rounded">received_amount</code> for reconciliation (net after processor fees).</p>
+                        <p class="text-gray-700 text-sm mb-6">There is no <code class="bg-gray-100 px-1 rounded">account_number</code> on card payments. Poll <code class="bg-gray-100 px-1 rounded">GET /payment/{transactionId}</code> or wait for <code class="bg-gray-100 px-1 rounded">payment.approved</code>. Use <code class="bg-gray-100 px-1 rounded">received_amount</code> for reconciliation (net after processor fees).</p>
+
+                        <h3 class="text-xl font-semibold text-gray-900 mb-3">Sample: collect a card payment</h3>
+                        <p class="text-gray-700 text-sm mb-4">Create the payment on your server, then redirect the customer to <code class="bg-gray-100 px-1 rounded">card_checkout.checkout_url</code>. Do not call the card processor yourself. When the customer finishes, you receive the same <code class="bg-gray-100 px-1 rounded">payment.approved</code> webhook with <code class="bg-gray-100 px-1 rounded">payment_method: card</code>.</p>
+
+                        <h4 class="font-semibold text-gray-900 mb-2">PHP</h4>
+                        <div class="code-block mb-6">
+                            <pre><code>$apiKey = 'pk_your_api_key_here';
+$apiUrl = '{{ url('/api/v1') }}';
+
+$data = [
+    'amount' => 200.00,
+    'payment_method' => 'card',
+    'email' => 'customer@example.com',
+    'phone' => '08012345678',
+    'payer_name' => 'Jane Doe',
+    'webhook_url' => 'https://yourwebsite.com/webhook/payment-status',
+    'service' => 'Order #1234',
+];
+
+$ch = curl_init($apiUrl . '/payment-request');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'X-API-Key: ' . $apiKey,
+]);
+
+$response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+
+$result = json_decode($response, true);
+
+if ($httpCode === 201 && !empty($result['success'])) {
+    $checkoutUrl = $result['data']['card_checkout']['checkout_url'] ?? null;
+    if ($checkoutUrl) {
+        header('Location: ' . $checkoutUrl);
+        exit;
+    }
+}
+
+http_response_code(502);
+echo $result['message'] ?? 'Unable to start card checkout';</code></pre>
+                        </div>
+
+                        <h4 class="font-semibold text-gray-900 mb-2">JavaScript (Node / Fetch)</h4>
+                        <div class="code-block mb-6">
+                            <pre><code>const apiKey = 'pk_your_api_key_here';
+const apiUrl = '{{ url('/api/v1') }}';
+
+const response = await fetch(`${apiUrl}/payment-request`, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': apiKey,
+  },
+  body: JSON.stringify({
+    amount: 200.00,
+    payment_method: 'card',
+    email: 'customer@example.com',
+    phone: '08012345678',
+    payer_name: 'Jane Doe',
+    webhook_url: 'https://yourwebsite.com/webhook/payment-status',
+    service: 'Order #1234',
+  }),
+});
+
+const result = await response.json();
+
+if (result.success &amp;&amp; result.data?.card_checkout?.checkout_url) {
+  const checkoutUrl = result.data.card_checkout.checkout_url;
+  // Call this from your backend, then send checkoutUrl to the browser and redirect
+  window.location.href = checkoutUrl;
+} else {
+  throw new Error(result.message || 'Unable to start card checkout');
+}</code></pre>
+                        </div>
+
+                        <h4 class="font-semibold text-gray-900 mb-2">Python</h4>
+                        <div class="code-block mb-6">
+                            <pre><code>import json
+import requests
+
+api_key = 'pk_your_api_key_here'
+api_url = '{{ url('/api/v1') }}'
+
+payload = {
+    'amount': 200.00,
+    'payment_method': 'card',
+    'email': 'customer@example.com',
+    'phone': '08012345678',
+    'payer_name': 'Jane Doe',
+    'webhook_url': 'https://yourwebsite.com/webhook/payment-status',
+    'service': 'Order #1234',
+}
+
+response = requests.post(
+    f'{api_url}/payment-request',
+    headers={
+        'Content-Type': 'application/json',
+        'X-API-Key': api_key,
+    },
+    data=json.dumps(payload),
+)
+result = response.json()
+
+if response.status_code == 201 and result.get('success'):
+    checkout_url = result['data']['card_checkout']['checkout_url']
+    # Redirect the customer to checkout_url
+    print(checkout_url)
+else:
+    raise RuntimeError(result.get('message', 'Unable to start card checkout'))</code></pre>
+                        </div>
+
+                        <h4 class="font-semibold text-gray-900 mb-2">Webhook after a successful card payment</h4>
+                        <p class="text-gray-700 text-sm mb-3"><code class="bg-gray-100 px-1 rounded">event</code> stays <code class="bg-gray-100 px-1 rounded">payment.approved</code>. Bank fields are <code class="bg-gray-100 px-1 rounded">null</code>. <code class="bg-gray-100 px-1 rounded">external_reference</code> is the card checkout payment reference when present.</p>
+                        <div class="code-block">
+                            <pre><code>{
+  "event": "payment.approved",
+  "transaction_id": "TXN-ABC123",
+  "external_reference": "PAY_...",
+  "status": "approved",
+  "amount": 200.00,
+  "received_amount": 196.00,
+  "payer_name": "Jane Doe",
+  "payerName": "Jane Doe",
+  "sender_name": "Jane Doe",
+  "bank": null,
+  "bank_name": null,
+  "payer_bank": null,
+  "payer_account": null,
+  "payer_account_number": null,
+  "sender_account": null,
+  "payer": {
+    "name": "Jane Doe",
+    "account": null,
+    "bank": null
+  },
+  "account_number": null,
+  "is_mismatch": false,
+  "mismatch_reason": null,
+  "charges": {
+    "percentage": 1.5,
+    "fixed": 50.00,
+    "total": 4.00,
+    "business_receives": 192.00
+  },
+  "timestamp": "2026-09-03T10:35:00Z",
+  "payment_method": "card",
+  "email_data": {}
+}</code></pre>
+                        </div>
                     </div>
 
                     <!-- WhatsApp Pay Code (checkout dual rail) -->
@@ -956,6 +1110,7 @@ X-API-Key: pk_your_api_key_here
                             <div>
                                 <h3 class="text-xl font-semibold text-gray-900 mb-3">Webhook Payload</h3>
                                 <p class="text-gray-700 mb-4">When a payment is approved, you'll receive a POST request to your webhook URL with the following payload (structure is stable; new fields may be added in the future). This includes payments that were matched after an amount correction via <code>PATCH /payment/{transactionId}/amount</code>—the webhook payload is unchanged.</p>
+                                <p class="text-gray-700 mb-4"><strong>Website event name does not change.</strong> <code class="bg-gray-100 px-1 rounded">event</code> is always <code class="bg-gray-100 px-1 rounded">payment.approved</code>. Payer identity is duplicated under a few aliases so POS / Pay at Shop clients can read either naming style. Treat aliases as the same value.</p>
                                 <div class="code-block">
                                     <pre><code>{
   "event": "payment.approved",
@@ -965,8 +1120,19 @@ X-API-Key: pk_your_api_key_here
   "amount": 5000.00,
   "received_amount": 5000.00,
   "payer_name": "John Doe",
+  "payerName": "John Doe",
+  "sender_name": "John Doe",
   "bank": "GTBank",
+  "bank_name": "GTBank",
+  "payer_bank": "GTBank",
+  "payer_account": "0123456789",
   "payer_account_number": "0123456789",
+  "sender_account": "0123456789",
+  "payer": {
+    "name": "John Doe",
+    "account": "0123456789",
+    "bank": "GTBank"
+  },
   "account_number": "0987654321",
   "is_mismatch": false,
   "mismatch_reason": null,
@@ -985,7 +1151,30 @@ X-API-Key: pk_your_api_key_here
   "developer_program_fee_share_base_description": "CheckoutPay's transaction fee revenue on qualifying attributed volume"
 }</code></pre>
                                 </div>
-                                <p class="text-sm text-gray-600 mt-2"><strong>Fields:</strong> <code>event</code>, <code>transaction_id</code>, <code>external_reference</code> (when set on the payment, e.g. WhatsApp wallet <code>pay/start</code> <code>order_reference</code> or card checkout <code>payment_reference</code>), <code>status</code>, <code>amount</code> (requested), <code>received_amount</code> (actual received; use for reconciliation), <code>payer_name</code>, <code>bank</code>, <code>payer_account_number</code>, <code>account_number</code> (your account; null for card), <code>is_mismatch</code>, <code>mismatch_reason</code>, <code>charges</code>, <code>timestamp</code>, <code>payment_method</code> (<code>bank_transfer</code>, <code>whatsapp_wallet</code>, or <code>card</code>, nullable), <code>email_data</code> (optional raw email info). Developer program (nullable): <code>developer_program_partner_business_id</code>, <code>developer_program_partner_share_amount</code>, <code>developer_program_partner_share_percent_effective</code>, <code>developer_program_fee_share_base_description</code>—see <a href="#developer-program" class="text-primary underline">Developer program</a>.</p>
+                                <p class="text-sm text-gray-600 mt-2 mb-4"><strong>Core fields:</strong> <code>event</code> (<code>payment.approved</code>), <code>transaction_id</code>, <code>external_reference</code> (when set on the payment, e.g. WhatsApp wallet <code>pay/start</code> <code>order_reference</code> or card checkout <code>payment_reference</code>), <code>status</code>, <code>amount</code> (requested), <code>received_amount</code> (actual received; use for reconciliation), <code>payer_name</code>, <code>bank</code>, <code>payer_account_number</code>, <code>account_number</code> (your virtual account; <code>null</code> for card), <code>is_mismatch</code>, <code>mismatch_reason</code>, <code>charges</code>, <code>timestamp</code>, <code>payment_method</code> (<code>bank_transfer</code>, <code>whatsapp_wallet</code>, or <code>card</code>, nullable), <code>email_data</code> (optional raw email info). Developer program (nullable): <code>developer_program_partner_business_id</code>, <code>developer_program_partner_share_amount</code>, <code>developer_program_partner_share_percent_effective</code>, <code>developer_program_fee_share_base_description</code>—see <a href="#developer-program" class="text-primary underline">Developer program</a>.</p>
+                                <div class="overflow-x-auto mb-4">
+                                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                                        <thead class="bg-gray-50">
+                                            <tr>
+                                                <th class="px-4 py-2 text-left font-semibold text-gray-700">Canonical field</th>
+                                                <th class="px-4 py-2 text-left font-semibold text-gray-700">Aliases (same value)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200 text-gray-700">
+                                            <tr><td class="px-4 py-2 font-mono">payer_name</td><td class="px-4 py-2 font-mono">payerName, sender_name, payer.name</td></tr>
+                                            <tr><td class="px-4 py-2 font-mono">payer_account_number</td><td class="px-4 py-2 font-mono">payer_account, sender_account, payer.account</td></tr>
+                                            <tr><td class="px-4 py-2 font-mono">bank</td><td class="px-4 py-2 font-mono">bank_name, payer_bank, payer.bank</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-2">
+                                    <p class="text-sm text-slate-800 mb-2"><strong>Pay at Shop (Cheko) only.</strong> If this approved payment is linked to an in-store broadcast session, these extra fields are included. Existing website handlers can ignore them.</p>
+                                    <ul class="list-disc list-inside text-sm text-slate-800 space-y-1">
+                                        <li><code>session_id</code> — Pay at Shop session UUID</li>
+                                        <li><code>reference</code> — same as <code>transaction_id</code> (or <code>external_reference</code> if no transaction id)</li>
+                                        <li><code>broadcast_event</code> — always <code>payment.confirmed</code> (this is <em>not</em> a replacement for <code>event</code>)</li>
+                                    </ul>
+                                </div>
                             </div>
 
                             <div>
@@ -1153,6 +1342,42 @@ createPayment();</code></pre>
                                 </div>
                             </div>
 
+                            <!-- Card collection example -->
+                            <div>
+                                <h3 class="text-xl font-semibold text-gray-900 mb-3">Card collection (PHP)</h3>
+                                <p class="text-gray-700 text-sm mb-3">Requires <strong>Card payments</strong> enabled on the business. Full samples (PHP, JavaScript, Python) and the card webhook are under <a href="#card-payments" class="text-primary underline">Card collection</a>.</p>
+                                <div class="code-block">
+                                    <pre><code>$apiKey = 'pk_your_api_key_here';
+$apiUrl = '{{ url('/api/v1') }}';
+
+$data = [
+    'amount' => 200.00,
+    'payment_method' => 'card',
+    'email' => 'customer@example.com',
+    'payer_name' => 'Jane Doe',
+    'webhook_url' => 'https://yourwebsite.com/webhook/payment-status',
+];
+
+$ch = curl_init($apiUrl . '/payment-request');
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'X-API-Key: ' . $apiKey,
+]);
+
+$result = json_decode(curl_exec($ch), true);
+curl_close($ch);
+
+$checkoutUrl = $result['data']['card_checkout']['checkout_url'] ?? null;
+if (!empty($result['success']) &amp;&amp; $checkoutUrl) {
+    header('Location: ' . $checkoutUrl);
+    exit;
+}</code></pre>
+                                </div>
+                            </div>
+
                             <!-- Python Example -->
                             <div>
                                 <h3 class="text-xl font-semibold text-gray-900 mb-3">Python</h3>
@@ -1201,14 +1426,17 @@ else:
 
 $payload = json_decode(file_get_contents('php://input'), true);
 
-if ($payload['event'] === 'payment.approved') {
-    $transactionId = $payload['transaction_id'];
-    $amount = $payload['amount'];
-    $status = $payload['status'];
-    
+if (($payload['event'] ?? '') === 'payment.approved') {
+    $transactionId = $payload['transaction_id'] ?? null;
+    $method = $payload['payment_method'] ?? null; // bank_transfer | whatsapp_wallet | card
+    $payerName = $payload['payer_name']
+        ?? $payload['payerName']
+        ?? ($payload['payer']['name'] ?? null);
+    $received = $payload['received_amount'] ?? $payload['amount'] ?? 0;
+
     // Update your database
     // Mark order as paid, send confirmation email, etc.
-    
+
     // Always return 200 OK to acknowledge receipt
     http_response_code(200);
     echo json_encode(['status' => 'received']);

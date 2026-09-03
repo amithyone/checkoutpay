@@ -64,6 +64,9 @@ Creates a pending payment and returns bank account details for the customer.
 | `transaction_id` | string | Must be unique among payments if provided |
 | `business_website_id` | integer | Must exist in your `business_websites` |
 | `website_url` | string (URL) | Helps identify website / charging context |
+| `payment_method` | string | Omit or `bank_transfer` for virtual-account collection. Send `card` for hosted card checkout (see below). |
+| `email` | string | Required when `payment_method` is `card` |
+| `phone` | string | Optional customer phone |
 
 **Success:** `201 Created`
 
@@ -100,6 +103,76 @@ Creates a pending payment and returns bank account details for the customer.
 
 ---
 
+## Card collection (`payment_method: card`)
+
+Opt-in on the same `POST /payment-request` endpoint. Enable **Card payments** in the business dashboard first (otherwise the API returns **403**).
+
+Send `payment_method: card` and a customer `email`. Bank transfer remains the default when you omit `payment_method`. `payer_name` is optional for card (still recommended).
+
+**Request**
+
+```json
+{
+  "amount": 200.00,
+  "payment_method": "card",
+  "email": "customer@example.com",
+  "phone": "08012345678",
+  "payer_name": "Jane Doe",
+  "webhook_url": "https://yourwebsite.com/webhook/payment-status"
+}
+```
+
+**Success `201`** includes `data.card_checkout.checkout_url`. Redirect the customer there. There is no `account_number` on card payments.
+
+```json
+{
+  "success": true,
+  "data": {
+    "transaction_id": "TXN-ABC123",
+    "amount": 200,
+    "payment_method": "card",
+    "status": "pending",
+    "card_checkout": {
+      "checkout_url": "https://checkout.example.com/pay/...",
+      "payment_reference": "PAY_..."
+    }
+  }
+}
+```
+
+When the customer pays, you receive the usual **`payment.approved`** webhook with `payment_method: "card"`. Bank fields (`account_number`, `payer_account_number`, `bank`) are `null`. `external_reference` is the card checkout payment reference when present.
+
+**PHP sample**
+
+```php
+$ch = curl_init($apiUrl . '/payment-request');
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => json_encode([
+        'amount' => 200.00,
+        'payment_method' => 'card',
+        'email' => 'customer@example.com',
+        'payer_name' => 'Jane Doe',
+        'webhook_url' => 'https://yourwebsite.com/webhook/payment-status',
+    ]),
+    CURLOPT_HTTPHEADER => [
+        'Content-Type: application/json',
+        'X-API-Key: ' . $apiKey,
+    ],
+]);
+$result = json_decode(curl_exec($ch), true);
+curl_close($ch);
+
+$checkoutUrl = $result['data']['card_checkout']['checkout_url'] ?? null;
+if (!empty($result['success']) && $checkoutUrl) {
+    header('Location: ' . $checkoutUrl);
+    exit;
+}
+```
+
+---
+
 ## GET /payment/{transactionId}
 
 Returns one payment for your business. **Requires** `X-API-Key`.
@@ -130,9 +203,11 @@ The `api` middleware group applies a limit of **60 requests per minute** (per au
 
 ## Webhooks
 
-When a payment is approved, Checkout **POST**s JSON to the `webhook_url` you supplied (bank `payment-request` flow) or the `webhook_url` on **`pay/start`** (wallet flow). The URL must match an **approved** website or business webhook configured in Checkout.
+When a payment is approved, Checkout **POST**s JSON to the `webhook_url` you supplied (bank `payment-request` flow), the `webhook_url` on **`pay/start`** (wallet flow), or the website / business webhook. The URL must match an **approved** website or business webhook configured in Checkout.
 
-Use `transaction_id` as the stable payment identifier. When present, `external_reference` carries your own reference (for wallet **`pay/start`**, this is your `order_reference`). Wallet partner approvals typically use `transaction_id` values prefixed with **`WLT-PARTNER-`**.
+Use `transaction_id` as the stable payment identifier. When present, `external_reference` carries your own reference (for wallet **`pay/start`**, this is your `order_reference`; for card checkout, the processor payment reference). Wallet partner approvals typically use `transaction_id` values prefixed with **`WLT-PARTNER-`**.
+
+**`event` is always `payment.approved`** for website webhooks. Extra payer aliases were added so Pay at Shop / POS clients can read either naming style; they duplicate the canonical fields.
 
 Example **`payment.approved`** body (fields may be `null` where not applicable):
 
@@ -145,8 +220,19 @@ Example **`payment.approved`** body (fields may be `null` where not applicable):
   "amount": 2500.0,
   "received_amount": 2500.0,
   "payer_name": "Ada",
+  "payerName": "Ada",
+  "sender_name": "Ada",
   "bank": null,
+  "bank_name": null,
+  "payer_bank": null,
+  "payer_account": null,
   "payer_account_number": null,
+  "sender_account": null,
+  "payer": {
+    "name": "Ada",
+    "account": null,
+    "bank": null
+  },
   "account_number": null,
   "is_mismatch": false,
   "mismatch_reason": null,
@@ -157,9 +243,20 @@ Example **`payment.approved`** body (fields may be `null` where not applicable):
     "business_receives": 2500.0
   },
   "timestamp": "2026-04-26T12:00:00.000000Z",
+  "payment_method": "whatsapp_wallet",
   "email_data": {}
 }
 ```
+
+**Payer aliases** (same value as the canonical field):
+
+| Canonical | Aliases |
+|-----------|---------|
+| `payer_name` | `payerName`, `sender_name`, `payer.name` |
+| `payer_account_number` | `payer_account`, `sender_account`, `payer.account` |
+| `bank` | `bank_name`, `payer_bank`, `payer.bank` |
+
+**Pay at Shop only.** If the payment is linked to an in-store broadcast session, the payload also includes `session_id`, `reference`, and `broadcast_event: "payment.confirmed"`. `event` remains `payment.approved`. Website handlers can ignore those three fields.
 
 ---
 

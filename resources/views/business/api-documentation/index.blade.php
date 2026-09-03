@@ -205,13 +205,21 @@ Content-Type: application/json
   "amount": 5000.00,
   "received_amount": 5000.00,
   "payer_name": "John Doe",
+  "payerName": "John Doe",
+  "sender_name": "John Doe",
   "bank": "GTBank",
+  "bank_name": "GTBank",
+  "payer_bank": "GTBank",
+  "payer_account": "0123456789",
   "payer_account_number": "0123456789",
+  "sender_account": "0123456789",
+  "payer": { "name": "John Doe", "account": "0123456789", "bank": "GTBank" },
   "account_number": "0987654321",
   "is_mismatch": false,
   "mismatch_reason": null,
   "charges": { "percentage": 50, "fixed": 50, "total": 100, "business_receives": 4900 },
   "timestamp": "2024-01-15T10:30:00Z",
+  "payment_method": "bank_transfer",
   "email_data": {},
   "developer_program_partner_business_id": 42,
   "developer_program_partner_share_amount": 25.00,
@@ -219,7 +227,7 @@ Content-Type: application/json
   "developer_program_fee_share_base_description": "CheckoutPay's transaction fee revenue on qualifying attributed volume"
 }</code></pre>
                 </div>
-                <p class="text-xs text-gray-600 mt-2">Use <code>transaction_id</code> to identify the payment; use <code>external_reference</code> when present (e.g. your <code>order_reference</code> from WhatsApp wallet <code>pay/start</code>). Use <code>received_amount</code> and <code>charges.business_receives</code> for reconciliation. When you use the developer program, also read <code>developer_program_partner_business_id</code> and <code>developer_program_partner_share_amount</code> (nullable).</p>
+                <p class="text-xs text-gray-600 mt-2">Use <code>transaction_id</code> to identify the payment; use <code>external_reference</code> when present (e.g. your <code>order_reference</code> from WhatsApp wallet <code>pay/start</code>). <code>event</code> is always <code>payment.approved</code>. Payer aliases (<code>payerName</code>, <code>sender_name</code>, <code>payer_account</code>, <code>payer.bank</code>, etc.) duplicate the canonical fields. Pay at Shop sessions may also include <code>session_id</code>, <code>reference</code>, and <code>broadcast_event: payment.confirmed</code>. Use <code>received_amount</code> and <code>charges.business_receives</code> for reconciliation. When you use the developer program, also read <code>developer_program_partner_business_id</code> and <code>developer_program_partner_share_amount</code> (nullable).</p>
                 <div class="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
                     <p class="text-xs text-green-800">
                         <i class="fas fa-check-circle mr-1"></i>
@@ -257,12 +265,39 @@ X-API-Key: {{ $business->api_key }}
   "webhook_url": "https://yourwebsite.com/webhook/checkout"
 }</code></pre>
         </div>
-        <p class="text-sm text-gray-600 mb-2">
+        <p class="text-sm text-gray-600 mb-3">
             On success you get the same <code class="bg-gray-100 px-1 rounded text-xs">payment.approved</code> webhook with
             <code class="bg-gray-100 px-1 rounded text-xs">payment_method: card</code> and
             <code class="bg-gray-100 px-1 rounded text-xs">external_reference</code> set to the card checkout payment reference.
         </p>
-        <p class="text-sm text-gray-600">Full reference: <a href="{{ route('api-docs') }}#card-payments" class="text-primary underline font-medium">public API docs — Card payments</a>.</p>
+        <h4 class="text-sm font-semibold text-gray-900 mb-2">Sample: collect a card payment (PHP)</h4>
+        <div class="bg-gray-900 rounded-lg p-4 overflow-x-auto mb-3">
+            <pre class="text-xs text-gray-100"><code>$ch = curl_init('{{ url('/api/v1/payment-request') }}');
+curl_setopt_array($ch, [
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => json_encode([
+        'amount' => 200.00,
+        'payment_method' => 'card',
+        'email' => 'customer@example.com',
+        'payer_name' => 'Jane Doe',
+        'webhook_url' => 'https://yourwebsite.com/webhook/checkout',
+    ]),
+    CURLOPT_HTTPHEADER => [
+        'Content-Type: application/json',
+        'X-API-Key: {{ $business->api_key }}',
+    ],
+]);
+$result = json_decode(curl_exec($ch), true);
+curl_close($ch);
+
+$checkoutUrl = $result['data']['card_checkout']['checkout_url'] ?? null;
+if (!empty($result['success']) &amp;&amp; $checkoutUrl) {
+    header('Location: ' . $checkoutUrl);
+    exit;
+}</code></pre>
+        </div>
+        <p class="text-sm text-gray-600">Full reference (PHP, JavaScript, Python + card webhook): <a href="{{ route('api-docs') }}#card-payments" class="text-primary underline font-medium">public API docs — Card collection</a>.</p>
     </div>
 
     <!-- WhatsApp Pay Code -->
