@@ -215,7 +215,19 @@ class ConsumerWalletAuthController extends Controller
         $account = ConsumerWalletApiAccount::query()->where('phone_e164', $result['phone_e164'])->first();
         $appSessionId = null;
         if ($account instanceof ConsumerWalletApiAccount) {
-            $appSessionId = app(ConsumerAppSessionService::class)->afterPlainTokenIssued(
+            $sessions = app(ConsumerAppSessionService::class);
+            $ctx = $sessions->clientContextFromRequest($request);
+            $wallet = WhatsappWallet::query()->find($result['wallet_id']);
+            if ($wallet instanceof WhatsappWallet) {
+                app(\App\Services\Consumer\ConsumerDeviceTrustService::class)->bootstrapTrustedDeviceIfEligible(
+                    $account,
+                    $wallet,
+                    $sessions->deviceIdFromRequest($request),
+                    $ctx['platform'],
+                    $ctx['device_label'],
+                );
+            }
+            $appSessionId = $sessions->afterPlainTokenIssued(
                 $account,
                 ConsumerAppSession::LOGIN_REGISTER,
                 $request,

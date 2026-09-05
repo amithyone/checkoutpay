@@ -51,6 +51,12 @@ return [
     /** Hours to lock high-value transfers after binding a new trusted device. */
     'transfer_lock_hours' => (int) env('CONSUMER_TRANSFER_LOCK_HOURS', 48),
 
+    /**
+     * Browser / Expo web wallet: daily outbound spend cap (NGN). Phone app is not capped by this.
+     */
+    'web_daily_transfer_cap_enabled' => filter_var(env('CONSUMER_WEB_DAILY_TRANSFER_CAP_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'web_daily_transfer_cap_ngn' => (float) env('CONSUMER_WEB_DAILY_TRANSFER_CAP_NGN', 10000),
+
     /** Short-lived passkey payment_token TTL (minutes). */
     'payment_token_ttl_minutes' => (int) env('CONSUMER_PAYMENT_TOKEN_TTL_MINUTES', 5),
 

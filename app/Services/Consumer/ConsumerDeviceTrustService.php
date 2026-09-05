@@ -125,7 +125,7 @@ class ConsumerDeviceTrustService
     }
 
     /**
-     * First-time bootstrap: Tier-2 wallet with no trusted device yet → trust this device (no lock).
+     * First login with a device_id and no trusted device yet → bind this install (no transfer lock).
      */
     public function bootstrapTrustedDeviceIfEligible(
         ConsumerWalletApiAccount $account,
@@ -143,7 +143,7 @@ class ConsumerDeviceTrustService
         }
 
         $normalized = $this->normalizeDeviceId($deviceId);
-        if ($normalized === null || ! $wallet->isTier2()) {
+        if ($normalized === null) {
             return null;
         }
 
@@ -155,6 +155,23 @@ class ConsumerDeviceTrustService
             applyTransferLock: false,
             revokeOthers: false,
         );
+    }
+
+    public function deviceMismatchJsonResponse(ConsumerWalletApiAccount $account, ?string $deviceId): ?JsonResponse
+    {
+        if (! $this->isEnabled() || ! $this->requiresStepUp($account, $deviceId)) {
+            return null;
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'This wallet is registered to another device. Verify this device to continue.',
+            'code' => 'device_mismatch',
+            'data' => [
+                'stepup_required' => true,
+                'other_device_label' => $this->otherDeviceLabel($account),
+            ],
+        ], 403);
     }
 
     /**

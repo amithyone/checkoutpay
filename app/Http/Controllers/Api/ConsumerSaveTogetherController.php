@@ -92,6 +92,10 @@ class ConsumerSaveTogetherController extends Controller
             if ($lockResponse !== null) {
                 return $lockResponse;
             }
+            $webCap = app(\App\Services\Consumer\ConsumerWebDailyCapService::class)->rejectIfExceeded($user, $request, $amount);
+            if ($webCap !== null) {
+                return $webCap;
+            }
         }
 
         $wallet = $this->walletFor($request)->fresh();
@@ -101,6 +105,10 @@ class ConsumerSaveTogetherController extends Controller
         }
 
         $result = $saveTogether->contribute($wallet, $id, $amount);
+
+        if (($result['ok'] ?? false) && $user instanceof ConsumerWalletApiAccount) {
+            app(\App\Services\Consumer\ConsumerWebDailyCapService::class)->record($user, $request, $amount);
+        }
 
         return response()->json([
             'success' => $result['ok'],

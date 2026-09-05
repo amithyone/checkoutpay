@@ -16,6 +16,7 @@ use App\Services\Consumer\ConsumerBusinessActivityService;
 use App\Services\Consumer\ConsumerBusinessNameRegistrationService;
 use App\Services\Consumer\ConsumerBusinessWalletLedgerService;
 use App\Services\Consumer\ConsumerDeviceTrustService;
+use App\Services\Consumer\ConsumerWebDailyCapService;
 use App\Services\Consumer\ConsumerWalletElectricityReceiptEnricher;
 use App\Services\Consumer\ConsumerWalletTransactionScope;
 use App\Services\Consumer\ConsumerWalletTransferService;
@@ -211,6 +212,13 @@ class ConsumerWalletApiController extends Controller
                 'high_value_single_transfer_cap' => $this->deviceTrust->highValueCap(),
                 'high_value_transfer_blocked' => false,
             ];
+        $webDaily = $user instanceof ConsumerWalletApiAccount
+            ? $this->webDailyCap()->meta($user, $request)
+            : ['applies' => false, 'cap' => 0.0, 'used' => 0.0, 'remaining' => 0.0];
+        $transferLock['web_daily_transfer_cap'] = $webDaily['cap'];
+        $transferLock['web_daily_transfer_used'] = $webDaily['used'];
+        $transferLock['web_daily_transfer_remaining'] = $webDaily['remaining'];
+        $transferLock['web_daily_transfer_applies'] = $webDaily['applies'];
 
         return response()->json([
             'success' => true,
@@ -1104,11 +1112,9 @@ class ConsumerWalletApiController extends Controller
         ], $this->paymentAuth->validationRules()));
 
         $user = $request->user();
-        if ($user instanceof ConsumerWalletApiAccount) {
-            $lockResponse = $this->deviceTrust->transferLockJsonResponse($user, (float) $request->input('amount'));
-            if ($lockResponse !== null) {
-                return $lockResponse;
-            }
+        $amount = (float) $request->input('amount');
+        if ($spendBlock = $this->rejectWalletSpendLimits($request, $amount)) {
+            return $spendBlock;
         }
 
         $wallet = $this->walletFor($request)->fresh();
@@ -1123,13 +1129,14 @@ class ConsumerWalletApiController extends Controller
         );
 
         if ($result['ok'] && $user instanceof ConsumerWalletApiAccount) {
+            $this->noteWalletSpendSuccess($request, $amount, true);
             $this->appSessions->recordForAccount(
                 $user,
                 $request,
                 ConsumerAppSessionEvent::TYPE_TRANSFER_P2P,
                 'P2P transfer to '.(string) $request->input('to_phone'),
                 [
-                    'amount' => (float) $request->input('amount'),
+                    'amount' => $amount,
                     'to_phone' => (string) $request->input('to_phone'),
                     'reference' => $result['data']['reference'] ?? null,
                 ],
@@ -1203,11 +1210,9 @@ class ConsumerWalletApiController extends Controller
         ], $this->paymentAuth->validationRules()));
 
         $user = $request->user();
-        if ($user instanceof ConsumerWalletApiAccount) {
-            $lockResponse = $this->deviceTrust->transferLockJsonResponse($user, (float) $request->input('amount'));
-            if ($lockResponse !== null) {
-                return $lockResponse;
-            }
+        $amount = (float) $request->input('amount');
+        if ($spendBlock = $this->rejectWalletSpendLimits($request, $amount)) {
+            return $spendBlock;
         }
 
         $wallet = $this->walletFor($request)->fresh();
@@ -1232,6 +1237,7 @@ class ConsumerWalletApiController extends Controller
         }
 
         if ($result['ok'] && $user instanceof ConsumerWalletApiAccount) {
+            $this->noteWalletSpendSuccess($request, $amount, true);
             if ($request->filled('idempotency_key')) {
                 $broadcastSession = $this->broadcastSessions->find((string) $request->input('idempotency_key'));
                 if ($broadcastSession !== null && (int) $broadcastSession->amount_ngn > 0) {
@@ -1393,6 +1399,10 @@ class ConsumerWalletApiController extends Controller
         ], $this->paymentAuth->validationRules()));
 
         $wallet = $this->walletFor($request)->fresh();
+        $amount = (float) $request->input('amount');
+        if ($spendBlock = $this->rejectWalletSpendLimits($request, $amount)) {
+            return $spendBlock;
+        }
         if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
             return $authResponse;
         }
@@ -1408,6 +1418,8 @@ class ConsumerWalletApiController extends Controller
             $e164,
             (float) $request->input('amount')
         );
+
+        $this->noteWalletSpendSuccess($request, $amount, (bool) ($out['ok'] ?? false));
 
         return response()->json([
             'success' => $out['ok'],
@@ -1426,6 +1438,10 @@ class ConsumerWalletApiController extends Controller
         ], $this->paymentAuth->validationRules()));
 
         $wallet = $this->walletFor($request)->fresh();
+        $amount = (float) $request->input('expected_price');
+        if ($spendBlock = $this->rejectWalletSpendLimits($request, $amount)) {
+            return $spendBlock;
+        }
         if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
             return $authResponse;
         }
@@ -1450,8 +1466,10 @@ class ConsumerWalletApiController extends Controller
             (string) $request->input('network_id'),
             $e164,
             $variationId,
-            (float) $request->input('expected_price')
+            $amount
         );
+
+        $this->noteWalletSpendSuccess($request, $amount, (bool) ($out['ok'] ?? false));
 
         return response()->json([
             'success' => $out['ok'],
@@ -1520,6 +1538,9 @@ class ConsumerWalletApiController extends Controller
         if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
             return $authResponse;
         }
+        if ($spendBlock = $this->rejectWalletSpendLimits($request, (float) $request->input('amount'))) {
+            return $spendBlock;
+        }
 
         $serviceId = (string) $request->input('service_id');
         if (! $this->consumerVtuServiceAllowed($serviceId, 'vtu.electricity_discos')) {
@@ -1557,6 +1578,8 @@ class ConsumerWalletApiController extends Controller
             $amount,
             $customerName,
         );
+
+        $this->noteWalletSpendSuccess($request, $amount, (bool) ($out['ok'] ?? false));
 
         return response()->json([
             'success' => $out['ok'],
@@ -1634,6 +1657,10 @@ class ConsumerWalletApiController extends Controller
         if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
             return $authResponse;
         }
+        $tvAmount = (float) $request->input('expected_price');
+        if ($spendBlock = $this->rejectWalletSpendLimits($request, $tvAmount)) {
+            return $spendBlock;
+        }
 
         $serviceId = (string) $request->input('service_id');
         if (! $this->consumerVtuServiceAllowed($serviceId, 'vtu.cable_tv_services')) {
@@ -1655,8 +1682,10 @@ class ConsumerWalletApiController extends Controller
             $serviceId,
             $smart,
             is_numeric($variationId) ? (int) $variationId : (string) $variationId,
-            (float) $request->input('expected_price'),
+            $tvAmount,
         );
+
+        $this->noteWalletSpendSuccess($request, $tvAmount, (bool) ($out['ok'] ?? false));
 
         return response()->json([
             'success' => $out['ok'],
@@ -1705,6 +1734,10 @@ class ConsumerWalletApiController extends Controller
         if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
             return $authResponse;
         }
+        $betAmount = (float) $request->input('amount');
+        if ($spendBlock = $this->rejectWalletSpendLimits($request, $betAmount)) {
+            return $spendBlock;
+        }
 
         $serviceId = (string) $request->input('service_id');
         if (! $this->consumerVtuServiceAllowed($serviceId, 'vtu.betting_services')) {
@@ -1722,6 +1755,8 @@ class ConsumerWalletApiController extends Controller
 
         $amount = (float) $request->input('amount');
         $out = $this->vtuPurchase->purchaseBetting($wallet, $serviceId, $customerId, $amount);
+
+        $this->noteWalletSpendSuccess($request, $amount, (bool) ($out['ok'] ?? false));
 
         return response()->json([
             'success' => $out['ok'],
@@ -1894,6 +1929,40 @@ class ConsumerWalletApiController extends Controller
         }
 
         return null;
+    }
+
+    private function webDailyCap(): ConsumerWebDailyCapService
+    {
+        return app(ConsumerWebDailyCapService::class);
+    }
+
+    private function rejectWalletSpendLimits(Request $request, float $amount): ?JsonResponse
+    {
+        $user = $request->user();
+        if (! $user instanceof ConsumerWalletApiAccount) {
+            return null;
+        }
+
+        $lock = $this->deviceTrust->transferLockJsonResponse($user, $amount);
+        if ($lock !== null) {
+            return $lock;
+        }
+
+        return $this->webDailyCap()->rejectIfExceeded($user, $request, $amount);
+    }
+
+    private function noteWalletSpendSuccess(Request $request, float $amount, bool $ok): void
+    {
+        if (! $ok) {
+            return;
+        }
+
+        $user = $request->user();
+        if (! $user instanceof ConsumerWalletApiAccount) {
+            return;
+        }
+
+        $this->webDailyCap()->record($user, $request, $amount);
     }
 
     /**

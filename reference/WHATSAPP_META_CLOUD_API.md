@@ -130,7 +130,40 @@ Test:
 
 ---
 
-## 8. Proactive notifications (templates)
+## 8. Login OTP without the user messaging you first
+
+Free-form WhatsApp text (`type: text`) is **blocked** by Meta until the user opens a 24-hour session by messaging your business number. That is why OTP only arrived after they texted you.
+
+Fix: send OTP as an **Authentication** template via Cloud API (`type: template`). The app does this automatically (`sendAuthenticationOtp`) when `WHATSAPP_OTP_TEMPLATE_NAME` is set.
+
+### Create the template in Meta
+
+1. [WhatsApp Manager](https://business.facebook.com/latest/whatsapp_manager) → **Message templates** → **Create template**
+2. **Category:** Authentication (not Marketing / Utility — Meta rejects custom OTP wording)
+3. **Name:** `checkoutnow_login_otp` (must match `.env`)
+4. **Language:** English (`en`)
+5. Use Meta’s fixed auth body (code as `{{1}}`). Add the **Copy code** button if offered.
+6. Submit. Authentication templates are usually approved quickly.
+
+```env
+WHATSAPP_OTP_TEMPLATE_NAME=checkoutnow_login_otp
+WHATSAPP_OTP_TEMPLATE_LANGUAGE=en
+WHATSAPP_OTP_TEMPLATE_BUTTON=true
+```
+
+If your template has **no** copy-code button, set `WHATSAPP_OTP_TEMPLATE_BUTTON=false`.
+
+Then:
+
+```bash
+php artisan config:clear
+```
+
+The login API sends the template first. If Meta rejects the name/language, it falls back to session text (only works after they messaged you), then email.
+
+---
+
+## 9. Proactive notifications (templates)
 
 Meta only allows **template messages** outside the 24-hour customer service window.
 
@@ -141,7 +174,7 @@ Keep `WHATSAPP_PROACTIVE_NOTIFICATIONS_ENABLED=false` until templates are approv
 
 ---
 
-## 9. Switching back to Evolution
+## 10. Switching back to Evolution
 
 ```env
 WHATSAPP_PROVIDER=evolution

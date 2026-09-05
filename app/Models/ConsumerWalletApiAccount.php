@@ -25,6 +25,8 @@ class ConsumerWalletApiAccount extends Model implements AuthenticatableContract
         'last_app_active_at',
         'transfer_lock_until',
         'pin_reset_required',
+        'web_daily_transfer_total',
+        'web_daily_transfer_for_date',
     ];
 
     protected $casts = [
@@ -32,6 +34,8 @@ class ConsumerWalletApiAccount extends Model implements AuthenticatableContract
         'last_app_active_at' => 'datetime',
         'transfer_lock_until' => 'datetime',
         'pin_reset_required' => 'boolean',
+        'web_daily_transfer_total' => 'decimal:2',
+        'web_daily_transfer_for_date' => 'date',
     ];
 
     public function requiresPinReset(): bool

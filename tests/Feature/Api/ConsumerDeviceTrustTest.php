@@ -31,6 +31,8 @@ class ConsumerDeviceTrustTest extends TestCase
             'consumer_wallet.device_stepup_required_on_login' => true,
             'consumer_wallet.high_value_single_transfer_cap' => 10000,
             'consumer_wallet.transfer_lock_hours' => 24,
+            'consumer_wallet.web_daily_transfer_cap_enabled' => true,
+            'consumer_wallet.web_daily_transfer_cap_ngn' => 10000,
             'checkout.quarantine.enabled' => false,
         ]);
     }
@@ -121,6 +123,59 @@ class ConsumerDeviceTrustTest extends TestCase
         $this->assertNotEquals(403, $response->status());
     }
 
+    public function test_first_pin_login_binds_device_and_blocks_second_device(): void
+    {
+        $this->seedWalletWithoutTrustedDevice();
+
+        $this->postJson('/api/v1/consumer/auth/pin/verify', [
+            'phone' => self::PHONE,
+            'pin' => '1234',
+        ], [
+            'X-Device-Id' => 'pixel-first-install',
+        ])->assertOk()->assertJsonPath('success', true);
+
+        $this->assertDatabaseHas('consumer_trusted_devices', [
+            'device_id' => 'pixel-first-install',
+        ]);
+
+        $this->postJson('/api/v1/consumer/auth/pin/verify', [
+            'phone' => self::PHONE,
+            'pin' => '1234',
+        ], [
+            'X-Device-Id' => 'other-phone-install',
+        ])->assertStatus(403)
+            ->assertJsonPath('data.stepup_required', true);
+    }
+
+    public function test_web_p2p_is_blocked_over_daily_cap(): void
+    {
+        [$wallet, $account] = $this->seedWalletWithPasskeyDevice();
+        $account->web_daily_transfer_total = 9000;
+        $account->web_daily_transfer_for_date = now()->toDateString();
+        $account->save();
+
+        Sanctum::actingAs($account, ['consumer']);
+
+        $this->postJson('/api/v1/consumer/transfers/p2p', [
+            'pin' => '1234',
+            'to_phone' => '+2348098765432',
+            'amount' => 2000,
+        ], [
+            'X-App-Platform' => 'web',
+        ])->assertStatus(403)
+            ->assertJsonPath('code', 'web_daily_cap')
+            ->assertJsonPath('data.web_daily_transfer_remaining', 1000);
+
+        $android = $this->postJson('/api/v1/consumer/transfers/p2p', [
+            'pin' => '1234',
+            'to_phone' => '+2348098765432',
+            'amount' => 2000,
+        ], [
+            'X-App-Platform' => 'android',
+        ]);
+        $this->assertNotSame('web_daily_cap', $android->json('code'));
+    }
+
     private function ensureSchema(): void
     {
         Config::set('database.default', 'sqlite');
@@ -163,6 +218,8 @@ class ConsumerDeviceTrustTest extends TestCase
                 $table->timestamp('last_app_active_at')->nullable();
                 $table->timestamp('transfer_lock_until')->nullable();
                 $table->boolean('pin_reset_required')->default(false);
+                $table->decimal('web_daily_transfer_total', 14, 2)->default(0);
+                $table->date('web_daily_transfer_for_date')->nullable();
                 $table->timestamps();
             });
         }
@@ -273,6 +330,30 @@ class ConsumerDeviceTrustTest extends TestCase
                 $table->timestamps();
             });
         }
+    }
+
+    /**
+     * @return array{0: WhatsappWallet, 1: ConsumerWalletApiAccount}
+     */
+    private function seedWalletWithoutTrustedDevice(): array
+    {
+        $e164 = PhoneNormalizer::canonicalNgE164Digits(self::PHONE);
+
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => $e164,
+            'tier' => WhatsappWallet::TIER_WHATSAPP_ONLY,
+            'balance' => 50000,
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'pin_hash' => Hash::make('1234'),
+            'pin_set_at' => now(),
+        ]);
+
+        $account = ConsumerWalletApiAccount::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'phone_e164' => $e164,
+        ]);
+
+        return [$wallet, $account];
     }
 
     /**

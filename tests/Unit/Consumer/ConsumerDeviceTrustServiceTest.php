@@ -58,4 +58,29 @@ class ConsumerDeviceTrustServiceTest extends TestCase
 
         $this->assertFalse($service->requiresStepUp($account, 'device-a'));
     }
+
+    public function test_device_mismatch_payload_when_trusted_device_exists(): void
+    {
+        config([
+            'consumer_wallet.device_trust_enabled' => true,
+            'consumer_wallet.device_stepup_required_on_login' => true,
+        ]);
+
+        $service = $this->app->make(ConsumerDeviceTrustService::class);
+        $trusted = new \App\Models\ConsumerTrustedDevice([
+            'device_id' => 'phone-one',
+            'label' => 'Pixel',
+            'kyc_confirmed_at' => now(),
+        ]);
+        $trusted->setRelation('passkey', null);
+        $account = new ConsumerWalletApiAccount(['id' => 2]);
+        $account->setRelation('trustedDevices', collect([$trusted]));
+
+        $this->assertTrue($service->requiresStepUp($account, 'phone-two'));
+        $this->assertFalse($service->requiresStepUp($account, 'phone-one'));
+        $response = $service->deviceMismatchJsonResponse($account, 'phone-two');
+        $this->assertNotNull($response);
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertSame('device_mismatch', $response->getData(true)['code']);
+    }
 }

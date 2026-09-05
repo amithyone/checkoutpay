@@ -251,9 +251,14 @@ class ConsumerWalletOtpService
 
         $sent = false;
         if ($instance !== '') {
-            $sent = $this->whatsapp->sendText($instance, $e164, $text);
+            // Meta Cloud API blocks free-form text until the user messages you (24h session).
+            // Authentication templates can be delivered with no prior chat.
+            $sent = $this->whatsapp->sendAuthenticationOtp($instance, $e164, $code);
+            if (! $sent) {
+                $sent = $this->whatsapp->sendText($instance, $e164, $text);
+            }
         } else {
-            Log::warning('consumer_wallet.otp: no evolution instance', ['phone_e164' => $e164]);
+            Log::warning('consumer_wallet.otp: no whatsapp instance', ['phone_e164' => $e164]);
         }
 
         if ($sent) {

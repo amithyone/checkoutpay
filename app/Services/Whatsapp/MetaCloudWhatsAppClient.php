@@ -65,6 +65,79 @@ class MetaCloudWhatsAppClient extends EvolutionWhatsAppClient
         }
     }
 
+    /**
+     * Official Cloud API template send — required to reach users who have not messaged first.
+     *
+     * @param  list<array<string, mixed>>  $components
+     */
+    public function sendTemplate(
+        string $instanceName,
+        string $numberDigits,
+        string $name,
+        string $language,
+        array $components,
+    ): bool {
+        if (WalletConversationCapture::isActive()) {
+            WalletConversationCapture::append('[template] '.$name);
+
+            return true;
+        }
+
+        $name = trim($name);
+        $language = trim($language) ?: 'en';
+        if ($name === '') {
+            return false;
+        }
+
+        $phoneNumberId = WhatsappCloudConfigResolver::phoneNumberIdForInstance($instanceName);
+        $token = WhatsappCloudConfigResolver::accessToken();
+
+        if ($phoneNumberId === '' || $token === '') {
+            Log::warning('whatsapp.cloud: missing phone_number_id or access_token for sendTemplate', [
+                'instance' => $instanceName,
+            ]);
+
+            return false;
+        }
+
+        $to = PhoneNormalizer::digitsOnly($numberDigits) ?? $numberDigits;
+        $url = WhatsappCloudConfigResolver::graphBaseUrl().'/'.$phoneNumberId.'/messages';
+
+        try {
+            $response = $this->graphHttp($token)
+                ->timeout(25)
+                ->post($url, [
+                    'messaging_product' => 'whatsapp',
+                    'recipient_type' => 'individual',
+                    'to' => $to,
+                    'type' => 'template',
+                    'template' => [
+                        'name' => $name,
+                        'language' => ['code' => $language],
+                        'components' => $components,
+                    ],
+                ]);
+
+            if (! $response->successful()) {
+                Log::warning('whatsapp.cloud: sendTemplate failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                    'name' => $name,
+                    'language' => $language,
+                    'to' => $to,
+                ]);
+
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('whatsapp.cloud: sendTemplate exception', ['error' => $e->getMessage()]);
+
+            return false;
+        }
+    }
+
     public function sendMedia(
         string $instanceName,
         string $numberDigits,

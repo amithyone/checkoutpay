@@ -109,6 +109,38 @@ class ConsumerDeviceAuthController extends Controller
             return $this->webauthnFailureResponse($result);
         }
 
+        $deviceId = $sessions->deviceIdFromRequest($request);
+        $ctx = $sessions->clientContextFromRequest($request);
+        $account = $result['account'];
+        $account->loadMissing('wallet');
+        $wallet = $account->wallet;
+        if ($wallet && $trust->requiresStepUp($account, $deviceId)) {
+            $stepup = app(\App\Services\Consumer\ConsumerDeviceStepupService::class);
+            $session = $stepup->createSession(
+                $account,
+                $wallet,
+                $deviceId,
+                $ctx['platform'],
+                $ctx['device_label'],
+            );
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Verify this device to continue',
+                'data' => $trust->stepUpPayload($session, $wallet),
+            ], 403);
+        }
+
+        if ($wallet) {
+            $trust->bootstrapTrustedDeviceIfEligible(
+                $account,
+                $wallet,
+                $deviceId,
+                $ctx['platform'],
+                $ctx['device_label'],
+            );
+        }
+
         $login = $trust->issueLoginToken($result['account'], resetTransferLock: false);
         $appSessionId = $sessions->afterPlainTokenIssued(
             $result['account'],

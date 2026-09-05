@@ -63,9 +63,14 @@ class ConsumerMoneyRequestController extends Controller
         $user = $request->user();
         $pending = $moneyRequests->findByPublicId($id);
         if ($pending !== null && $user instanceof ConsumerWalletApiAccount) {
-            $lockResponse = $deviceTrust->transferLockJsonResponse($user, (float) $pending->amount);
+            $payAmount = (float) $pending->amount;
+            $lockResponse = $deviceTrust->transferLockJsonResponse($user, $payAmount);
             if ($lockResponse !== null) {
                 return $lockResponse;
+            }
+            $webCap = app(\App\Services\Consumer\ConsumerWebDailyCapService::class)->rejectIfExceeded($user, $request, $payAmount);
+            if ($webCap !== null) {
+                return $webCap;
             }
         }
 
@@ -76,6 +81,10 @@ class ConsumerMoneyRequestController extends Controller
         }
 
         $result = $moneyRequests->accept($wallet, $id);
+
+        if (($result['ok'] ?? false) && $user instanceof ConsumerWalletApiAccount && $pending !== null) {
+            app(\App\Services\Consumer\ConsumerWebDailyCapService::class)->record($user, $request, (float) $pending->amount);
+        }
 
         return response()->json([
             'success' => $result['ok'],

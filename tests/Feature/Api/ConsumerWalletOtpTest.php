@@ -33,6 +33,7 @@ class ConsumerWalletOtpTest extends TestCase
         ]);
 
         $mock = Mockery::mock(EvolutionWhatsAppClient::class);
+        $mock->shouldReceive('sendAuthenticationOtp')->andReturn(false);
         $mock->shouldReceive('sendText')->andReturn(true);
         $this->app->instance(EvolutionWhatsAppClient::class, $mock);
     }
@@ -85,5 +86,24 @@ class ConsumerWalletOtpTest extends TestCase
             'code' => $code,
         ]);
         $verify->assertOk()->assertJsonPath('success', true);
+    }
+
+    public function test_whatsapp_otp_prefers_authentication_template(): void
+    {
+        $mock = Mockery::mock(EvolutionWhatsAppClient::class);
+        $mock->shouldReceive('sendAuthenticationOtp')
+            ->once()
+            ->withArgs(function (string $instance, string $phone, string $code) {
+                return $phone !== '' && preg_match('/^\d{4,8}$/', $code) === 1;
+            })
+            ->andReturn(true);
+        $mock->shouldReceive('sendText')->never();
+        $this->app->instance(EvolutionWhatsAppClient::class, $mock);
+
+        $service = $this->app->make(ConsumerWalletOtpService::class);
+        $result = $service->requestOtp(self::PHONE, 'whatsapp');
+
+        $this->assertTrue($result['ok']);
+        $this->assertSame('whatsapp', $result['channel']);
     }
 }

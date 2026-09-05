@@ -138,4 +138,108 @@ class EvolutionWhatsAppClient
             return false;
         }
     }
+
+    /**
+     * Send a Meta-approved WhatsApp template (Cloud API / Evolution Business).
+     *
+     * @param  list<array<string, mixed>>  $components
+     */
+    public function sendTemplate(
+        string $instanceName,
+        string $numberDigits,
+        string $name,
+        string $language,
+        array $components,
+    ): bool {
+        if (WalletConversationCapture::isActive()) {
+            WalletConversationCapture::append('[template] '.$name);
+
+            return true;
+        }
+
+        $base = WhatsappEvolutionConfigResolver::baseUrl();
+        $key = WhatsappEvolutionConfigResolver::apiKey();
+        $instanceName = $instanceName !== '' ? $instanceName : WhatsappEvolutionConfigResolver::defaultInstance();
+        $instanceName = WhatsappEvolutionConfigResolver::canonicalInstanceName($instanceName);
+
+        if ($base === '' || $key === '' || $instanceName === '' || trim($name) === '') {
+            return false;
+        }
+
+        $url = $base.'/message/sendTemplate/'.rawurlencode($instanceName);
+
+        try {
+            $response = Http::withHeaders([
+                'apikey' => $key,
+                'Content-Type' => 'application/json',
+            ])
+                ->timeout(25)
+                ->post($url, [
+                    'number' => $numberDigits,
+                    'name' => $name,
+                    'language' => $language,
+                    'components' => $components,
+                ]);
+
+            if (! $response->successful()) {
+                Log::warning('whatsapp.evolution: sendTemplate failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                    'name' => $name,
+                ]);
+
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('whatsapp.evolution: sendTemplate exception', ['error' => $e->getMessage()]);
+
+            return false;
+        }
+    }
+
+    /**
+     * Authentication OTP template — works without a 24-hour customer-care session.
+     */
+    public function sendAuthenticationOtp(string $instanceName, string $numberDigits, string $code): bool
+    {
+        $name = trim((string) config('whatsapp.otp.template_name', ''));
+        if ($name === '') {
+            return false;
+        }
+
+        $preferred = trim((string) config('whatsapp.otp.template_language', 'en')) ?: 'en';
+        $languages = array_values(array_unique(array_filter([$preferred, 'en_US', 'en'])));
+        $includeButton = (bool) config('whatsapp.otp.template_button', true);
+        $code = preg_replace('/\D+/', '', $code) ?? $code;
+
+        $bodyOnly = [
+            [
+                'type' => 'body',
+                'parameters' => [
+                    ['type' => 'text', 'text' => $code],
+                ],
+            ],
+        ];
+        $withButton = array_merge($bodyOnly, [[
+            'type' => 'button',
+            'sub_type' => 'url',
+            'index' => '0',
+            'parameters' => [
+                ['type' => 'text', 'text' => $code],
+            ],
+        ]]);
+
+        foreach ($languages as $language) {
+            if ($includeButton && $this->sendTemplate($instanceName, $numberDigits, $name, $language, $withButton)) {
+                return true;
+            }
+            if ($this->sendTemplate($instanceName, $numberDigits, $name, $language, $bodyOnly)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

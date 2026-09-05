@@ -210,5 +210,13 @@ return [
     'otp' => [
         'ttl_minutes' => (int) env('WHATSAPP_OTP_TTL_MINUTES', 10),
         'max_attempts' => (int) env('WHATSAPP_OTP_MAX_ATTEMPTS', 5),
+        /**
+         * Meta Authentication template name (WhatsApp Manager). Required to send OTP
+         * to users who have not messaged the business number first.
+         */
+        'template_name' => (string) env('WHATSAPP_OTP_TEMPLATE_NAME', 'checkoutnow_login_otp'),
+        'template_language' => (string) env('WHATSAPP_OTP_TEMPLATE_LANGUAGE', 'en'),
+        /** True if the approved template includes the Copy code / URL button. */
+        'template_button' => filter_var(env('WHATSAPP_OTP_TEMPLATE_BUTTON', true), FILTER_VALIDATE_BOOL),
     ],
 ];

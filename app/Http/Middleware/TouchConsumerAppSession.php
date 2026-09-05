@@ -35,6 +35,12 @@ class TouchConsumerAppSession
                 ], 401);
             }
 
+            $mismatch = app(\App\Services\Consumer\ConsumerDeviceTrustService::class)
+                ->deviceMismatchJsonResponse($user, $this->sessions->deviceIdFromRequest($request));
+            if ($mismatch !== null) {
+                return $mismatch;
+            }
+
             // Always slide token + last_seen while the user is making requests.
             $this->sessions->touchSession($request, $user);
         }
