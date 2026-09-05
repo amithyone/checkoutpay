@@ -209,7 +209,7 @@ class EvolutionWhatsAppClient
             return false;
         }
 
-        $preferred = trim((string) config('whatsapp.otp.template_language', 'en')) ?: 'en';
+        $preferred = $this->normalizeTemplateLanguage((string) config('whatsapp.otp.template_language', 'en_US'));
         $languages = array_values(array_unique(array_filter([$preferred, 'en_US', 'en'])));
         $includeButton = (bool) config('whatsapp.otp.template_button', true);
         $code = preg_replace('/\D+/', '', $code) ?? $code;
@@ -241,5 +241,18 @@ class EvolutionWhatsAppClient
         }
 
         return false;
+    }
+
+    /**
+     * Meta language codes must be like en or en_US — a trailing comma makes the template 404.
+     */
+    protected function normalizeTemplateLanguage(string $language): string
+    {
+        $language = trim($language, " \t\n\r\0\x0B\"',");
+        if (preg_match('/^[A-Za-z]{2}(?:_[A-Za-z]{2})?$/', $language) !== 1) {
+            return 'en_US';
+        }
+
+        return $language;
     }
 }

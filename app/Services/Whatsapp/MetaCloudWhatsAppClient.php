@@ -84,7 +84,7 @@ class MetaCloudWhatsAppClient extends EvolutionWhatsAppClient
         }
 
         $name = trim($name);
-        $language = trim($language) ?: 'en';
+        $language = $this->normalizeTemplateLanguage($language);
         if ($name === '') {
             return false;
         }
