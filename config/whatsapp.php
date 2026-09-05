@@ -215,7 +215,7 @@ return [
          * to users who have not messaged the business number first.
          */
         'template_name' => (string) env('WHATSAPP_OTP_TEMPLATE_NAME', 'checkoutnow_login_otp'),
-        'template_language' => (string) env('WHATSAPP_OTP_TEMPLATE_LANGUAGE', 'en'),
+        'template_language' => (string) env('WHATSAPP_OTP_TEMPLATE_LANGUAGE', 'en_US'),
         /** True if the approved template includes the Copy code / URL button. */
         'template_button' => filter_var(env('WHATSAPP_OTP_TEMPLATE_BUTTON', true), FILTER_VALIDATE_BOOL),
     ],
