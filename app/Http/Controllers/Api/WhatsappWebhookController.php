@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
+use App\Services\Whatsapp\MetaCloudWebhookPayloadParser;
 use App\Services\Whatsapp\WhatsappCloudConfigResolver;
 use App\Services\Whatsapp\WhatsappInboundHandler;
 use Illuminate\Http\JsonResponse;
@@ -30,6 +31,13 @@ class WhatsappWebhookController extends Controller
         }
 
         try {
+            if (WhatsappCloudConfigResolver::isEnabled()) {
+                $parser = app(MetaCloudWebhookPayloadParser::class);
+                foreach ($parser->extractStatuses($request) as $status) {
+                    $level = in_array($status['status'], ['failed', 'undelivered'], true) ? 'warning' : 'info';
+                    Log::{$level}('whatsapp.cloud: message status', $status);
+                }
+            }
             $handler->handleRequest($request);
         } catch (\Throwable $e) {
             Log::error('whatsapp.webhook: handler failed', ['error' => $e->getMessage()]);

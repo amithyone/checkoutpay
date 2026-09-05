@@ -55,6 +55,50 @@ class MetaCloudWebhookPayloadParser
     }
 
     /**
+     * Delivery receipts Meta posts on the same webhook (`statuses`).
+     *
+     * @return list<array{wamid: string, status: string, recipient: string, error_code: int|null, error: string|null}>
+     */
+    public function extractStatuses(Request $request): array
+    {
+        $payload = $request->all();
+        if (($payload['object'] ?? '') !== 'whatsapp_business_account') {
+            return [];
+        }
+
+        $out = [];
+        foreach ($payload['entry'] ?? [] as $entry) {
+            if (! is_array($entry)) {
+                continue;
+            }
+            foreach ($entry['changes'] ?? [] as $change) {
+                if (! is_array($change) || ($change['field'] ?? '') !== 'messages') {
+                    continue;
+                }
+                $value = $change['value'] ?? [];
+                if (! is_array($value)) {
+                    continue;
+                }
+                foreach ($value['statuses'] ?? [] as $status) {
+                    if (! is_array($status)) {
+                        continue;
+                    }
+                    $errors = $status['errors'][0] ?? [];
+                    $out[] = [
+                        'wamid' => (string) ($status['id'] ?? ''),
+                        'status' => (string) ($status['status'] ?? ''),
+                        'recipient' => (string) ($status['recipient_id'] ?? ''),
+                        'error_code' => isset($errors['code']) ? (int) $errors['code'] : null,
+                        'error' => isset($errors['message']) ? (string) $errors['message'] : (isset($errors['title']) ? (string) $errors['title'] : null),
+                    ];
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * @return ?array{instance: string, remote_jid: string, phone_e164: string, text: string, from_me: bool}
      */
     private function fromMessage(array $message, string $instance): ?array

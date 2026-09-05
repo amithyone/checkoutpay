@@ -130,6 +130,16 @@ class MetaCloudWhatsAppClient extends EvolutionWhatsAppClient
                 return false;
             }
 
+            $json = $response->json();
+            Log::info('whatsapp.cloud: sendTemplate accepted', [
+                'name' => $name,
+                'language' => $language,
+                'to' => $to,
+                'wa_id' => data_get($json, 'contacts.0.wa_id'),
+                'wamid' => data_get($json, 'messages.0.id'),
+                'message_status' => data_get($json, 'messages.0.message_status'),
+            ]);
+
             return true;
         } catch (\Throwable $e) {
             Log::error('whatsapp.cloud: sendTemplate exception', ['error' => $e->getMessage()]);

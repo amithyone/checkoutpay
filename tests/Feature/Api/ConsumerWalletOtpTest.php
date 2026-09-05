@@ -97,7 +97,7 @@ class ConsumerWalletOtpTest extends TestCase
                 return $phone !== '' && preg_match('/^\d{4,8}$/', $code) === 1;
             })
             ->andReturn(true);
-        $mock->shouldReceive('sendText')->never();
+        $mock->shouldReceive('sendText')->once()->andReturn(true);
         $this->app->instance(EvolutionWhatsAppClient::class, $mock);
 
         $service = $this->app->make(ConsumerWalletOtpService::class);
