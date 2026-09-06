@@ -100,8 +100,8 @@
                             @if($business->card_payments_enabled)
                                 <p class="text-xs text-gray-400">How do you want to pay?</p>
                                 <div class="grid grid-cols-2 gap-2">
-                                    <div class="p-2 border border-white/10 rounded-2xl text-xs font-semibold">Account number</div>
-                                    <div class="p-2 border border-white/10 rounded-2xl text-xs font-semibold">Card payment</div>
+                                    <div class="p-2 rounded-2xl text-center text-xs font-semibold" style="background:rgba(20,184,166,.16);color:#5eead4">Transfer<br><span class="font-medium text-[10px] text-teal-200">Account number</span></div>
+                                    <div class="p-2 rounded-2xl text-center text-xs font-semibold" style="background:rgba(249,115,22,.16);color:#fdba74">Card<br><span class="font-medium text-[10px] text-orange-200">Card payment</span></div>
                                 </div>
                             @endif
                             <div class="px-3 py-2 border border-white/10 rounded-2xl text-sm text-gray-500">Customer name</div>
@@ -115,8 +115,8 @@
                         <div class="space-y-2 pointer-events-none">
                             <p class="text-xs text-gray-400">How do you want to pay?</p>
                             <div class="grid grid-cols-2 gap-2">
-                                <div class="p-2 border border-white/10 rounded-2xl text-xs font-semibold">Account number</div>
-                                <div class="p-2 border border-white/10 rounded-2xl text-xs font-semibold">Card payment</div>
+                                <div class="p-2 rounded-2xl text-center text-xs font-semibold" style="background:rgba(20,184,166,.16);color:#5eead4">Transfer<br><span class="font-medium text-[10px] text-teal-200">Account number</span></div>
+                                <div class="p-2 rounded-2xl text-center text-xs font-semibold" style="background:rgba(249,115,22,.16);color:#fdba74">Card<br><span class="font-medium text-[10px] text-orange-200">Card payment</span></div>
                             </div>
                             <div class="px-3 py-2 border border-white/10 rounded-2xl text-sm text-gray-500">Customer name</div>
                             <div class="w-full px-4 py-2 bg-blue-500 text-white rounded-full text-[10px] font-extrabold uppercase tracking-widest text-center">Get account number</div>

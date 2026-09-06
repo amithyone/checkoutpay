@@ -139,41 +139,43 @@
                     @csrf
                     @if(!empty($cardPaymentsEnabled))
                         <div>
-                            <p class="pl-hint" style="margin-bottom:8px">How do you want to pay?</p>
-                            <div class="pl-methods">
-                                <label class="pl-method">
+                            <p class="pl-hint" style="margin-bottom:10px">How do you want to pay?</p>
+                            <div class="pl-methods" role="radiogroup" aria-label="How do you want to pay?">
+                                <label class="pl-method is-transfer">
                                     <input type="radio" name="payment_method" value="bank_transfer" {{ old('payment_method', 'bank_transfer') === 'bank_transfer' ? 'checked' : '' }}>
-                                    <strong>Account number</strong>
-                                    <span>Transfer to a bank account</span>
+                                    <span class="pl-method-ico" aria-hidden="true"><i class="fas fa-university"></i></span>
+                                    <strong>Transfer</strong>
+                                    <span>Account number</span>
                                 </label>
-                                <label class="pl-method">
+                                <label class="pl-method is-card">
                                     <input type="radio" name="payment_method" value="card" {{ old('payment_method') === 'card' ? 'checked' : '' }}>
-                                    <strong>Card payment</strong>
-                                    <span>Debit or credit card</span>
+                                    <span class="pl-method-ico" aria-hidden="true"><i class="fas fa-credit-card"></i></span>
+                                    <strong>Card</strong>
+                                    <span>Card payment</span>
                                 </label>
                             </div>
                             @error('payment_method')<p class="pl-hint" style="color:#fecaca">{{ $message }}</p>@enderror
                         </div>
                     @endif
-                    <div>
+                    <div class="pl-field">
                         <label>Your name</label>
                         <input type="text" name="payer_name" value="{{ old('payer_name') }}" required>
                         @error('payer_name')<p class="pl-hint" style="color:#fecaca">{{ $message }}</p>@enderror
                     </div>
-                    <div id="card-email-field" class="{{ old('payment_method') === 'card' ? '' : 'hidden' }}">
+                    <div id="card-email-field" class="pl-field {{ old('payment_method') === 'card' ? '' : 'hidden' }}">
                         <label>Email</label>
                         <input type="email" name="email" id="card-email-input" value="{{ old('email') }}">
                         <p class="pl-hint">Required for card checkout</p>
                         @error('email')<p class="pl-hint" style="color:#fecaca">{{ $message }}</p>@enderror
                     </div>
                     @if($link->isOpenAmount())
-                        <div>
+                        <div class="pl-field">
                             <label>Amount (₦, minimum 100)</label>
                             <input type="number" name="amount" step="0.01" min="100" value="{{ old('amount') }}" required>
                             @error('amount')<p class="pl-hint" style="color:#fecaca">{{ $message }}</p>@enderror
                         </div>
                     @endif
-                    <button type="submit" id="pay-submit" class="pl-btn pl-btn-primary">{{ !empty($cardPaymentsEnabled) ? 'Get account number' : 'Get payment details' }}</button>
+                    <button type="submit" id="pay-submit" class="pl-btn pl-btn-primary{{ !empty($cardPaymentsEnabled) && old('payment_method') === 'card' ? ' is-card' : (!empty($cardPaymentsEnabled) ? ' is-transfer' : '') }}">{{ !empty($cardPaymentsEnabled) ? 'Get account number' : 'Get payment details' }}</button>
                 </form>
             </div>
         @endif
@@ -196,6 +198,8 @@
             emailWrap.classList.toggle('hidden', !isCard);
             emailInput.required = isCard;
             submit.textContent = isCard ? 'Continue to card payment' : 'Get account number';
+            submit.classList.toggle('is-card', isCard);
+            submit.classList.toggle('is-transfer', !isCard);
         }
 
         form.querySelectorAll('input[name="payment_method"]').forEach(function (el) {

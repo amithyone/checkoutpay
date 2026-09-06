@@ -240,8 +240,10 @@
     }
     .pl-alt summary::-webkit-details-marker { display: none; }
     .pl-form { display: grid; gap: 12px; margin-top: 12px; }
-    .pl-form label { display: block; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #9ca3af; margin-bottom: 6px; }
-    .pl-form input {
+    .pl-field label { display: block; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: #9ca3af; margin-bottom: 6px; }
+    .pl-form input[type="text"],
+    .pl-form input[type="email"],
+    .pl-form input[type="number"] {
         width: 100%;
         box-sizing: border-box;
         border-radius: 18px;
@@ -252,24 +254,78 @@
         font-size: 15px;
         font-family: inherit;
     }
-    .pl-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .pl-methods {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
     .pl-method {
+        position: relative;
         display: flex;
         flex-direction: column;
-        gap: 4px;
+        align-items: center;
+        text-align: center;
+        gap: 6px;
         border: 1px solid var(--cn-line);
-        border-radius: 22px;
-        padding: 12px;
+        border-radius: 26px;
+        padding: 16px 10px 14px;
         background: rgba(255,255,255,.04);
         cursor: pointer;
+        transition: border-color .15s ease, background .15s ease, box-shadow .15s ease, transform .15s ease;
     }
-    .pl-method:has(:checked) {
-        border-color: rgba(59, 130, 246, .55);
-        background: rgba(59, 130, 246, .16);
+    .pl-method input {
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
+        margin: 0;
+        pointer-events: none;
     }
-    .pl-method input { accent-color: var(--cn-blue); }
-    .pl-method strong { font-size: 12px; }
-    .pl-method span { font-size: 10px; color: var(--cn-muted); }
+    .pl-method-ico {
+        width: 46px;
+        height: 46px;
+        border-radius: 9999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+    }
+    .pl-method.is-transfer .pl-method-ico { background: rgba(20, 184, 166, .18); color: #2dd4bf; }
+    .pl-method.is-card .pl-method-ico { background: rgba(249, 115, 22, .18); color: #fb923c; }
+    .pl-method.is-transfer:has(:checked) {
+        border-color: rgba(45, 212, 191, .75);
+        background: rgba(20, 184, 166, .16);
+        box-shadow: 0 0 0 1px rgba(45, 212, 191, .28), 0 14px 28px rgba(13, 148, 136, .22);
+        transform: translateY(-1px);
+    }
+    .pl-method.is-card:has(:checked) {
+        border-color: rgba(251, 146, 60, .8);
+        background: rgba(249, 115, 22, .16);
+        box-shadow: 0 0 0 1px rgba(251, 146, 60, .28), 0 14px 28px rgba(234, 88, 12, .22);
+        transform: translateY(-1px);
+    }
+    .pl-method strong {
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+        color: #fff;
+    }
+    .pl-method > span:not(.pl-method-ico) {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--cn-muted);
+    }
+    .pl-btn.is-transfer {
+        background: #14b8a6;
+        box-shadow: 0 12px 28px rgba(20, 184, 166, .28);
+    }
+    .pl-btn.is-card {
+        background: #ea580c;
+        box-shadow: 0 12px 28px rgba(234, 88, 12, .28);
+    }
     .pl-error {
         background: rgba(239, 68, 68, .12);
         color: #fecaca;
