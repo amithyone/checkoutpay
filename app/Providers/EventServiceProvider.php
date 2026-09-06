@@ -19,6 +19,7 @@ class EventServiceProvider extends ServiceProvider
             \App\Listeners\CreditDeveloperPartnerShareOnPaymentApproved::class,
             \App\Listeners\SendPaymentWebhook::class,
             \App\Listeners\MarkInvoicePaidOnPaymentApproved::class,
+            \App\Listeners\MarkPaymentLinkPaidOnPaymentApproved::class,
             \App\Listeners\MarkRentalPaidOnPaymentApproved::class,
             \App\Listeners\CreateMembershipSubscriptionOnPaymentApproved::class,
             \App\Listeners\CreateNigtaxProUserFromPendingOnPaymentApproved::class,

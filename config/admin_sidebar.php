@@ -38,6 +38,7 @@ return [
         'honeypot',
         'match_attempts',
         'invoices',
+        'payment_links',
         'email_accounts',
         'account_numbers',
         'bank_email_templates',

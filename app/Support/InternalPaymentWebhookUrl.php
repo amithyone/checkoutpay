@@ -24,6 +24,9 @@ final class InternalPaymentWebhookUrl
         if (preg_match('#^/invoices/pay/[^/]+/webhook$#', $path)) {
             return true;
         }
+        if (preg_match('#^/pay/l/[^/]+/webhook$#', $path)) {
+            return true;
+        }
         if (preg_match('#^/tickets/payment/webhook/[^/]+$#', $path)) {
             return true;
         }

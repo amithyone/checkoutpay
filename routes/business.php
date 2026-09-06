@@ -170,6 +170,12 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::post('/verification', [\App\Http\Controllers\Business\VerificationController::class, 'store'])->name('verification.store');
 
         // Invoices
+        Route::resource('payment-links', \App\Http\Controllers\Business\PaymentLinkController::class)
+            ->parameters(['payment-links' => 'payment_link'])
+            ->except(['edit', 'update']);
+        Route::post('payment-links/{payment_link}/pause', [\App\Http\Controllers\Business\PaymentLinkController::class, 'pause'])->name('payment-links.pause');
+        Route::post('payment-links/{payment_link}/resume', [\App\Http\Controllers\Business\PaymentLinkController::class, 'resume'])->name('payment-links.resume');
+
         Route::resource('invoices', \App\Http\Controllers\Business\InvoiceController::class);
         Route::post('invoices/{invoice}/send', [\App\Http\Controllers\Business\InvoiceController::class, 'send'])->name('invoices.send');
         Route::post('invoices/{invoice}/mark-paid', [\App\Http\Controllers\Business\InvoiceController::class, 'markPaid'])->name('invoices.mark-paid');

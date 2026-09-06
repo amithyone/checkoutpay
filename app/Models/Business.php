@@ -303,6 +303,11 @@ class Business extends Authenticatable implements CanResetPasswordContract
         return $this->hasMany(Payment::class);
     }
 
+    public function paymentLinks()
+    {
+        return $this->hasMany(PaymentLink::class);
+    }
+
     /**
      * Get withdrawal requests for this business
      */

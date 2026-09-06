@@ -228,6 +228,11 @@ if (app()->environment('local')) {
     Route::post('/test-email', [TestEmailController::class, 'test']);
 }
 
+// Business payment links (dedicated collection page — register before /pay/{transactionId})
+Route::get('/pay/l/{code}', [\App\Http\Controllers\Public\PaymentLinkPaymentController::class, 'show'])->name('payment-links.pay');
+Route::post('/pay/l/{code}', [\App\Http\Controllers\Public\PaymentLinkPaymentController::class, 'start'])->name('payment-links.start');
+Route::post('/pay/l/{code}/webhook', [\App\Http\Controllers\Public\PaymentLinkPaymentController::class, 'webhook'])->name('payment-links.payment.webhook');
+
 // Hosted checkout page routes (public)
 Route::get('/pay', [\App\Http\Controllers\CheckoutController::class, 'show'])->name('checkout.show');
 Route::post('/pay', [\App\Http\Controllers\CheckoutController::class, 'store'])->name('checkout.store');

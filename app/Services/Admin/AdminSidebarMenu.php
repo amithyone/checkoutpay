@@ -285,6 +285,7 @@ class AdminSidebarMenu
             ),
             'match_attempts' => $this->link('Match Logs', 'admin.match-attempts.index', 'fas fa-search-dollar', ['admin.match-attempts.*']),
             'invoices' => $this->link('Invoices', 'admin.invoices.index', 'fas fa-file-invoice', ['admin.invoices.*']),
+            'payment_links' => $this->link('Payment links', 'admin.payment-links.index', 'fas fa-link', ['admin.payment-links.*']),
             'email_accounts' => array_merge(
                 $this->link('Email Accounts', 'admin.email-accounts.index', 'fas fa-envelope', ['admin.email-accounts.*']),
                 ['visible' => $admin->canManageEmailAccounts()]

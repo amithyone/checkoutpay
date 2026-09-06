@@ -193,6 +193,12 @@ return [
             'route_patterns' => ['admin.invoices.*'],
             'default_roles' => ['super_admin', 'admin', 'staff'],
         ],
+        'payment_links' => [
+            'label' => 'Payment links',
+            'group' => 'System',
+            'route_patterns' => ['admin.payment-links.*'],
+            'default_roles' => ['super_admin', 'admin', 'staff'],
+        ],
         'email_accounts' => [
             'label' => 'Email Accounts',
             'group' => 'System',

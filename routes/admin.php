@@ -241,6 +241,9 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
         Route::delete('payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
 
         // Invoices
+        Route::get('payment-links', [\App\Http\Controllers\Admin\PaymentLinkController::class, 'index'])->name('payment-links.index');
+        Route::get('payment-links/{payment_link}', [\App\Http\Controllers\Admin\PaymentLinkController::class, 'show'])->name('payment-links.show');
+
         Route::resource('invoices', \App\Http\Controllers\Admin\InvoiceController::class);
         Route::get('invoices/{invoice}/pdf', [\App\Http\Controllers\Admin\InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
         Route::get('invoices/{invoice}/view-pdf', [\App\Http\Controllers\Admin\InvoiceController::class, 'viewPdf'])->name('invoices.view-pdf');

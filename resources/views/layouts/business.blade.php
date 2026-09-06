@@ -89,6 +89,10 @@
                     <i class="fas fa-file-invoice w-5 mr-3"></i>
                     <span>Invoices</span>
                 </a>
+                <a href="{{ route('business.payment-links.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.payment-links.*') ? 'bg-primary/10 text-primary' : '' }}">
+                    <i class="fas fa-link w-5 mr-3"></i>
+                    <span>Payment links</span>
+                </a>
 
                 <a href="{{ route('business.rentals.index') }}" onclick="closeSidebar()" class="flex items-center px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 {{ request()->routeIs('business.rentals.*') ? 'bg-primary/10 text-primary' : '' }}">
                     <i class="fas fa-camera w-5 mr-3"></i>

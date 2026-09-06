@@ -193,11 +193,17 @@ class Payment extends Model
             $eligible->where(function ($exempt) {
                 $exempt->whereJsonContains('email_data->service', 'invoice')
                     ->orWhereJsonContains('email_data->service', 'membership')
+                    ->orWhereJsonContains('email_data->service', 'payment_link')
                     ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(email_data, '$.membership_id')) IS NOT NULL")
                     ->orWhereExists(function ($sub) {
                         $sub->from('invoice_payments')
                             ->selectRaw('1')
                             ->whereColumn('invoice_payments.payment_id', 'payments.id');
+                    })
+                    ->orWhereExists(function ($sub) {
+                        $sub->from('payment_link_payments')
+                            ->selectRaw('1')
+                            ->whereColumn('payment_link_payments.payment_id', 'payments.id');
                     });
             })->orWhere(function ($regular) use ($cutoff) {
                 $regular->where('created_at', '>', $cutoff)
@@ -230,7 +236,7 @@ class Payment extends Model
                 $q->where(function ($row) {
                     $row->whereNull('email_data')
                         ->orWhere(function ($service) {
-                            $service->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(email_data, '$.service')) NOT IN ('invoice', 'membership')")
+                            $service->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(email_data, '$.service')) NOT IN ('invoice', 'membership', 'payment_link')")
                                 ->orWhereRaw("JSON_EXTRACT(email_data, '$.service') IS NULL");
                         });
                 })
@@ -239,6 +245,11 @@ class Payment extends Model
                         $sub->from('invoice_payments')
                             ->selectRaw('1')
                             ->whereColumn('invoice_payments.payment_id', 'payments.id');
+                    })
+                    ->whereNotExists(function ($sub) {
+                        $sub->from('payment_link_payments')
+                            ->selectRaw('1')
+                            ->whereColumn('payment_link_payments.payment_id', 'payments.id');
                     });
             });
     }
@@ -305,10 +316,19 @@ class Payment extends Model
             || ! empty($emailData['membership_id']);
     }
 
-    /** Invoice and membership checkout links stay open until paid or manually closed. */
+    public function isPaymentLinkPayment(): bool
+    {
+        if (($this->email_data['service'] ?? null) === 'payment_link') {
+            return true;
+        }
+
+        return PaymentLinkPayment::where('payment_id', $this->id)->exists();
+    }
+
+    /** Invoice, membership, and payment-link checkouts stay open until paid or manually closed. */
     public function shouldStayPendingIndefinitely(): bool
     {
-        return $this->isInvoicePayment() || $this->isMembershipPayment();
+        return $this->isInvoicePayment() || $this->isMembershipPayment() || $this->isPaymentLinkPayment();
     }
 
     /** Hard cap: non-invoice/membership bank-transfer checkouts cannot stay matchable beyond this age. */
@@ -324,7 +344,7 @@ class Payment extends Model
     public static function defaultExpiresAtForService(?string $service, bool $useInvoicePool = false): ?\Carbon\Carbon
     {
         $normalized = strtolower(trim((string) ($service ?? '')));
-        if ($useInvoicePool || in_array($normalized, ['invoice', 'membership'], true)) {
+        if ($useInvoicePool || in_array($normalized, ['invoice', 'membership', 'payment_link'], true)) {
             return null;
         }
 
