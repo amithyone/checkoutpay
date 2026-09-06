@@ -22,10 +22,14 @@
     @include('payment-links.partials.payer-styles')
 </head>
 <body class="pl-app">
+    <div class="pl-atmosphere" aria-hidden="true">
+        <div class="pl-blob pl-blob-a"></div>
+        <div class="pl-blob pl-blob-b"></div>
+        <div class="pl-blob pl-blob-c"></div>
+    </div>
+
     <div class="pl-shell">
-        <div class="pl-top">
-            <span class="pl-brand">{{ $siteName }}</span>
-        </div>
+        <div class="pl-brand">{{ $siteName }}</div>
 
         <div class="pl-hero">
             <div class="pl-avatar">{{ $initials !== '' ? $initials : 'P' }}</div>
@@ -49,33 +53,51 @@
 
         @if(!empty($paymentSetupError))
             <div class="pl-card pl-center">
-                <p class="font-medium mb-2">Payment setup issue</p>
-                <p class="text-sm text-gray-600 mb-4">{{ $paymentSetupError }}</p>
-                <a href="{{ route('payment-links.pay', $link->code) }}" class="pl-submit" style="display:inline-block;text-decoration:none;">Try again</a>
+                <p class="pl-kicker">Try again</p>
+                <h2>Payment setup issue</h2>
+                <p class="pl-hint">{{ $paymentSetupError }}</p>
+                <a href="{{ route('payment-links.pay', $link->code) }}" class="pl-btn pl-btn-primary">Try again</a>
             </div>
         @elseif($selectedPayment && $selectedPayment->isApproved())
             <div class="pl-card pl-center">
-                <i class="fas fa-check-circle text-green-600"></i>
+                <i class="fas fa-check-circle" style="color:#22c55e"></i>
                 <h2>Payment received</h2>
-                <p class="text-sm text-gray-600">Thank you. This payment has been confirmed.</p>
-                <p class="text-xs text-gray-500 font-mono mt-3">{{ $selectedPayment->transaction_id }}</p>
+                <p class="pl-hint">Thank you. This payment has been confirmed.</p>
+                <p class="pl-hint" style="font-family:ui-monospace,monospace">{{ $selectedPayment->transaction_id }}</p>
             </div>
         @elseif($selectedPayment && $selectedPayment->account_number)
             <div class="pl-card">
-                <h2>Payment instructions</h2>
-                <p class="text-xs text-gray-500 mb-1">Transfer the exact amount to this account.</p>
-                <div class="pl-acc-num">
-                    <span id="accountNumber">{{ $selectedPayment->account_number }}</span>
-                    <button type="button" class="pl-copy" id="copyBtn">Copy</button>
-                </div>
-                <div class="pl-meta">
-                    <div>
-                        <p>Bank</p>
-                        <strong>{{ $selectedPayment->accountNumberDetails->bank_name ?? 'N/A' }}</strong>
+                <p class="pl-kicker">Payment instructions</p>
+                <p class="pl-hint">Transfer the exact amount to this account.</p>
+
+                <div class="pl-row">
+                    <div class="pl-row-main">
+                        <div class="pl-ico purple"><i class="fas fa-credit-card"></i></div>
+                        <div>
+                            <p>Account Number</p>
+                            <strong class="pl-acc" id="accountNumber">{{ $selectedPayment->account_number }}</strong>
+                        </div>
                     </div>
-                    <div>
-                        <p>Account name</p>
-                        <strong>{{ $selectedPayment->accountNumberDetails->account_name ?? 'N/A' }}</strong>
+                    <button type="button" class="pl-copy" id="copyBtn" title="Copy"><i class="fas fa-copy"></i></button>
+                </div>
+                <div class="pl-rule"></div>
+                <div class="pl-row">
+                    <div class="pl-row-main">
+                        <div class="pl-ico cyan"><i class="fas fa-university"></i></div>
+                        <div>
+                            <p>Bank Institution</p>
+                            <strong>{{ $selectedPayment->accountNumberDetails->bank_name ?? 'N/A' }}</strong>
+                        </div>
+                    </div>
+                </div>
+                <div class="pl-rule"></div>
+                <div class="pl-row">
+                    <div class="pl-row-main">
+                        <div class="pl-ico blue"><i class="fas fa-user"></i></div>
+                        <div>
+                            <p>Account Name</p>
+                            <strong>{{ $selectedPayment->accountNumberDetails->account_name ?? 'N/A' }}</strong>
+                        </div>
                     </div>
                 </div>
 
@@ -87,13 +109,13 @@
                             <p id="pay-wait-sub" class="pl-wait-sub">We’ll confirm it after you transfer.</p>
                         </div>
                     </div>
-                    <button type="button" id="check-payment-status" class="pl-check">Check payment status</button>
+                    <button type="button" id="check-payment-status" class="pl-btn pl-btn-primary">Check payment status</button>
                 @endif
 
                 @if(!empty($cardPaymentsEnabled))
                     <details class="pl-alt">
                         <summary>Pay with card instead</summary>
-                        <form method="POST" action="{{ route('payment-links.start', $link->code) }}" class="pl-form" style="margin-top:10px;">
+                        <form method="POST" action="{{ route('payment-links.start', $link->code) }}" class="pl-form">
                             @csrf
                             <input type="hidden" name="payment_method" value="card">
                             <input type="hidden" name="payer_name" value="{{ $selectedPayment->payer_name }}">
@@ -103,21 +125,21 @@
                             <div>
                                 <label>Email for card receipt</label>
                                 <input type="email" name="email" value="{{ old('email') }}" required>
-                                @error('email')<p class="text-sm text-red-600 mt-1">{{ $message }}</p>@enderror
+                                @error('email')<p class="pl-hint" style="color:#fecaca">{{ $message }}</p>@enderror
                             </div>
-                            <button type="submit" class="pl-submit">Continue to card payment</button>
+                            <button type="submit" class="pl-btn pl-btn-primary">Continue to card payment</button>
                         </form>
                     </details>
                 @endif
             </div>
         @else
             <div class="pl-card">
-                <h2>Continue to pay</h2>
+                <p class="pl-kicker">Continue to pay</p>
                 <form method="POST" action="{{ route('payment-links.start', $link->code) }}" class="pl-form" id="pay-start-form">
                     @csrf
                     @if(!empty($cardPaymentsEnabled))
                         <div>
-                            <p class="text-sm font-semibold mb-2">How do you want to pay?</p>
+                            <p class="pl-hint" style="margin-bottom:8px">How do you want to pay?</p>
                             <div class="pl-methods">
                                 <label class="pl-method">
                                     <input type="radio" name="payment_method" value="bank_transfer" {{ old('payment_method', 'bank_transfer') === 'bank_transfer' ? 'checked' : '' }}>
@@ -130,28 +152,28 @@
                                     <span>Debit or credit card</span>
                                 </label>
                             </div>
-                            @error('payment_method')<p class="text-sm text-red-600 mt-1">{{ $message }}</p>@enderror
+                            @error('payment_method')<p class="pl-hint" style="color:#fecaca">{{ $message }}</p>@enderror
                         </div>
                     @endif
                     <div>
                         <label>Your name</label>
                         <input type="text" name="payer_name" value="{{ old('payer_name') }}" required>
-                        @error('payer_name')<p class="text-sm text-red-600 mt-1">{{ $message }}</p>@enderror
+                        @error('payer_name')<p class="pl-hint" style="color:#fecaca">{{ $message }}</p>@enderror
                     </div>
                     <div id="card-email-field" class="{{ old('payment_method') === 'card' ? '' : 'hidden' }}">
                         <label>Email</label>
                         <input type="email" name="email" id="card-email-input" value="{{ old('email') }}">
-                        <p class="text-xs text-gray-500 mt-1">Required for card checkout</p>
-                        @error('email')<p class="text-sm text-red-600 mt-1">{{ $message }}</p>@enderror
+                        <p class="pl-hint">Required for card checkout</p>
+                        @error('email')<p class="pl-hint" style="color:#fecaca">{{ $message }}</p>@enderror
                     </div>
                     @if($link->isOpenAmount())
                         <div>
                             <label>Amount (₦, minimum 100)</label>
                             <input type="number" name="amount" step="0.01" min="100" value="{{ old('amount') }}" required>
-                            @error('amount')<p class="text-sm text-red-600 mt-1">{{ $message }}</p>@enderror
+                            @error('amount')<p class="pl-hint" style="color:#fecaca">{{ $message }}</p>@enderror
                         </div>
                     @endif
-                    <button type="submit" id="pay-submit" class="pl-submit">{{ !empty($cardPaymentsEnabled) ? 'Get account number' : 'Get payment details' }}</button>
+                    <button type="submit" id="pay-submit" class="pl-btn pl-btn-primary">{{ !empty($cardPaymentsEnabled) ? 'Get account number' : 'Get payment details' }}</button>
                 </form>
             </div>
         @endif
@@ -197,8 +219,8 @@
         if (copyBtn && accountEl) {
             copyBtn.addEventListener('click', function () {
                 navigator.clipboard.writeText(accountEl.textContent.trim()).then(function () {
-                    copyBtn.textContent = 'Copied';
-                    setTimeout(function () { copyBtn.textContent = 'Copy'; }, 1600);
+                    copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                    setTimeout(function () { copyBtn.innerHTML = '<i class="fas fa-copy"></i>'; }, 1600);
                 });
             });
         }

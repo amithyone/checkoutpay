@@ -16,8 +16,13 @@
     @include('payment-links.partials.payer-styles')
 </head>
 <body class="pl-app">
+    <div class="pl-atmosphere" aria-hidden="true">
+        <div class="pl-blob pl-blob-a"></div>
+        <div class="pl-blob pl-blob-b"></div>
+        <div class="pl-blob pl-blob-c"></div>
+    </div>
     <div class="pl-shell">
-        <div class="pl-top"><span class="pl-brand">{{ $siteName }}</span></div>
+        <div class="pl-brand">{{ $siteName }}</div>
         <div class="pl-hero">
             <div class="pl-avatar">{{ $initials !== '' ? $initials : 'P' }}</div>
             <div>
@@ -26,9 +31,9 @@
             </div>
         </div>
         <div class="pl-card pl-center">
-            <i class="fas fa-ban text-gray-400"></i>
+            <i class="fas fa-ban" style="color:#6b7280"></i>
             <h2>This payment link is closed</h2>
-            <p class="text-sm text-gray-600">{{ $link->title }} is not accepting payments right now. Contact {{ $link->business->name }} if you still need to pay.</p>
+            <p class="pl-hint">{{ $link->title }} is not accepting payments right now. Contact {{ $link->business->name }} if you still need to pay.</p>
         </div>
     </div>
     @include('payment-links.partials.create-own')
