@@ -151,7 +151,11 @@ class PaymentLinkTest extends TestCase
             'status' => PaymentLink::STATUS_ACTIVE,
         ]);
 
-        $this->get('/pay/l/'.$link->code)->assertOk()->assertSee('Deposit');
+        $this->get('/pay/l/'.$link->code)
+            ->assertOk()
+            ->assertSee('Deposit')
+            ->assertSee('Waiting for payment')
+            ->assertSee('Check payment status');
 
         $this->assertDatabaseHas('payments', [
             'business_id' => $business->id,
@@ -396,5 +400,57 @@ class PaymentLinkTest extends TestCase
             ])
             ->assertRedirect('/pay/l/'.$link->code)
             ->assertSessionHasErrors('email');
+    }
+
+    public function test_status_endpoint_reports_pending_then_paid(): void
+    {
+        $this->mockTempVa();
+        $business = $this->business();
+        $link = PaymentLink::create([
+            'business_id' => $business->id,
+            'title' => 'Status check',
+            'amount' => 1200,
+            'currency' => 'NGN',
+            'reuse_mode' => PaymentLink::REUSE_ONE_TIME,
+            'status' => PaymentLink::STATUS_ACTIVE,
+        ]);
+
+        $this->get('/pay/l/'.$link->code)->assertOk();
+        $payment = Payment::where('business_id', $business->id)->first();
+        $this->assertNotNull($payment);
+
+        $this->getJson('/pay/l/'.$link->code.'/status?payment_id='.$payment->id)
+            ->assertOk()
+            ->assertJsonPath('paid', false)
+            ->assertJsonPath('status', Payment::STATUS_PENDING)
+            ->assertJsonPath('message', 'Waiting for payment');
+
+        $payment->update(['status' => Payment::STATUS_APPROVED]);
+
+        $this->getJson('/pay/l/'.$link->code.'/status?payment_id='.$payment->id)
+            ->assertOk()
+            ->assertJsonPath('paid', true)
+            ->assertJsonPath('message', 'Payment received')
+            ->assertJsonPath('redirect_url', route('payment-links.pay', [
+                'code' => $link->code,
+                'payment_id' => $payment->id,
+            ]));
+
+        $this->assertSame(PaymentLink::STATUS_PAID, $link->fresh()->status);
+    }
+
+    public function test_status_endpoint_rejects_unknown_payment(): void
+    {
+        $business = $this->business();
+        $link = PaymentLink::create([
+            'business_id' => $business->id,
+            'title' => 'No payment',
+            'amount' => 400,
+            'reuse_mode' => PaymentLink::REUSE_ONE_TIME,
+            'status' => PaymentLink::STATUS_ACTIVE,
+        ]);
+
+        $this->getJson('/pay/l/'.$link->code.'/status?payment_id=999')
+            ->assertNotFound();
     }
 }

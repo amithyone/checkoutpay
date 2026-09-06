@@ -231,6 +231,7 @@ if (app()->environment('local')) {
 // Business payment links (dedicated collection page — register before /pay/{transactionId})
 Route::get('/pay/l/{code}', [\App\Http\Controllers\Public\PaymentLinkPaymentController::class, 'show'])->name('payment-links.pay');
 Route::post('/pay/l/{code}', [\App\Http\Controllers\Public\PaymentLinkPaymentController::class, 'start'])->name('payment-links.start');
+Route::get('/pay/l/{code}/status', [\App\Http\Controllers\Public\PaymentLinkPaymentController::class, 'status'])->name('payment-links.status');
 Route::post('/pay/l/{code}/webhook', [\App\Http\Controllers\Public\PaymentLinkPaymentController::class, 'webhook'])->name('payment-links.payment.webhook');
 
 // Hosted checkout page routes (public)

@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\PaymentLink;
 use App\Services\PaymentLinkService;
 use App\Services\PaymentService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -146,6 +147,42 @@ class PaymentLinkPaymentController extends Controller
         return redirect()->route('payment-links.pay', [
             'code' => $code,
             'payment_id' => $created['payment']->id,
+        ]);
+    }
+
+    public function status(Request $request, string $code): JsonResponse
+    {
+        $link = PaymentLink::where('code', $code)->firstOrFail();
+        $paymentId = (int) $request->query('payment_id', 0);
+        if ($paymentId < 1) {
+            abort(404);
+        }
+
+        $attached = $link->linkPayments()->where('payment_id', $paymentId)->exists();
+        if (! $attached) {
+            abort(404);
+        }
+
+        $payment = Payment::query()->findOrFail($paymentId);
+
+        if ($payment->status === Payment::STATUS_APPROVED) {
+            $this->links->recordApproved($link, $payment);
+            $link->refresh();
+        }
+
+        $paid = $payment->status === Payment::STATUS_APPROVED;
+        $rejected = $payment->status === Payment::STATUS_REJECTED;
+
+        return response()->json([
+            'success' => true,
+            'status' => $payment->status,
+            'paid' => $paid,
+            'message' => $paid
+                ? 'Payment received'
+                : ($rejected ? 'This payment was not completed' : 'Waiting for payment'),
+            'redirect_url' => $paid
+                ? route('payment-links.pay', ['code' => $code, 'payment_id' => $payment->id])
+                : null,
         ]);
     }
 

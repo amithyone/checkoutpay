@@ -8,6 +8,25 @@
         <link rel="icon" type="image/png" href="{{ asset('storage/' . \App\Models\Setting::get('site_favicon')) }}">
     @endif
     @include('partials.tailwind-assets')
+    <style>
+        @keyframes pay-spin { to { transform: rotate(360deg); } }
+        @keyframes pay-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+        .pay-wait-spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid #fde68a;
+            border-top-color: #d97706;
+            border-radius: 50%;
+            animation: pay-spin 0.75s linear infinite;
+            flex-shrink: 0;
+        }
+        .pay-wait-spinner.is-checking {
+            border-color: #bfdbfe;
+            border-top-color: #2563eb;
+            animation-duration: 0.5s;
+        }
+        .pay-wait-copy.is-checking { animation: pay-pulse 1s ease-in-out infinite; }
+    </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-3xl">
@@ -50,6 +69,16 @@
                         <p class="text-gray-600 mb-4">{{ $paymentSetupError }}</p>
                         <a href="{{ route('payment-links.pay', $link->code) }}" class="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg">Try again</a>
                     </div>
+                @elseif($selectedPayment && $selectedPayment->isApproved())
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center">
+                        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-green-100 mb-4">
+                            <i class="fas fa-check text-green-600 text-2xl"></i>
+                        </div>
+                        <h2 class="text-lg font-semibold text-gray-900 mb-2">Payment received</h2>
+                        <p class="text-gray-600 mb-4">Thank you. This payment has been confirmed.</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ $link->currency }} {{ number_format($selectedPayment->amount, 2) }}</p>
+                        <p class="text-xs text-gray-500 font-mono mt-3">{{ $selectedPayment->transaction_id }}</p>
+                    </div>
                 @elseif($selectedPayment && $selectedPayment->account_number)
                     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                         <h2 class="text-lg font-semibold text-gray-900 mb-4">Payment instructions</h2>
@@ -73,6 +102,22 @@
                             <span class="text-2xl font-bold text-blue-900">{{ $link->currency }} {{ number_format($selectedPayment->amount, 2) }}</span>
                         </div>
                         <p class="text-xs text-gray-500 font-mono mb-4">{{ $selectedPayment->transaction_id }}</p>
+
+                        @if($selectedPayment->isPending())
+                            <div id="pay-wait" class="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-4">
+                                <div class="flex items-start gap-3">
+                                    <div id="pay-wait-spinner" class="pay-wait-spinner mt-0.5" aria-hidden="true"></div>
+                                    <div class="pay-wait-copy min-w-0">
+                                        <p id="pay-wait-title" class="text-sm font-semibold text-amber-950">Waiting for payment</p>
+                                        <p id="pay-wait-sub" class="text-xs text-amber-800 mt-1">We’ll confirm it automatically after you transfer the exact amount.</p>
+                                    </div>
+                                </div>
+                                <button type="button" id="check-payment-status"
+                                    class="mt-4 w-full px-4 py-2 bg-white border border-amber-300 text-amber-950 rounded-lg text-sm font-medium hover:bg-amber-100 disabled:opacity-60">
+                                    Check payment status
+                                </button>
+                            </div>
+                        @endif
 
                         @if(!empty($cardPaymentsEnabled))
                             <div class="pt-4 border-t border-gray-200">
@@ -167,6 +212,72 @@
             el.addEventListener('change', sync);
         });
         sync();
+    })();
+    </script>
+    @endif
+    @if($selectedPayment && $selectedPayment->isPending() && $selectedPayment->account_number)
+    <script>
+    (function () {
+        const statusUrl = @json(route('payment-links.status', ['code' => $link->code, 'payment_id' => $selectedPayment->id]));
+        const title = document.getElementById('pay-wait-title');
+        const sub = document.getElementById('pay-wait-sub');
+        const spinner = document.getElementById('pay-wait-spinner');
+        const copy = document.querySelector('.pay-wait-copy');
+        const btn = document.getElementById('check-payment-status');
+        if (!btn || !title) return;
+
+        let busy = false;
+
+        function setState(mode, message) {
+            const checking = mode === 'checking';
+            spinner.classList.toggle('is-checking', checking);
+            if (copy) copy.classList.toggle('is-checking', checking);
+            title.textContent = checking ? 'Checking for payment' : 'Waiting for payment';
+            sub.textContent = message || (checking
+                ? 'Looking up this transfer now…'
+                : 'We’ll confirm it automatically after you transfer the exact amount.');
+            btn.disabled = checking;
+            btn.textContent = checking ? 'Checking…' : 'Check payment status';
+        }
+
+        function checkStatus(manual) {
+            if (busy) return;
+            busy = true;
+            setState('checking');
+
+            fetch(statusUrl, { headers: { 'Accept': 'application/json' } })
+                .then(function (res) { return res.json(); })
+                .then(function (data) {
+                    if (data && data.paid && data.redirect_url) {
+                        title.textContent = 'Payment received';
+                        sub.textContent = 'Taking you to the confirmation page…';
+                        window.location.href = data.redirect_url;
+                        return;
+                    }
+                    if (data && data.status === 'rejected') {
+                        title.textContent = 'Payment not completed';
+                        sub.textContent = data.message || 'This payment was not completed.';
+                        spinner.classList.remove('is-checking');
+                        if (copy) copy.classList.remove('is-checking');
+                        btn.disabled = false;
+                        btn.textContent = 'Check payment status';
+                        busy = false;
+                        return;
+                    }
+                    setState('waiting', manual
+                        ? 'No payment yet. Transfer the exact amount, then check again.'
+                        : 'Still waiting for payment.');
+                    busy = false;
+                })
+                .catch(function () {
+                    setState('waiting', 'Could not check just now. Try again in a moment.');
+                    busy = false;
+                });
+        }
+
+        btn.addEventListener('click', function () { checkStatus(true); });
+        const poll = setInterval(function () { checkStatus(false); }, 8000);
+        window.addEventListener('beforeunload', function () { clearInterval(poll); });
     })();
     </script>
     @endif
