@@ -38,6 +38,8 @@ class PaymentLinkPaymentController extends Controller
             return view('payment-links.closed', compact('link'));
         }
 
+        $cardPaymentsEnabled = (bool) $link->business->card_payments_enabled;
+
         $selectedPayment = null;
         $paymentId = $request->query('payment_id');
         if ($paymentId) {
@@ -47,8 +49,15 @@ class PaymentLinkPaymentController extends Controller
                 ->first()?->payment;
         }
 
-        if (! $selectedPayment && $link->isOneTime() && ! $link->isOpenAmount()) {
-            $selectedPayment = $this->existingPending($link);
+        if ($selectedPayment && $selectedPayment->isMevonCardCheckout() && $selectedPayment->isPending()) {
+            $checkoutUrl = $selectedPayment->cardCheckoutPayload()['checkout_url'] ?? null;
+            if (is_string($checkoutUrl) && $checkoutUrl !== '') {
+                return redirect()->away($checkoutUrl);
+            }
+        }
+
+        if (! $selectedPayment && ! $cardPaymentsEnabled && $link->isOneTime() && ! $link->isOpenAmount()) {
+            $selectedPayment = $this->existingPendingBank($link);
             if (! $selectedPayment) {
                 $created = $this->createLinkedPayment($link, (float) $link->amount, $link->business->name.' customer');
                 $selectedPayment = $created['payment'];
@@ -58,6 +67,7 @@ class PaymentLinkPaymentController extends Controller
                     'link' => $link,
                     'selectedPayment' => $selectedPayment,
                     'paymentSetupError' => $paymentSetupError,
+                    'cardPaymentsEnabled' => $cardPaymentsEnabled,
                 ]);
             }
         }
@@ -66,6 +76,7 @@ class PaymentLinkPaymentController extends Controller
             'link' => $link,
             'selectedPayment' => $selectedPayment,
             'paymentSetupError' => null,
+            'cardPaymentsEnabled' => $cardPaymentsEnabled,
         ]);
     }
 
@@ -77,23 +88,59 @@ class PaymentLinkPaymentController extends Controller
             return redirect()->route('payment-links.pay', $code);
         }
 
+        $cardPaymentsEnabled = (bool) $link->business->card_payments_enabled;
         $rules = [
             'payer_name' => 'required|string|max:255',
+            'payment_method' => $cardPaymentsEnabled
+                ? 'nullable|in:card,bank_transfer,bank'
+                : 'nullable|in:bank_transfer,bank',
         ];
         if ($link->isOpenAmount()) {
             $rules['amount'] = 'required|numeric|min:'.self::OPEN_AMOUNT_MIN;
         }
+        if ($cardPaymentsEnabled) {
+            $rules['email'] = 'required_if:payment_method,card|nullable|email|max:255';
+        }
         $validated = $request->validate($rules);
+
+        $method = strtolower(trim((string) ($validated['payment_method'] ?? Payment::METHOD_BANK_TRANSFER)));
+        if ($method === '' || $method === 'bank') {
+            $method = Payment::METHOD_BANK_TRANSFER;
+        }
 
         $amount = $link->isOpenAmount()
             ? (float) $validated['amount']
             : (float) $link->amount;
 
-        $created = $this->createLinkedPayment($link, $amount, $validated['payer_name']);
+        if ($method === Payment::METHOD_BANK_TRANSFER && $link->isOneTime() && ! $link->isOpenAmount()) {
+            $existing = $this->existingPendingBank($link);
+            if ($existing) {
+                return redirect()->route('payment-links.pay', [
+                    'code' => $code,
+                    'payment_id' => $existing->id,
+                ]);
+            }
+        }
+
+        $created = $this->createLinkedPayment(
+            $link,
+            $amount,
+            $validated['payer_name'],
+            $method,
+            $validated['email'] ?? null
+        );
         if ($created['error'] || ! $created['payment']) {
             return redirect()
                 ->route('payment-links.pay', $code)
+                ->withInput()
                 ->with('error', $created['error'] ?? 'Could not start payment. Try again shortly.');
+        }
+
+        if ($created['payment']->isMevonCardCheckout()) {
+            $checkoutUrl = $created['payment']->cardCheckoutPayload()['checkout_url'] ?? null;
+            if (is_string($checkoutUrl) && $checkoutUrl !== '') {
+                return redirect()->away($checkoutUrl);
+            }
         }
 
         return redirect()->route('payment-links.pay', [
@@ -119,21 +166,33 @@ class PaymentLinkPaymentController extends Controller
     /**
      * @return array{payment: ?Payment, error: ?string}
      */
-    private function createLinkedPayment(PaymentLink $link, float $amount, string $payerName): array
-    {
+    private function createLinkedPayment(
+        PaymentLink $link,
+        float $amount,
+        string $payerName,
+        string $method = Payment::METHOD_BANK_TRANSFER,
+        ?string $email = null
+    ): array {
         try {
-            $payment = $this->paymentService->createPayment([
+            $payload = [
                 'amount' => $amount,
                 'payer_name' => $payerName,
                 'webhook_url' => route('payment-links.payment.webhook', ['code' => $link->code]),
                 'service' => 'payment_link',
                 'business_website_id' => null,
-            ], $link->business, request(), true);
+                'currency' => $link->currency ?: 'NGN',
+            ];
+            if ($method === Payment::METHOD_CARD) {
+                $payload['payment_method'] = Payment::METHOD_CARD;
+                $payload['email'] = $email;
+            }
+
+            $payment = $this->paymentService->createPayment($payload, $link->business, request(), false);
 
             $emailData = $payment->email_data ?? [];
             $emailData['service'] = 'payment_link';
             $emailData['payment_link_id'] = $link->id;
-            $payment->update(['email_data' => $emailData, 'expires_at' => null]);
+            $payment->update(['email_data' => $emailData]);
 
             $this->links->attachPayment($link, $payment);
             $payment->load('accountNumberDetails');
@@ -152,11 +211,18 @@ class PaymentLinkPaymentController extends Controller
         }
     }
 
-    private function existingPending(PaymentLink $link): ?Payment
+    private function existingPendingBank(PaymentLink $link): ?Payment
     {
         return $link->linkPayments()
             ->with('payment.accountNumberDetails')
-            ->whereHas('payment', fn ($q) => $q->where('status', Payment::STATUS_PENDING))
+            ->whereHas('payment', function ($q) {
+                $q->where('status', Payment::STATUS_PENDING)
+                    ->whereNotNull('account_number')
+                    ->where('account_number', '!=', '')
+                    ->where(function ($exp) {
+                        $exp->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                    });
+            })
             ->latest()
             ->first()?->payment;
     }

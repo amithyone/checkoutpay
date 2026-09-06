@@ -80,6 +80,11 @@ class PaymentService
         }
 
         $requestedService = (string) ($data['service'] ?? ($useInvoicePool ? 'invoice' : 'general'));
+        $isPaymentLink = strtolower($requestedService) === 'payment_link';
+        if ($isPaymentLink) {
+            // Payment links always use a Mevon temp VA — never the invoice pool.
+            $useInvoicePool = false;
+        }
 
         $externalOverride = $data['external_override'] ?? null;
         if (is_string($externalOverride) && in_array($externalOverride, ['external_only', 'hybrid', 'internal_only'], true)) {
@@ -94,24 +99,32 @@ class PaymentService
             $vaMode = $routing['va_mode'];
         }
 
+        if ($isPaymentLink) {
+            $mode = 'external_only';
+            $vaMode = 'temp';
+        }
+
         $forceExternal = $mode === 'external_only';
         $preferExternal = $mode === 'hybrid';
 
         $account = null;
         $externalExpiresAt = null;
+        $tempVaRegistration = null;
 
         if ($forceExternal || $preferExternal) {
             $vaMode = $vaMode ?: $business->externalProviderVaGenerationMode('mevonpay');
 
             try {
                 if ($vaMode === 'temp') {
-                    // create_tem_va RC is admin-controlled only (platform vs business CAC flag).
-                    // Merchants cannot override via payment-request registration_number/rc_number.
-                    $resolved = $business->resolveMevonTempVaRegistration();
+                    // Payment links: own CAC if present, else Checkout platform RC.
+                    // Other temp VAs stay admin-flagged (platform vs business CAC).
+                    $tempVaRegistration = $isPaymentLink
+                        ? $business->resolvePaymentLinkTempVaRegistration()
+                        : $business->resolveMevonTempVaRegistration();
 
                     $va = $this->mevonPayVirtualAccountService->createTempVa(
-                        $resolved['rc_number'],
-                        $resolved['business_type']
+                        $tempVaRegistration['rc_number'],
+                        $tempVaRegistration['business_type']
                     );
                 } else {
                     // Default to dynamic VA; it doesn't require BVN.
@@ -202,7 +215,7 @@ class PaymentService
             $webhookUrlForPayment = InternalPaymentWebhookUrl::rewriteToAppUrl($webhookUrlForPayment);
         }
 
-        if ($useInvoicePool) {
+        if ($useInvoicePool || $isPaymentLink) {
             $charges = $this->chargeService->calculateInvoiceCharges($amount, $business);
             $chargePercentage = $charges['charge_percentage'] ?? 0;
             $chargeFixed = $charges['charge_fixed'] ?? 0;
@@ -252,6 +265,7 @@ class PaymentService
                 'website_url' => $data['website_url'] ?? null,
                 'skip_auto_match' => $isExternalAssigned ? true : null,
                 'developer_program_partner_business_id' => $partnerBusinessId,
+                'temp_va_rc_source' => $isPaymentLink ? ($tempVaRegistration['source'] ?? null) : null,
             ]),
             'charge_percentage' => $chargePercentage,
             'charge_fixed' => $chargeFixed,

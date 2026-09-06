@@ -27,6 +27,7 @@ class PaymentExpirationTest extends TestCase
     {
         $this->assertNull(Payment::defaultExpiresAtForService('invoice', true));
         $this->assertNull(Payment::defaultExpiresAtForService('membership', false));
+        $this->assertNotNull(Payment::defaultExpiresAtForService('payment_link', false));
     }
 
     private function makeBusiness(): Business
@@ -71,9 +72,19 @@ class PaymentExpirationTest extends TestCase
             'email_data' => ['service' => 'invoice'],
         ]);
 
+        $paymentLink = Payment::create([
+            'transaction_id' => 'TXN-LINK-1',
+            'amount' => 4000,
+            'business_id' => $business->id,
+            'status' => Payment::STATUS_PENDING,
+            'webhook_url' => '',
+            'email_data' => ['service' => 'payment_link'],
+        ]);
+
         $this->assertFalse($regular->shouldStayPendingIndefinitely());
         $this->assertTrue($membership->shouldStayPendingIndefinitely());
         $this->assertTrue($invoice->shouldStayPendingIndefinitely());
+        $this->assertFalse($paymentLink->shouldStayPendingIndefinitely());
     }
 
     public function test_payment_expire_command_rejects_stale_regular_pending_rows(): void

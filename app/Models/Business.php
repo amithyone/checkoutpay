@@ -684,6 +684,37 @@ class Business extends Authenticatable implements CanResetPasswordContract
     }
 
     /**
+     * Payment-link temp VAs: business CAC/RC when on file, otherwise Checkout platform RC.
+     * Does not require the admin use_own_cac_for_temp_va flag.
+     *
+     * @return array{rc_number: string, business_type: string, source: string}
+     */
+    public function resolvePaymentLinkTempVaRegistration(): array
+    {
+        $own = self::normalizeCacRegistrationNumber((string) ($this->cac_registration_number ?? ''));
+        if ($own !== '') {
+            return [
+                'rc_number' => $own,
+                'business_type' => self::inferCacBusinessType($own),
+                'source' => 'business_cac',
+            ];
+        }
+
+        $platform = self::normalizeCacRegistrationNumber(
+            (string) config('services.mevonpay.temp_va_registration_number', '')
+        );
+        if ($platform === '') {
+            throw new \RuntimeException('Platform MevonPay temp VA registration number is not configured.');
+        }
+
+        return [
+            'rc_number' => $platform,
+            'business_type' => self::inferCacBusinessType($platform),
+            'source' => 'platform',
+        ];
+    }
+
+    /**
      * Get activity logs for this business
      */
     public function activityLogs()

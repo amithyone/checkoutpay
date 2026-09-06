@@ -72,17 +72,65 @@
                             <span class="text-sm font-medium text-blue-900">Amount to pay</span>
                             <span class="text-2xl font-bold text-blue-900">{{ $link->currency }} {{ number_format($selectedPayment->amount, 2) }}</span>
                         </div>
-                        <p class="text-xs text-gray-500 font-mono">{{ $selectedPayment->transaction_id }}</p>
+                        <p class="text-xs text-gray-500 font-mono mb-4">{{ $selectedPayment->transaction_id }}</p>
+
+                        @if(!empty($cardPaymentsEnabled))
+                            <div class="pt-4 border-t border-gray-200">
+                                <p class="text-sm font-medium text-gray-900 mb-2">Or pay by card</p>
+                                <form method="POST" action="{{ route('payment-links.start', $link->code) }}" class="space-y-3">
+                                    @csrf
+                                    <input type="hidden" name="payment_method" value="card">
+                                    <input type="hidden" name="payer_name" value="{{ $selectedPayment->payer_name }}">
+                                    @if($link->isOpenAmount())
+                                        <input type="hidden" name="amount" value="{{ $selectedPayment->amount }}">
+                                    @endif
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 mb-1">Email for card receipt</label>
+                                        <input type="email" name="email" value="{{ old('email') }}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                        @error('email')<p class="text-sm text-red-600 mt-1">{{ $message }}</p>@enderror
+                                    </div>
+                                    <button type="submit" class="w-full px-4 py-2 border border-gray-300 rounded-lg font-medium text-gray-800 hover:bg-gray-50">Pay with card instead</button>
+                                </form>
+                            </div>
+                        @endif
                     </div>
                 @else
                     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                         <h2 class="text-lg font-semibold text-gray-900 mb-4">Continue to pay</h2>
-                        <form method="POST" action="{{ route('payment-links.start', $link->code) }}" class="space-y-4">
+                        <form method="POST" action="{{ route('payment-links.start', $link->code) }}" class="space-y-4" id="pay-start-form">
                             @csrf
+                            @if(!empty($cardPaymentsEnabled))
+                                <div>
+                                    <p class="block text-sm font-medium text-gray-700 mb-2">How do you want to pay?</p>
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <label class="flex items-start gap-3 p-4 border rounded-lg cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-blue-50">
+                                            <input type="radio" name="payment_method" value="bank_transfer" class="mt-1" {{ old('payment_method', 'bank_transfer') === 'bank_transfer' ? 'checked' : '' }}>
+                                            <span>
+                                                <span class="block text-sm font-semibold text-gray-900">Account number</span>
+                                                <span class="block text-xs text-gray-500 mt-0.5">Transfer to a temporary bank account</span>
+                                            </span>
+                                        </label>
+                                        <label class="flex items-start gap-3 p-4 border rounded-lg cursor-pointer has-[:checked]:border-primary has-[:checked]:bg-blue-50">
+                                            <input type="radio" name="payment_method" value="card" class="mt-1" {{ old('payment_method') === 'card' ? 'checked' : '' }}>
+                                            <span>
+                                                <span class="block text-sm font-semibold text-gray-900">Card payment</span>
+                                                <span class="block text-xs text-gray-500 mt-0.5">Pay with a debit or credit card</span>
+                                            </span>
+                                        </label>
+                                    </div>
+                                    @error('payment_method')<p class="text-sm text-red-600 mt-1">{{ $message }}</p>@enderror
+                                </div>
+                            @endif
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Your name</label>
                                 <input type="text" name="payer_name" value="{{ old('payer_name') }}" required class="w-full px-3 py-2 border border-gray-300 rounded-lg">
                                 @error('payer_name')<p class="text-sm text-red-600 mt-1">{{ $message }}</p>@enderror
+                            </div>
+                            <div id="card-email-field" class="{{ old('payment_method') === 'card' ? '' : 'hidden' }}">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input type="email" name="email" id="card-email-input" value="{{ old('email') }}" class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                                <p class="text-xs text-gray-500 mt-1">Required for card checkout</p>
+                                @error('email')<p class="text-sm text-red-600 mt-1">{{ $message }}</p>@enderror
                             </div>
                             @if($link->isOpenAmount())
                                 <div>
@@ -91,12 +139,36 @@
                                     @error('amount')<p class="text-sm text-red-600 mt-1">{{ $message }}</p>@enderror
                                 </div>
                             @endif
-                            <button type="submit" class="w-full px-4 py-2 bg-primary text-white rounded-lg font-medium">Get payment details</button>
+                            <button type="submit" id="pay-submit" class="w-full px-4 py-2 bg-primary text-white rounded-lg font-medium">{{ !empty($cardPaymentsEnabled) ? 'Get account number' : 'Get payment details' }}</button>
                         </form>
                     </div>
                 @endif
             </div>
         </div>
     </div>
+    @if(!empty($cardPaymentsEnabled) && (empty($selectedPayment) || empty($selectedPayment->account_number)))
+    <script>
+    (function () {
+        const form = document.getElementById('pay-start-form');
+        if (!form) return;
+        const emailWrap = document.getElementById('card-email-field');
+        const emailInput = document.getElementById('card-email-input');
+        const submit = document.getElementById('pay-submit');
+
+        function sync() {
+            const method = (form.querySelector('input[name="payment_method"]:checked') || {}).value;
+            const isCard = method === 'card';
+            emailWrap.classList.toggle('hidden', !isCard);
+            emailInput.required = isCard;
+            submit.textContent = isCard ? 'Continue to card payment' : 'Get account number';
+        }
+
+        form.querySelectorAll('input[name="payment_method"]').forEach(function (el) {
+            el.addEventListener('change', sync);
+        });
+        sync();
+    })();
+    </script>
+    @endif
 </body>
 </html>

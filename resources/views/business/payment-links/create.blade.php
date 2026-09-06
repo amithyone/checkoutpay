@@ -10,7 +10,7 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
         <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 class="text-lg font-semibold text-gray-900 mb-1">New payment link</h2>
-            <p class="text-sm text-gray-600 mb-6">Your client opens a dedicated pay page and transfers to a CheckoutPay account. The preview on the right is what they see.</p>
+            <p class="text-sm text-gray-600 mb-6">Your client opens a dedicated pay page{{ $business->card_payments_enabled ? ' and can pay by card or transfer to a CheckoutPay account' : ' and transfers to a CheckoutPay account' }}. The preview on the right is what they see.</p>
 
             <form id="link-form" method="POST" action="{{ route('business.payment-links.store') }}" class="space-y-5">
                 @csrf
@@ -98,6 +98,15 @@
                         <div id="preview-open-form" class="bg-white rounded-lg border border-gray-200 p-4 hidden">
                             <h4 class="text-sm font-semibold text-gray-900 mb-3">Continue to pay</h4>
                             <div class="space-y-3 pointer-events-none opacity-90">
+                                @if($business->card_payments_enabled)
+                                    <div>
+                                        <p class="text-xs text-gray-600 mb-2">How do you want to pay?</p>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <div class="p-2 border rounded-lg text-xs font-medium text-gray-800">Account number</div>
+                                            <div class="p-2 border rounded-lg text-xs font-medium text-gray-800">Card payment</div>
+                                        </div>
+                                    </div>
+                                @endif
                                 <div>
                                     <label class="block text-xs text-gray-600 mb-1">Your name</label>
                                     <div class="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-400">Customer name</div>
@@ -106,11 +115,29 @@
                                     <label class="block text-xs text-gray-600 mb-1">Amount (₦, minimum 100)</label>
                                     <div class="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-400">They type the amount</div>
                                 </div>
-                                <div class="w-full px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium text-center">Get payment details</div>
+                                <div class="w-full px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium text-center">{{ $business->card_payments_enabled ? 'Get account number' : 'Get payment details' }}</div>
                             </div>
                         </div>
 
-                        <div id="preview-pay-modal" class="bg-white rounded-lg border border-gray-200 p-4">
+                        <div id="preview-methods" class="bg-white rounded-lg border border-gray-200 p-4 {{ $business->card_payments_enabled ? '' : 'hidden' }}">
+                            <h4 class="text-sm font-semibold text-gray-900 mb-3">Continue to pay</h4>
+                            <div class="space-y-3 pointer-events-none opacity-90">
+                                <div>
+                                    <p class="text-xs text-gray-600 mb-2">How do you want to pay?</p>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div class="p-2 border rounded-lg text-xs font-medium text-gray-800">Account number</div>
+                                        <div class="p-2 border rounded-lg text-xs font-medium text-gray-800">Card payment</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs text-gray-600 mb-1">Your name</label>
+                                    <div class="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-400">Customer name</div>
+                                </div>
+                                <div class="w-full px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium text-center">Get account number</div>
+                            </div>
+                        </div>
+
+                        <div id="preview-pay-modal" class="bg-white rounded-lg border border-gray-200 p-4 {{ $business->card_payments_enabled ? 'hidden' : '' }}">
                             <h4 class="text-sm font-semibold text-gray-900 mb-1">Payment instructions</h4>
                             <p class="text-xs text-gray-500 mb-3">Transfer the exact amount to the account below.</p>
                             <div class="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
@@ -148,6 +175,8 @@
     const previewReuse = document.getElementById('preview-reuse');
     const previewOpenForm = document.getElementById('preview-open-form');
     const previewPayModal = document.getElementById('preview-pay-modal');
+    const previewMethods = document.getElementById('preview-methods');
+    const cardsEnabled = {{ $business->card_payments_enabled ? 'true' : 'false' }};
 
     function naira(value) {
         const n = Number(value);
@@ -182,7 +211,10 @@
         const open = amountMode() === 'open';
         fixedWrap.classList.toggle('hidden', open);
         previewOpenForm.classList.toggle('hidden', !open);
-        previewPayModal.classList.toggle('hidden', open);
+        if (previewMethods) {
+            previewMethods.classList.toggle('hidden', open || !cardsEnabled);
+        }
+        previewPayModal.classList.toggle('hidden', open || cardsEnabled);
 
         if (open) {
             previewAmount.textContent = 'Customer chooses';
