@@ -38,6 +38,17 @@ class PaymentLinkTest extends TestCase
         ]);
     }
 
+    public function test_create_page_shows_live_customer_preview(): void
+    {
+        $this->actingAs($this->business(), 'business')
+            ->get('/dashboard/payment-links/create')
+            ->assertOk()
+            ->assertSee('Customer preview')
+            ->assertSee('Pay')
+            ->assertSee('Link Shop')
+            ->assertSee('Payment instructions');
+    }
+
     public function test_business_can_create_fixed_one_time_and_open_reusable_links(): void
     {
         $business = $this->business();

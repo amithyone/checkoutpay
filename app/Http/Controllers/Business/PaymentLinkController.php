@@ -77,9 +77,9 @@ class PaymentLinkController extends Controller
 
     public function create(): View
     {
-        $this->currentBusiness();
+        $business = $this->currentBusiness();
 
-        return view('business.payment-links.create');
+        return view('business.payment-links.create', compact('business'));
     }
 
     public function store(Request $request): RedirectResponse
