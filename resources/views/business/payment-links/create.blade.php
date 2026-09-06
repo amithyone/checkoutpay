@@ -67,89 +67,67 @@
 
         <div class="lg:sticky lg:top-6">
             <p class="text-xs font-medium uppercase tracking-wide text-gray-500 mb-2">Customer preview</p>
-            <div class="rounded-2xl border border-gray-200 bg-gray-100 p-3 sm:p-4 shadow-sm">
-                <div class="rounded-xl bg-gray-50 overflow-hidden border border-gray-200">
-                    <div class="bg-white px-4 py-3 border-b border-gray-100 text-center">
-                        <p class="text-[11px] text-gray-400">checkoutpay.com/pay/l/••••</p>
-                        <h3 class="text-lg font-bold text-gray-900 mt-1">Pay <span id="preview-business">{{ $business->name }}</span></h3>
-                        <p id="preview-title" class="text-sm text-gray-600">Your product title</p>
+            <div class="mx-auto max-w-[360px] rounded-[28px] border border-gray-200 bg-[#f4f6fb] shadow-sm overflow-hidden">
+                <div class="px-4 pt-4 pb-3">
+                    <p class="text-[11px] font-bold uppercase tracking-wide text-primary mb-3">{{ \App\Models\Setting::get('site_name', 'CheckoutPay') }}</p>
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center text-sm font-extrabold">{{ strtoupper(mb_substr($business->name, 0, 1)) }}</div>
+                        <div>
+                            <h3 class="text-sm font-extrabold text-gray-900 leading-tight">Pay <span id="preview-business">{{ $business->name }}</span></h3>
+                            <p id="preview-title" class="text-xs text-gray-500">Your product title</p>
+                        </div>
+                    </div>
+                    <div class="rounded-2xl bg-white border border-gray-100 px-3 py-2.5 mb-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400">Amount</p>
+                        <p id="preview-amount" class="text-2xl font-extrabold text-gray-900 leading-tight">₦0.00</p>
+                        <p id="preview-note-wrap" class="hidden text-xs text-gray-500 mt-1"><span id="preview-note"></span></p>
+                    </div>
+                </div>
+
+                <div class="px-4 pb-4 space-y-3">
+                    <div id="preview-open-form" class="rounded-2xl bg-white border border-gray-100 p-3 hidden">
+                        <h4 class="text-sm font-semibold text-gray-900 mb-2">Continue to pay</h4>
+                        <div class="space-y-2 pointer-events-none">
+                            @if($business->card_payments_enabled)
+                                <p class="text-xs text-gray-600">How do you want to pay?</p>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="p-2 border rounded-xl text-xs font-semibold">Account number</div>
+                                    <div class="p-2 border rounded-xl text-xs font-semibold">Card payment</div>
+                                </div>
+                            @endif
+                            <div class="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-400">Customer name</div>
+                            <div class="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-400">They type the amount</div>
+                            <div class="w-full px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold text-center">{{ $business->card_payments_enabled ? 'Get account number' : 'Get payment details' }}</div>
+                        </div>
                     </div>
 
-                    <div class="p-4 space-y-4">
-                        <div class="bg-white rounded-lg border border-gray-200 p-4">
-                            <h4 class="text-sm font-semibold text-gray-900 mb-3">Details</h4>
-                            <div class="space-y-2 text-sm">
-                                <div>
-                                    <p class="text-gray-500">Business</p>
-                                    <p class="font-medium text-gray-900">{{ $business->name }}</p>
-                                </div>
-                                <div>
-                                    <p class="text-gray-500">Amount</p>
-                                    <p id="preview-amount" class="font-medium text-gray-900">₦0.00</p>
-                                </div>
-                                <div id="preview-note-wrap" class="hidden">
-                                    <p class="text-gray-500">Note</p>
-                                    <p id="preview-note" class="text-gray-800"></p>
-                                </div>
-                                <p id="preview-reuse" class="text-xs text-gray-500">One-time link</p>
+                    <div id="preview-methods" class="rounded-2xl bg-white border border-gray-100 p-3 {{ $business->card_payments_enabled ? '' : 'hidden' }}">
+                        <h4 class="text-sm font-semibold text-gray-900 mb-2">Continue to pay</h4>
+                        <div class="space-y-2 pointer-events-none">
+                            <p class="text-xs text-gray-600">How do you want to pay?</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="p-2 border rounded-xl text-xs font-semibold">Account number</div>
+                                <div class="p-2 border rounded-xl text-xs font-semibold">Card payment</div>
                             </div>
+                            <div class="px-3 py-2 border border-gray-200 rounded-xl text-sm text-gray-400">Customer name</div>
+                            <div class="w-full px-4 py-2 bg-primary text-white rounded-xl text-sm font-semibold text-center">Get account number</div>
                         </div>
+                    </div>
 
-                        <div id="preview-open-form" class="bg-white rounded-lg border border-gray-200 p-4 hidden">
-                            <h4 class="text-sm font-semibold text-gray-900 mb-3">Continue to pay</h4>
-                            <div class="space-y-3 pointer-events-none opacity-90">
-                                @if($business->card_payments_enabled)
-                                    <div>
-                                        <p class="text-xs text-gray-600 mb-2">How do you want to pay?</p>
-                                        <div class="grid grid-cols-2 gap-2">
-                                            <div class="p-2 border rounded-lg text-xs font-medium text-gray-800">Account number</div>
-                                            <div class="p-2 border rounded-lg text-xs font-medium text-gray-800">Card payment</div>
-                                        </div>
-                                    </div>
-                                @endif
-                                <div>
-                                    <label class="block text-xs text-gray-600 mb-1">Your name</label>
-                                    <div class="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-400">Customer name</div>
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-gray-600 mb-1">Amount (₦, minimum 100)</label>
-                                    <div class="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-400">They type the amount</div>
-                                </div>
-                                <div class="w-full px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium text-center">{{ $business->card_payments_enabled ? 'Get account number' : 'Get payment details' }}</div>
-                            </div>
+                    <div id="preview-pay-modal" class="rounded-2xl bg-white border border-gray-100 p-3 {{ $business->card_payments_enabled ? 'hidden' : '' }}">
+                        <h4 class="text-sm font-semibold text-gray-900 mb-1">Payment instructions</h4>
+                        <p class="text-[11px] text-gray-500 mb-2">Transfer the exact amount to this account.</p>
+                        <div class="rounded-xl bg-primary/5 px-3 py-2 font-mono font-extrabold text-lg tracking-wide">•••• •••• ••••</div>
+                        <div class="grid grid-cols-2 gap-2 mt-2 text-xs">
+                            <div><span class="text-gray-400">Bank</span><p class="font-semibold">Assigned at checkout</p></div>
+                            <div><span class="text-gray-400">Account name</span><p class="font-semibold">CheckoutPay</p></div>
                         </div>
-
-                        <div id="preview-methods" class="bg-white rounded-lg border border-gray-200 p-4 {{ $business->card_payments_enabled ? '' : 'hidden' }}">
-                            <h4 class="text-sm font-semibold text-gray-900 mb-3">Continue to pay</h4>
-                            <div class="space-y-3 pointer-events-none opacity-90">
-                                <div>
-                                    <p class="text-xs text-gray-600 mb-2">How do you want to pay?</p>
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <div class="p-2 border rounded-lg text-xs font-medium text-gray-800">Account number</div>
-                                        <div class="p-2 border rounded-lg text-xs font-medium text-gray-800">Card payment</div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-gray-600 mb-1">Your name</label>
-                                    <div class="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-400">Customer name</div>
-                                </div>
-                                <div class="w-full px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium text-center">Get account number</div>
-                            </div>
-                        </div>
-
-                        <div id="preview-pay-modal" class="bg-white rounded-lg border border-gray-200 p-4 {{ $business->card_payments_enabled ? 'hidden' : '' }}">
-                            <h4 class="text-sm font-semibold text-gray-900 mb-1">Payment instructions</h4>
-                            <p class="text-xs text-gray-500 mb-3">Transfer the exact amount to the account below.</p>
-                            <div class="bg-gray-50 rounded-lg p-3 space-y-2 text-sm">
-                                <div class="flex justify-between"><span class="text-gray-500">Bank</span><span class="font-medium">Assigned at checkout</span></div>
-                                <div class="flex justify-between"><span class="text-gray-500">Account name</span><span class="font-medium">CheckoutPay</span></div>
-                                <div class="flex justify-between"><span class="text-gray-500">Account number</span><span class="font-mono font-semibold">•••• •••• ••••</span></div>
-                            </div>
-                            <div class="mt-3 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 flex justify-between items-center">
-                                <span class="text-xs font-medium text-blue-900">Amount to pay</span>
-                                <span id="preview-pay-amount" class="text-lg font-bold text-blue-900">₦0.00</span>
-                            </div>
-                        </div>
+                        <p id="preview-pay-amount" class="hidden">₦0.00</p>
+                    </div>
+                    <p id="preview-reuse" class="text-[11px] text-gray-500">One-time link</p>
+                    <div class="rounded-xl bg-white border border-gray-100 px-3 py-2 flex items-center justify-between gap-2">
+                        <p class="text-[11px] text-gray-600 leading-tight"><span class="block font-semibold text-gray-900">Need to collect like this?</span> Create your own payment link</p>
+                        <span class="text-[11px] font-bold bg-gray-900 text-white rounded-lg px-2 py-1">Create</span>
                     </div>
                 </div>
             </div>

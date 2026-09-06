@@ -155,7 +155,8 @@ class PaymentLinkTest extends TestCase
             ->assertOk()
             ->assertSee('Deposit')
             ->assertSee('Waiting for payment')
-            ->assertSee('Check payment status');
+            ->assertSee('Check payment status')
+            ->assertSee('Create your own payment link');
 
         $this->assertDatabaseHas('payments', [
             'business_id' => $business->id,
