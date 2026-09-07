@@ -28,9 +28,9 @@ class ConsumerWalletPinRecoveryService
     /**
      * @return array{ok: bool, message: string, data?: array<string, mixed>}
      */
-    public function options(string $phoneInput): array
+    public function options(string $phoneInput, ?string $countryIso = null): array
     {
-        $wallet = $this->walletForPhone($phoneInput);
+        $wallet = $this->walletForPhone($phoneInput, $countryIso);
         if ($wallet === null) {
             return ['ok' => false, 'message' => 'No wallet found for this number.'];
         }
@@ -88,9 +88,9 @@ class ConsumerWalletPinRecoveryService
     /**
      * @return array{ok: bool, message: string, recovery_token?: string}
      */
-    public function verifyP2pQuiz(string $phoneInput, string $senderHint, ?string $amountNaira = null): array
+    public function verifyP2pQuiz(string $phoneInput, string $senderHint, ?string $amountNaira = null, ?string $countryIso = null): array
     {
-        $wallet = $this->walletForPhone($phoneInput);
+        $wallet = $this->walletForPhone($phoneInput, $countryIso);
         if ($wallet === null || ! $wallet->hasPin()) {
             return ['ok' => false, 'message' => 'Wallet not found or PIN not set.'];
         }
@@ -129,9 +129,9 @@ class ConsumerWalletPinRecoveryService
     /**
      * @return array{ok: bool, message: string, recovery_token?: string}
      */
-    public function verifyBvn(string $phoneInput, string $bvnInput): array
+    public function verifyBvn(string $phoneInput, string $bvnInput, ?string $countryIso = null): array
     {
-        $wallet = $this->walletForPhone($phoneInput);
+        $wallet = $this->walletForPhone($phoneInput, $countryIso);
         if ($wallet === null || ! $wallet->hasPin()) {
             return ['ok' => false, 'message' => 'Wallet not found or PIN not set.'];
         }
@@ -158,9 +158,9 @@ class ConsumerWalletPinRecoveryService
      *
      * @return array{ok: bool, message: string, recovery_token?: string}
      */
-    public function verifyBankName(string $phoneInput, string $nameInput): array
+    public function verifyBankName(string $phoneInput, string $nameInput, ?string $countryIso = null): array
     {
-        $wallet = $this->walletForPhone($phoneInput);
+        $wallet = $this->walletForPhone($phoneInput, $countryIso);
         if ($wallet === null || ! $wallet->hasPin()) {
             return ['ok' => false, 'message' => 'Wallet not found or PIN not set.'];
         }
@@ -226,14 +226,14 @@ class ConsumerWalletPinRecoveryService
         return ['ok' => true, 'message' => 'PIN reset. Sign in with your new PIN.'];
     }
 
-    private function walletForPhone(string $phoneInput): ?WhatsappWallet
+    private function walletForPhone(string $phoneInput, ?string $countryIso = null): ?WhatsappWallet
     {
-        $e164 = PhoneNormalizer::canonicalNgE164Digits($phoneInput);
+        $e164 = WhatsappWallet::resolveAuthE164($phoneInput, $countryIso);
         if ($e164 === null) {
             return null;
         }
 
-        return WhatsappWallet::query()->where('phone_e164', $e164)->first();
+        return WhatsappWallet::findByPhoneE164($e164);
     }
 
     private function firstP2pCredit(WhatsappWallet $wallet): ?WhatsappWalletTransaction

@@ -143,4 +143,33 @@ class ConsumerWalletPinRecoveryTest extends TestCase
         $wallet->refresh();
         $this->assertTrue(Hash::check('9999', (string) $wallet->pin_hash));
     }
+
+    public function test_uk_wallet_recovery_options_accepts_local_and_truncated_number(): void
+    {
+        $wallet = WhatsappWallet::query()->create([
+            'phone_e164' => '447776291794',
+            'tier' => WhatsappWallet::TIER_WHATSAPP_ONLY,
+            'balance' => 1000,
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'pin_hash' => Hash::make('1234'),
+            'pin_set_at' => now(),
+        ]);
+
+        WhatsappWalletTransaction::query()->create([
+            'whatsapp_wallet_id' => $wallet->id,
+            'type' => WhatsappWalletTransaction::TYPE_P2P_CREDIT,
+            'amount' => 1500,
+            'counterparty_phone_e164' => '447700000001',
+            'sender_name' => 'Sam Taylor',
+        ]);
+
+        $this->postJson('/api/v1/consumer/auth/recovery/options', [
+            'phone' => '07776291794',
+            'country' => 'GB',
+        ])->assertOk()->assertJsonPath('data.phone_e164', '447776291794');
+
+        $this->postJson('/api/v1/consumer/auth/recovery/options', [
+            'phone' => '44777629179',
+        ])->assertOk()->assertJsonPath('data.phone_e164', '447776291794');
+    }
 }

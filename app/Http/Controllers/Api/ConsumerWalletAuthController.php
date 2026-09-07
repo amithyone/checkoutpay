@@ -378,9 +378,13 @@ class ConsumerWalletAuthController extends Controller
     {
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
+            'country' => 'nullable|string|size:2',
         ]);
 
-        $result = $recovery->options((string) $request->input('phone'));
+        $result = $recovery->options(
+            (string) $request->input('phone'),
+            $request->input('country') ? (string) $request->input('country') : null,
+        );
         if (! $result['ok']) {
             return response()->json([
                 'success' => false,
@@ -400,12 +404,14 @@ class ConsumerWalletAuthController extends Controller
             'phone' => 'required|string|min:10|max:20',
             'sender_hint' => 'required|string|min:2|max:120',
             'amount' => 'nullable|string|max:24',
+            'country' => 'nullable|string|size:2',
         ]);
 
         $result = $recovery->verifyP2pQuiz(
             (string) $request->input('phone'),
             (string) $request->input('sender_hint'),
             $request->input('amount') !== null ? (string) $request->input('amount') : null,
+            $request->input('country') ? (string) $request->input('country') : null,
         );
 
         return response()->json([
@@ -420,11 +426,13 @@ class ConsumerWalletAuthController extends Controller
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
             'bvn' => 'required|string|min:11|max:11',
+            'country' => 'nullable|string|size:2',
         ]);
 
         $result = $recovery->verifyBvn(
             (string) $request->input('phone'),
             (string) $request->input('bvn'),
+            $request->input('country') ? (string) $request->input('country') : null,
         );
 
         return response()->json([
@@ -439,11 +447,13 @@ class ConsumerWalletAuthController extends Controller
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
             'name' => 'required|string|min:2|max:120',
+            'country' => 'nullable|string|size:2',
         ]);
 
         $result = $recovery->verifyBankName(
             (string) $request->input('phone'),
             (string) $request->input('name'),
+            $request->input('country') ? (string) $request->input('country') : null,
         );
 
         return response()->json([
