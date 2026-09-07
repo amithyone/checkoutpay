@@ -24,9 +24,13 @@ class ConsumerWalletAuthController extends Controller
     {
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
+            'country' => 'nullable|string|size:2',
         ]);
 
-        $result = $otp->otpOptions((string) $request->input('phone'));
+        $result = $otp->otpOptions(
+            (string) $request->input('phone'),
+            $request->input('country') ? (string) $request->input('country') : null,
+        );
         if (! $result['ok']) {
             return response()->json([
                 'success' => false,
@@ -60,12 +64,14 @@ class ConsumerWalletAuthController extends Controller
             'phone' => 'required|string|min:10|max:20',
             'channel' => 'nullable|string|in:whatsapp,email',
             'email' => 'nullable|email|max:255',
+            'country' => 'nullable|string|size:2',
         ]);
 
         $result = $otp->requestOtp(
             (string) $request->input('phone'),
             (string) $request->input('channel', 'whatsapp'),
             $request->input('email') ? (string) $request->input('email') : null,
+            $request->input('country') ? (string) $request->input('country') : null,
         );
 
         return response()->json([
@@ -87,9 +93,11 @@ class ConsumerWalletAuthController extends Controller
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
             'code' => 'required|string|max:12',
+            'country' => 'nullable|string|size:2',
         ]);
 
-        $checked = $otp->checkOtp((string) $request->input('phone'), (string) $request->input('code'));
+        $country = $request->input('country') ? (string) $request->input('country') : null;
+        $checked = $otp->checkOtp((string) $request->input('phone'), (string) $request->input('code'), $country);
         if (! $checked['ok']) {
             return response()->json([
                 'success' => false,
@@ -100,7 +108,7 @@ class ConsumerWalletAuthController extends Controller
         $e164 = (string) $checked['phone_e164'];
         $region = $regions->forPhone($e164);
 
-        $wallet = WhatsappWallet::query()->where('phone_e164', $e164)->first();
+        $wallet = WhatsappWallet::findByPhoneE164($e164);
         if (! $wallet || $wallet->needsRegistrationProfile()) {
             return response()->json([
                 'success' => false,
@@ -113,7 +121,7 @@ class ConsumerWalletAuthController extends Controller
             ], 422);
         }
 
-        $verified = $otp->verifyOtp((string) $request->input('phone'), (string) $request->input('code'));
+        $verified = $otp->verifyOtp((string) $request->input('phone'), (string) $request->input('code'), $country);
         if (! $verified['ok']) {
             return response()->json([
                 'success' => false,
@@ -180,6 +188,7 @@ class ConsumerWalletAuthController extends Controller
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
             'code' => 'required|string|max:12',
+            'country' => 'nullable|string|size:2',
             'fname' => 'required|string|min:2|max:128',
             'lname' => 'required|string|min:2|max:128',
             'email' => 'required|email|max:255',
@@ -202,6 +211,7 @@ class ConsumerWalletAuthController extends Controller
                 'dob' => $request->input('dob'),
                 'gender' => $request->input('gender'),
                 'referral_code' => $request->input('referral_code'),
+                'country' => $request->input('country') ? (string) $request->input('country') : null,
             ],
         );
 
@@ -253,9 +263,13 @@ class ConsumerWalletAuthController extends Controller
         $request->validate([
             'phone' => 'required|string|min:10|max:20',
             'pin' => ['required', 'regex:/^\d{4}$/'],
+            'country' => 'nullable|string|size:2',
         ]);
 
-        $e164 = PhoneNormalizer::canonicalAuthE164Digits((string) $request->input('phone'));
+        $e164 = WhatsappWallet::resolveAuthE164(
+            (string) $request->input('phone'),
+            $request->input('country') ? (string) $request->input('country') : null,
+        );
         if ($e164 === null) {
             return response()->json([
                 'success' => false,
@@ -263,7 +277,7 @@ class ConsumerWalletAuthController extends Controller
             ], 422);
         }
 
-        $wallet = WhatsappWallet::query()->where('phone_e164', $e164)->first();
+        $wallet = WhatsappWallet::findByPhoneE164($e164);
         if (! $wallet) {
             return response()->json([
                 'success' => false,

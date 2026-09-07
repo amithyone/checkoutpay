@@ -16,12 +16,15 @@ class ConsumerWalletRegistrationService
     ) {}
 
     /**
-     * @param  array{fname: string, lname: string, email: string, bvn?: string|null, nin?: string|null, dob?: string|null, gender?: string|null, referral_code?: string|null}  $profile
+     * @param  array{fname: string, lname: string, email: string, bvn?: string|null, nin?: string|null, dob?: string|null, gender?: string|null, referral_code?: string|null, country?: string|null}  $profile
      * @return array{ok: bool, message: string, phone_e164?: string, token?: string, token_type?: string, wallet_id?: int}
      */
     public function register(string $phoneInput, string $code, array $profile): array
     {
-        $e164 = PhoneNormalizer::canonicalAuthE164Digits($phoneInput);
+        $e164 = PhoneNormalizer::canonicalAuthE164Digits(
+            $phoneInput,
+            isset($profile['country']) ? (string) $profile['country'] : null,
+        );
         if ($e164 === null) {
             return ['ok' => false, 'message' => 'Invalid mobile number for a supported country.'];
         }

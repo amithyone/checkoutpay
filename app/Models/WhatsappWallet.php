@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Whatsapp\PhoneNormalizer;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -107,6 +108,57 @@ class WhatsappWallet extends Model
         'referral_launch_notified_at' => 'datetime',
         'wallet_signup_notified_at' => 'datetime',
     ];
+
+    public static function findByPhoneE164(string $e164): ?self
+    {
+        $digits = PhoneNormalizer::digitsOnly($e164);
+        if ($digits === null) {
+            return null;
+        }
+
+        return static::query()
+            ->where('phone_e164', $digits)
+            ->orWhere('phone_e164', '+'.$digits)
+            ->first();
+    }
+
+    /**
+     * Login from store apps that cannot send + or a full UK international number
+     * (native keypad + 11-digit field). Recover only when exactly one wallet matches.
+     */
+    public static function resolveAuthE164(string $input, ?string $countryIso = null): ?string
+    {
+        $canonical = PhoneNormalizer::canonicalAuthE164Digits($input, $countryIso);
+        if ($canonical !== null) {
+            return $canonical;
+        }
+
+        return static::recoverTruncatedLoginE164($input);
+    }
+
+    public static function recoverTruncatedLoginE164(string $input): ?string
+    {
+        $digits = PhoneNormalizer::digitsOnly($input);
+        if ($digits === null || strlen($digits) !== 11 || ! str_starts_with($digits, '44')) {
+            return null;
+        }
+
+        $rows = static::query()
+            ->where(function ($q) use ($digits) {
+                $q->where('phone_e164', 'like', $digits.'%')
+                    ->orWhere('phone_e164', 'like', '+'.$digits.'%');
+            })
+            ->limit(3)
+            ->pluck('phone_e164');
+
+        $unique = $rows
+            ->map(fn ($phone) => PhoneNormalizer::digitsOnly((string) $phone))
+            ->filter()
+            ->unique()
+            ->values();
+
+        return $unique->count() === 1 ? (string) $unique->first() : null;
+    }
 
     public function renter(): BelongsTo
     {

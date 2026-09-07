@@ -97,4 +97,32 @@ class ConsumerAppSessionTest extends TestCase
         $session->refresh();
         $this->assertNotNull($session->ended_at);
     }
+
+    public function test_uk_pin_login_recognizes_country_code_without_plus(): void
+    {
+        WhatsappWallet::query()->create([
+            'phone_e164' => '447776291794',
+            'tier' => WhatsappWallet::TIER_WHATSAPP_ONLY,
+            'balance' => 0,
+            'status' => WhatsappWallet::STATUS_ACTIVE,
+            'pin_hash' => Hash::make('1234'),
+            'pin_set_at' => now(),
+        ]);
+
+        $this->postJson('/api/v1/consumer/auth/pin/verify', [
+            'phone' => '447776291794',
+            'pin' => '1234',
+        ])->assertOk()->assertJsonPath('data.phone_e164', '447776291794');
+
+        $this->postJson('/api/v1/consumer/auth/pin/verify', [
+            'phone' => '07776291794',
+            'pin' => '1234',
+            'country' => 'GB',
+        ])->assertOk()->assertJsonPath('data.phone_e164', '447776291794');
+
+        $this->postJson('/api/v1/consumer/auth/pin/verify', [
+            'phone' => '44777629179',
+            'pin' => '1234',
+        ])->assertOk()->assertJsonPath('data.phone_e164', '447776291794');
+    }
 }

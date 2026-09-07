@@ -18,6 +18,14 @@ final class PhoneNormalizer
     }
 
     /**
+     * Nigerian mobile NSN (10 digits): 70/71 and 80–91. Excludes 072–079 (UK mobiles).
+     */
+    public static function isNigerianMobileNsn(string $nsn): bool
+    {
+        return preg_match('/^(70|71|80|81|82|83|84|85|86|87|88|89|90|91)\d{8}$/', $nsn) === 1;
+    }
+
+    /**
      * Nigeria: returns 234XXXXXXXXXX (13 digits) or null.
      */
     public static function canonicalNgE164Digits(string $input): ?string
@@ -26,13 +34,18 @@ final class PhoneNormalizer
         if ($d === null) {
             return null;
         }
+        if (strlen($d) === 14 && str_starts_with($d, '2340')) {
+            $d = '234'.substr($d, 4);
+        }
         if (strlen($d) === 13 && str_starts_with($d, '234')) {
             return $d;
         }
         if (strlen($d) === 11 && str_starts_with($d, '0')) {
-            return '234'.substr($d, 1);
+            $nsn = substr($d, 1);
+
+            return self::isNigerianMobileNsn($nsn) ? '234'.$nsn : null;
         }
-        if (strlen($d) === 10 && $d[0] !== '0') {
+        if (strlen($d) === 10 && $d[0] !== '0' && self::isNigerianMobileNsn($d)) {
             return '234'.$d;
         }
 
@@ -85,7 +98,7 @@ final class PhoneNormalizer
     }
 
     /**
-     * United Kingdom: 44 + national significant number (typically 10 digits for mobiles).
+     * United Kingdom: 44 + 10-digit national significant number (mobiles 07…).
      */
     public static function canonicalGbE164Digits(string $input): ?string
     {
@@ -95,11 +108,18 @@ final class PhoneNormalizer
         }
         if (str_starts_with($d, '44')) {
             $rest = substr($d, 2);
+            if (str_starts_with($rest, '0')) {
+                $rest = substr($rest, 1);
+                $d = '44'.$rest;
+            }
 
-            return strlen($rest) >= 9 && strlen($rest) <= 10 ? $d : null;
+            return strlen($rest) === 10 ? $d : null;
         }
-        if (strlen($d) >= 10 && strlen($d) <= 11 && str_starts_with($d, '0')) {
+        if (strlen($d) === 11 && str_starts_with($d, '07')) {
             return '44'.substr($d, 1);
+        }
+        if (strlen($d) === 10 && str_starts_with($d, '7')) {
+            return '44'.$d;
         }
 
         return null;
@@ -352,8 +372,8 @@ final class PhoneNormalizer
         }
 
         if (strlen($d) === 10 && $d[0] !== '0') {
-            // Nigerian mobiles without trunk 0: 70/71/80–89/90/91… — avoid mis-reading US 10-digit (+1) numbers.
-            if (preg_match('/^(70|71|72|73|74|75|76|77|78|79|80|81|82|83|84|85|86|87|88|89|90|91)\d{8}$/', $d) === 1) {
+            // Nigerian mobiles without trunk 0: 70/71/80–91 — not 072–079 (UK).
+            if (self::isNigerianMobileNsn($d)) {
                 $ng = self::canonicalNgE164Digits($input);
                 if ($ng !== null) {
                     return $ng;
@@ -528,11 +548,32 @@ final class PhoneNormalizer
     }
 
     /**
-     * Auth / registration: accept any dial in whatsapp_wallet_regions (incl. KE/NA), not Nigeria-only.
-     * Prefer NG/KE/NA local + explicit country-code forms before ambiguous international parsers (e.g. UK 0…).
+     * Auth / registration: accept any dial in whatsapp_wallet_regions (incl. KE/NA/GB), not Nigeria-only.
+     * Explicit country codes (44…, 254…, 234…) win even without a leading +.
+     * Optional $countryIso applies when the user typed a local number (no + on the app keypad).
      */
-    public static function canonicalAuthE164Digits(string $input): ?string
+    public static function canonicalAuthE164Digits(string $input, ?string $countryIso = null): ?string
     {
+        $d = self::digitsOnly($input);
+        if ($d === null) {
+            return null;
+        }
+
+        if (self::looksExplicitInternational($d)) {
+            $explicit = self::canonicalInternationalWalletRecipientDigits($input);
+            if ($explicit !== null) {
+                return $explicit;
+            }
+        }
+
+        $iso = strtoupper(trim((string) $countryIso));
+        if ($iso !== '') {
+            $hinted = self::canonicalE164ForCountry($input, $iso);
+            if ($hinted !== null) {
+                return $hinted;
+            }
+        }
+
         return self::canonicalNgE164Digits($input)
             ?? self::canonicalKeE164Digits($input)
             ?? self::canonicalNaE164Digits($input)
