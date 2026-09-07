@@ -243,8 +243,11 @@ class ConsumerWalletApiController extends Controller
                         PrivateAccountProvisionService::STATUS_PROCESSING,
                     ], true),
                 'pay_in' => $payIn,
-                'business_pay_in' => $isNg ? $this->businessLedger->resolveBusinessPayInPayload($wallet) : null,
+                'business_pay_in' => $this->businessLedger->walletHasBusinessActivity($wallet)
+                    ? $this->businessLedger->resolveBusinessPayInPayload($wallet)
+                    : null,
                 'business_balance' => $this->businessLedger->resolvedBalance($wallet),
+                'business_currency' => 'NGN',
                 'business_wallet_enabled' => $this->businessLedger->walletHasBusinessActivity($wallet),
                 'business_overdraft' => $this->businessOverdraftSummary($wallet),
                 'linked_business_id' => $wallet->linked_business_id,

@@ -464,8 +464,9 @@ class ConsumerWalletTransferService
         if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS && ! $wallet->fresh()->hasBusinessWallet()) {
             return ['ok' => false, 'message' => 'Business wallet is not linked yet.'];
         }
-        if (! $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164)) {
-            return ['ok' => false, 'message' => 'Bank transfers are only available for Nigeria wallet numbers.'];
+        $nigeriaPhone = $this->walletCountry->isNigeriaPayInWallet((string) $wallet->phone_e164);
+        if (! $nigeriaPhone && $ledgerScope !== ConsumerWalletTransactionScope::SCOPE_BUSINESS) {
+            return ['ok' => false, 'message' => 'Personal bank transfers are only available for Nigeria wallet numbers. Switch to your linked business wallet to send naira to a Nigerian bank.'];
         }
 
         $acct = preg_replace('/\D/', '', $accountNumber10) ?? '';
