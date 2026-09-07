@@ -142,6 +142,11 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/recovery/verify-bvn', [ConsumerWalletAuthController::class, 'recoveryVerifyBvn']);
         Route::post('auth/recovery/verify-name', [ConsumerWalletAuthController::class, 'recoveryVerifyName']);
         Route::post('auth/recovery/reset-pin', [ConsumerWalletAuthController::class, 'recoveryResetPin']);
+        Route::post('auth/lockdown', [ConsumerWalletAuthController::class, 'lockdown']);
+        Route::post('auth/lockdown/unlock/start', [ConsumerWalletAuthController::class, 'lockdownUnlockStart']);
+        Route::post('auth/lockdown/unlock/email/request', [ConsumerWalletAuthController::class, 'lockdownUnlockEmailRequest']);
+        Route::post('auth/lockdown/unlock/email/verify', [ConsumerWalletAuthController::class, 'lockdownUnlockEmailVerify']);
+        Route::post('auth/lockdown/unlock', [ConsumerWalletAuthController::class, 'lockdownUnlock']);
         Route::post('auth/passkey/login/options', [ConsumerDeviceAuthController::class, 'passkeyLoginOptions']);
         Route::post('auth/passkey/login/verify', [ConsumerDeviceAuthController::class, 'passkeyLoginVerify']);
         Route::post('auth/device/stepup/start', [ConsumerDeviceAuthController::class, 'stepupStart']);

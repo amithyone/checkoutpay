@@ -8,6 +8,7 @@ use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
 use App\Services\Consumer\ConsumerAppSessionService;
 use App\Services\Consumer\ConsumerWalletOtpService;
+use App\Services\Consumer\ConsumerWalletLockdownService;
 use App\Services\Consumer\ConsumerWalletPinRecoveryService;
 use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Consumer\ConsumerWalletRegistrationService;
@@ -119,6 +120,14 @@ class ConsumerWalletAuthController extends Controller
                     'region' => $region,
                 ],
             ], 422);
+        }
+
+        if ($wallet->isLockedDown()) {
+            return response()->json([
+                'success' => false,
+                'message' => WhatsappWallet::lockdownMessage(),
+                'data' => ['locked_down' => true],
+            ], 423);
         }
 
         $verified = $otp->verifyOtp((string) $request->input('phone'), (string) $request->input('code'), $country);
@@ -283,6 +292,14 @@ class ConsumerWalletAuthController extends Controller
                 'success' => false,
                 'message' => 'No wallet for this number. Sign in with WhatsApp OTP first.',
             ], 422);
+        }
+
+        if ($wallet->isLockedDown()) {
+            return response()->json([
+                'success' => false,
+                'message' => WhatsappWallet::lockdownMessage(),
+                'data' => ['locked_down' => true],
+            ], 423);
         }
 
         if ($wallet->isPinLocked()) {
@@ -475,6 +492,115 @@ class ConsumerWalletAuthController extends Controller
             (string) $request->input('recovery_token'),
             (string) $request->input('pin'),
             (string) $request->input('pin_confirmation'),
+        );
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+        ], $result['ok'] ? 200 : 422);
+    }
+
+    public function lockdown(Request $request, ConsumerWalletLockdownService $lockdown): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+            'pin' => ['required', 'regex:/^\d{4}$/'],
+            'dob' => 'required|date_format:Y-m-d',
+            'country' => 'nullable|string|size:2',
+        ]);
+
+        $result = $lockdown->lockDown(
+            (string) $request->input('phone'),
+            (string) $request->input('pin'),
+            (string) $request->input('dob'),
+            $request->input('country') ? (string) $request->input('country') : null,
+        );
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+        ], $result['ok'] ? 200 : 422);
+    }
+
+    public function lockdownUnlockStart(Request $request, ConsumerWalletLockdownService $lockdown): JsonResponse
+    {
+        $request->validate([
+            'phone' => 'required|string|min:10|max:20',
+            'country' => 'nullable|string|size:2',
+        ]);
+
+        $result = $lockdown->unlockStart(
+            (string) $request->input('phone'),
+            $request->input('country') ? (string) $request->input('country') : null,
+        );
+        if (! ($result['ok'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'data' => $result['data'] ?? [],
+        ]);
+    }
+
+    public function lockdownUnlockEmailRequest(Request $request, ConsumerWalletLockdownService $lockdown): JsonResponse
+    {
+        $request->validate([
+            'unlock_token' => 'required|string|min:32|max:128',
+            'email' => 'required|email|max:255',
+        ]);
+
+        $result = $lockdown->requestUnlockEmail(
+            (string) $request->input('unlock_token'),
+            (string) $request->input('email'),
+        );
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+            'data' => $result['data'] ?? null,
+        ], $result['ok'] ? 200 : 422);
+    }
+
+    public function lockdownUnlockEmailVerify(Request $request, ConsumerWalletLockdownService $lockdown): JsonResponse
+    {
+        $request->validate([
+            'unlock_token' => 'required|string|min:32|max:128',
+            'code' => 'required|string|max:12',
+        ]);
+
+        $result = $lockdown->verifyUnlockEmail(
+            (string) $request->input('unlock_token'),
+            (string) $request->input('code'),
+        );
+
+        return response()->json([
+            'success' => $result['ok'],
+            'message' => $result['message'],
+        ], $result['ok'] ? 200 : 422);
+    }
+
+    public function lockdownUnlock(Request $request, ConsumerWalletLockdownService $lockdown): JsonResponse
+    {
+        $request->validate([
+            'unlock_token' => 'required|string|min:32|max:128',
+            'pin' => ['required', 'regex:/^\d{4}$/'],
+            'people' => 'nullable|array|max:6',
+            'people.*' => 'string|max:120',
+            'bvn' => 'nullable|string|size:11',
+            'nin' => 'nullable|string|size:11',
+        ]);
+
+        $identity = $request->input('bvn') ?: $request->input('nin');
+        $result = $lockdown->unlock(
+            (string) $request->input('unlock_token'),
+            (string) $request->input('pin'),
+            array_values(array_filter((array) $request->input('people', []), 'is_string')),
+            $identity !== null ? (string) $identity : null,
         );
 
         return response()->json([

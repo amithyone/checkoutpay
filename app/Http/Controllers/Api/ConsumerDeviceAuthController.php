@@ -114,6 +114,13 @@ class ConsumerDeviceAuthController extends Controller
         $account = $result['account'];
         $account->loadMissing('wallet');
         $wallet = $account->wallet;
+        if ($wallet && $wallet->isLockedDown()) {
+            return response()->json([
+                'success' => false,
+                'message' => \App\Models\WhatsappWallet::lockdownMessage(),
+                'data' => ['locked_down' => true],
+            ], 423);
+        }
         if ($wallet && $trust->requiresStepUp($account, $deviceId)) {
             $stepup = app(\App\Services\Consumer\ConsumerDeviceStepupService::class);
             $session = $stepup->createSession(

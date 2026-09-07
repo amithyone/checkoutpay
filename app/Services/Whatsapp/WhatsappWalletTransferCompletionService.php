@@ -275,6 +275,14 @@ class WhatsappWalletTransferCompletionService
             : 0.0;
         $isSelf = ! empty($ctx['is_self_transfer']);
 
+        if ($wallet->isLockedDown()) {
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->client->sendText($instance, $phone, WhatsappWallet::lockdownMessage());
+            $this->sendWalletSubmenu($instance, $phone, $wallet->fresh());
+
+            return WalletTransferCompletionResult::failed(WhatsappWallet::lockdownMessage());
+        }
+
         if ($amount < 1 || strlen($acct) !== 10 || $bankCode === '' || $beneficiary === '') {
             $session->update(['chat_context' => ['step' => 'submenu']]);
             $this->sendWalletSubmenu($instance, $phone, $wallet->fresh());
@@ -783,6 +791,14 @@ class WhatsappWalletTransferCompletionService
             ? $ctx['p2p_recipient_e164']
             : '';
         $amount = isset($ctx['p2p_amount']) && is_numeric($ctx['p2p_amount']) ? (float) $ctx['p2p_amount'] : 0.0;
+
+        if ($wallet->isLockedDown()) {
+            $session->update(['chat_context' => ['step' => 'submenu']]);
+            $this->client->sendText($instance, $phone, WhatsappWallet::lockdownMessage());
+            $this->sendWalletSubmenu($instance, $phone, $wallet->fresh());
+
+            return WalletTransferCompletionResult::failed(WhatsappWallet::lockdownMessage());
+        }
 
         if ($recipient === '' || $amount < 1) {
             $session->update(['chat_context' => ['step' => 'submenu']]);

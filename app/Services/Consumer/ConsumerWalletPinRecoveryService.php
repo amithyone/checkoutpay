@@ -39,6 +39,10 @@ class ConsumerWalletPinRecoveryService
             return ['ok' => false, 'message' => 'No PIN is set on this wallet. Sign in with OTP to set one.'];
         }
 
+        if ($wallet->isLockedDown()) {
+            return ['ok' => false, 'message' => WhatsappWallet::lockdownMessage()];
+        }
+
         if ($this->isRateLimited($wallet)) {
             return ['ok' => false, 'message' => 'Too many failed recovery attempts. Try again in about 15 minutes.'];
         }

@@ -73,6 +73,7 @@ class WhatsappWallet extends Model
         'notify_card_transaction_email',
         'notify_card_transaction_whatsapp',
         'status',
+        'locked_down_at',
         'balance_audit_exempt',
         'admin_bot_paused',
         'support_whatsapp_welcome_sent_at',
@@ -107,6 +108,7 @@ class WhatsappWallet extends Model
         'support_whatsapp_welcome_sent_at' => 'datetime',
         'referral_launch_notified_at' => 'datetime',
         'wallet_signup_notified_at' => 'datetime',
+        'locked_down_at' => 'datetime',
     ];
 
     public static function findByPhoneE164(string $e164): ?self
@@ -298,6 +300,16 @@ class WhatsappWallet extends Model
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE;
+    }
+
+    public function isLockedDown(): bool
+    {
+        return $this->locked_down_at !== null;
+    }
+
+    public static function lockdownMessage(): string
+    {
+        return 'This wallet is locked down. Unlock it from the CheckoutNow login screen.';
     }
 
     /** Admin manual-chat mode: bot stays silent until user sends START BOT. */

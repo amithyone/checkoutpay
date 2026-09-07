@@ -32,6 +32,17 @@ final class ConsumerPaymentAuthService
      */
     public function authorize(WhatsappWallet $wallet, ConsumerWalletApiAccount $account, Request $request): array
     {
+        if ($wallet->isLockedDown()) {
+            return [
+                'ok' => false,
+                'response' => response()->json([
+                    'success' => false,
+                    'message' => WhatsappWallet::lockdownMessage(),
+                    'data' => ['locked_down' => true],
+                ], 423),
+            ];
+        }
+
         if ($wallet->isPinLocked()) {
             return [
                 'ok' => false,

@@ -224,6 +224,9 @@ class ConsumerWalletTransferService
         float $amount,
         ?float $creditInRecipientCurrency = null,
     ): array {
+        if ($wallet->isLockedDown()) {
+            return ['ok' => false, 'message' => WhatsappWallet::lockdownMessage()];
+        }
         $phone = (string) $wallet->phone_e164;
         $recipient = \App\Services\Whatsapp\PhoneNormalizer::canonicalWalletRecipientForSender(
             $recipientPhoneInput,
@@ -461,6 +464,9 @@ class ConsumerWalletTransferService
         string $ledgerScope = ConsumerWalletTransactionScope::SCOPE_PERSONAL,
     ): array {
         $ledgerScope = ConsumerWalletTransactionScope::normalize($ledgerScope);
+        if ($wallet->isLockedDown()) {
+            return ['ok' => false, 'message' => WhatsappWallet::lockdownMessage()];
+        }
         if ($ledgerScope === ConsumerWalletTransactionScope::SCOPE_BUSINESS && ! $wallet->fresh()->hasBusinessWallet()) {
             return ['ok' => false, 'message' => 'Business wallet is not linked yet.'];
         }

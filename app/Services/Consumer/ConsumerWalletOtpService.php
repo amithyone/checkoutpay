@@ -222,6 +222,11 @@ class ConsumerWalletOtpService
             return ['ok' => false, 'message' => 'Invalid mobile number for a supported country.'];
         }
 
+        $existing = WhatsappWallet::findByPhoneE164($e164);
+        if ($existing?->isLockedDown()) {
+            return ['ok' => false, 'message' => WhatsappWallet::lockdownMessage()];
+        }
+
         $channel = strtolower(trim($channel));
         if (! in_array($channel, ['whatsapp', 'email'], true)) {
             return ['ok' => false, 'message' => 'Invalid delivery channel.'];
