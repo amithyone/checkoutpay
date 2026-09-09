@@ -734,7 +734,7 @@ else:
                         <p class="text-gray-700 mb-4">
                             Send money from your Checkout business balance to a Nigerian bank account. Same rail as <strong>Dashboard → Withdrawals</strong>.
                             Checkout must <strong>enable Payout API</strong> on your business (admin). Authenticate with <code class="bg-gray-100 px-2 py-1 rounded text-sm">X-API-Key</code>.
-                            Sender on the bank statement follows <strong>Dashboard → Settings</strong> (Checkout by default, or your business name if you have a permanent settlement account). No per-request override.
+                            Recipients see your <strong>business name</strong>. Money leaves the settlement account we issued to you. Until that account exists, payouts debit the platform account and show Checkout. No per-request override.
                         </p>
 
                         <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6">

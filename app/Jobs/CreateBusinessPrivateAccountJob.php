@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Business;
 use App\Services\MevonPay\MevonPrivateAccountService;
 use App\Services\MevonPay\PrivateAccountProvisionService;
+use App\Services\WithdrawalMavonPayPayoutService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -95,6 +96,7 @@ class CreateBusinessPrivateAccountJob implements ShouldQueue
             'rubies_business_account_created_at' => now(),
             'rubies_account_provision_status' => PrivateAccountProvisionService::STATUS_COMPLETED,
             'rubies_account_provision_error' => null,
+            'withdrawal_debit_source' => WithdrawalMavonPayPayoutService::DEBIT_BUSINESS,
         ]);
 
         Log::info('private_account.business_completed', [

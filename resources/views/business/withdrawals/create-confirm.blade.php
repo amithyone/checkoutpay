@@ -24,19 +24,18 @@
         </div>
 
         @php
-            $usesBusinessDebit = ($business->withdrawal_debit_source ?? 'checkout') === 'business'
-                && $business->hasPermanentSettlementAccount();
+            $usesBusinessDebit = $business->hasPermanentSettlementAccount();
         @endphp
         <div class="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
             <p class="text-xs text-gray-500 mb-1">Sender on bank statement</p>
             <p class="font-medium text-gray-900">{{ $usesBusinessDebit ? $business->name : 'Checkout' }}</p>
             <p class="text-xs text-gray-500 mt-1">
                 @if($usesBusinessDebit)
-                    Debits your permanent account. Change this in
+                    Debits your business account {{ $business->rubies_business_account_number }}.
                 @else
-                    Debits the platform account. Change this in
+                    Debits the platform account until your permanent settlement account is ready.
+                    See <a href="{{ route('business.settings.index') }}" class="text-primary hover:underline">Settings</a>.
                 @endif
-                <a href="{{ route('business.settings.index') }}" class="text-primary hover:underline">Settings</a>.
             </p>
         </div>
 

@@ -23,7 +23,7 @@ class WithdrawalDebitRoutingTest extends TestCase
         $this->assertSame(1, WithdrawalMavonPayPayoutService::COOLDOWN_MINUTES);
     }
 
-    public function test_default_debit_is_checkout_pool(): void
+    public function test_issued_account_uses_payout_even_when_setting_is_checkout(): void
     {
         config(['services.mevonpay.debit_account_number' => '9999000011']);
         config(['services.mevonpay.debit_account_name' => 'Checkout']);
@@ -34,14 +34,15 @@ class WithdrawalDebitRoutingTest extends TestCase
             'name' => 'Acme Ltd',
             'withdrawal_debit_source' => 'checkout',
             'rubies_business_account_number' => '8888777766',
-            'rubies_business_account_name' => 'Acme Ltd',
+            'rubies_business_account_name' => 'ACME LTD-VA',
         ]);
 
         $profile = app(WithdrawalMavonPayPayoutService::class)->debitProfile($business);
 
-        $this->assertSame(WithdrawalMavonPayPayoutService::DEBIT_CHECKOUT, $profile['source']);
-        $this->assertSame(MevonPayLedgerEntry::PAYOUT_API_CREATETRANSFER, $profile['payout_api']);
-        $this->assertSame('9999000011', $profile['debit_account_number']);
+        $this->assertSame(WithdrawalMavonPayPayoutService::DEBIT_BUSINESS, $profile['source']);
+        $this->assertSame(MevonPayLedgerEntry::PAYOUT_API_PAYOUT, $profile['payout_api']);
+        $this->assertSame('8888777766', $profile['debit_account_number']);
+        $this->assertSame('Acme Ltd', $profile['debit_account_name']);
     }
 
     public function test_business_source_without_permanent_va_falls_back_to_checkout(): void
@@ -78,7 +79,7 @@ class WithdrawalDebitRoutingTest extends TestCase
         $this->assertSame(WithdrawalMavonPayPayoutService::DEBIT_BUSINESS, $profile['source']);
         $this->assertSame(MevonPayLedgerEntry::PAYOUT_API_PAYOUT, $profile['payout_api']);
         $this->assertSame('8888777766', $profile['debit_account_number']);
-        $this->assertSame('Acme Ltd VA', $profile['debit_account_name']);
+        $this->assertSame('Acme Ltd', $profile['debit_account_name']);
     }
 
     public function test_business_source_falls_back_to_checkout_when_payout_not_configured(): void

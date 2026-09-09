@@ -16,9 +16,11 @@ use App\Services\Consumer\ConsumerWalletPushNotificationService;
 use App\Services\Consumer\ConsumerWalletTransactionScope;
 use App\Services\MavonPayTransferService;
 use App\Services\MevonPay\MevonPayLedgerRecorder;
+use App\Services\MevonPay\MevonPayPayoutService;
 use App\Services\NigerianBankCodeNormalizer;
 use App\Services\Payout\BankPayoutNarration;
 use App\Services\Whatsapp\WhatsappWalletMoneyFormatter;
+use App\Services\WithdrawalMavonPayPayoutService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -33,6 +35,8 @@ final class BusinessPayrollService
         private BusinessWhatsappWalletLinkService $walletLink,
         private ConsumerBusinessWalletLedgerService $businessLedger,
         private MavonPayTransferService $mavon,
+        private MevonPayPayoutService $payout,
+        private WithdrawalMavonPayPayoutService $withdrawalPayout,
         private MevonPayLedgerRecorder $ledger,
         private ConsumerWalletPushNotificationService $walletPush,
     ) {}
@@ -352,7 +356,7 @@ final class BusinessPayrollService
             return ['ok' => false, 'message' => 'Invalid bank payout details.'];
         }
 
-        if (! $this->mavon->isConfigured()) {
+        if (! $this->payout->isConfigured() && ! $this->mavon->isConfigured()) {
             return ['ok' => false, 'message' => 'Bank payout is not configured. Contact support.'];
         }
 
@@ -376,17 +380,38 @@ final class BusinessPayrollService
 
             $reference = 'pr_'.$item->id.'_'.Str::lower(Str::random(10));
             $sessionId = 'PR'.$item->id.'_'.now()->format('YmdHis');
+            $debit = $this->withdrawalPayout->debitProfile($lockedBusiness);
+            $usePayout = $debit['payout_api'] === MevonPayLedgerEntry::PAYOUT_API_PAYOUT
+                && $this->payout->isConfigured();
 
-            $result = $this->mavon->createTransfer([
-                'amount' => $amount,
-                'bankCode' => $nip,
-                'bankName' => $bankName,
-                'creditAccountName' => $accountName,
-                'creditAccountNumber' => $accountNumber,
-                'narration' => $narration,
-                'reference' => $reference,
-                'sessionId' => $sessionId,
-            ]);
+            if ($usePayout) {
+                $result = $this->payout->createPayout([
+                    'amount' => $amount,
+                    'bankCode' => $nip,
+                    'bankName' => $bankName,
+                    'creditAccountName' => $accountName,
+                    'creditAccountNumber' => $accountNumber,
+                    'debitAccountNumber' => $debit['debit_account_number'],
+                    'debitAccountName' => $debit['debit_account_name'],
+                    'narration' => $narration,
+                    'reference' => $reference,
+                ]);
+            } else {
+                if (! $this->mavon->isConfigured()) {
+                    return ['ok' => false, 'message' => 'Bank payout is not configured. Contact support.'];
+                }
+
+                $result = $this->mavon->createTransfer([
+                    'amount' => $amount,
+                    'bankCode' => $nip,
+                    'bankName' => $bankName,
+                    'creditAccountName' => $accountName,
+                    'creditAccountNumber' => $accountNumber,
+                    'narration' => $narration,
+                    'reference' => $reference,
+                    'sessionId' => $sessionId,
+                ]);
+            }
 
             $bucket = $result['bucket'] ?? MavonPayTransferService::BUCKET_FAILED;
 
@@ -394,9 +419,9 @@ final class BusinessPayrollService
                 MevonPayLedgerEntry::FLOW_BUSINESS_PAYROLL,
                 $amount,
                 $reference,
-                MevonPayLedgerEntry::PAYOUT_API_CREATETRANSFER,
+                $debit['payout_api'],
                 $bucket,
-                (string) config('services.mevonpay.debit_account_number', ''),
+                $debit['debit_account_number'],
                 $item,
                 [
                     'business_id' => $lockedBusiness->id,
@@ -406,6 +431,8 @@ final class BusinessPayrollService
                     'description' => $narration,
                     'response_code' => $result['response_code'] ?? null,
                     'source' => 'business_payroll',
+                    'debit_source' => $debit['source'],
+                    'debit_account_name' => $debit['debit_account_name'],
                 ],
             );
 

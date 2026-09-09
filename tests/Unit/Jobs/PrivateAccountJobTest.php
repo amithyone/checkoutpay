@@ -48,6 +48,7 @@ class PrivateAccountJobTest extends TestCase
             $table->timestamp('rubies_business_account_created_at')->nullable();
             $table->string('rubies_account_provision_status')->nullable();
             $table->text('rubies_account_provision_error')->nullable();
+            $table->string('withdrawal_debit_source', 20)->nullable();
             $table->timestamp('rubies_account_provision_queued_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
@@ -153,6 +154,7 @@ class PrivateAccountJobTest extends TestCase
         $business->refresh();
         $this->assertSame('1000000001', $business->rubies_business_account_number);
         $this->assertSame(PrivateAccountProvisionService::STATUS_COMPLETED, $business->rubies_account_provision_status);
+        $this->assertSame('business', $business->withdrawal_debit_source);
     }
 
     public function test_business_job_skips_when_account_already_exists(): void

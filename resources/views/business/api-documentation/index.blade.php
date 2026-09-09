@@ -394,7 +394,7 @@ X-API-Key: {{ $business->api_key }}
         <p class="text-sm text-gray-600 mb-4">
             Requires admin to <strong>enable Payout API</strong> on your business. Authenticate with <code class="bg-gray-100 px-1 rounded text-xs">X-API-Key</code>.
             Sends money from your Checkout balance to a Nigerian bank account — same as Dashboard → Withdrawals.
-            The name on the recipient’s statement follows <a href="{{ route('business.settings.index') }}" class="text-emerald-800 underline">Settings → Payout sender</a> (Checkout by default, or your business name with a permanent account).
+            Recipients see your <strong>business name</strong>. Money leaves the settlement account we issued to you. Until that account exists, payouts debit the platform account and show Checkout.
         </p>
         <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 mb-4">
             <p class="text-sm text-emerald-900"><strong>Validate before payout.</strong> Call <code class="bg-emerald-100 px-1 rounded">POST …/validate-account</code> with <code class="bg-emerald-100 px-1 rounded">account_number</code> + <code class="bg-emerald-100 px-1 rounded">bank_code</code> (from <code class="bg-emerald-100 px-1 rounded">GET …/banks</code>). Store the returned <code class="bg-emerald-100 px-1 rounded">account_name</code> when the user sets up their payout account, or validate on every withdrawal. <code class="bg-emerald-100 px-1 rounded">POST …/withdrawal</code> returns <code class="bg-emerald-100 px-1 rounded">422</code> if the name does not match — so payouts are not wasted on invalid account/name pairs.</p>

@@ -53,12 +53,12 @@ class WithdrawalMavonPayPayoutService
     }
 
     /**
-     * Whether this business's withdrawals should debit their permanent VA (recipient sees business name).
+     * Debit the permanent settlement account we issued, so /V1/payout shows the business name.
+     * Platform pool is only used when that account does not exist yet.
      */
     public function usesBusinessDebit(Business $business): bool
     {
-        return $business->withdrawal_debit_source === self::DEBIT_BUSINESS
-            && $business->hasPermanentSettlementAccount();
+        return $business->hasPermanentSettlementAccount();
     }
 
     /**
@@ -67,9 +67,9 @@ class WithdrawalMavonPayPayoutService
     public function debitProfile(Business $business): array
     {
         if ($this->usesBusinessDebit($business) && $this->payout->isConfigured()) {
-            $name = trim((string) ($business->rubies_business_account_name ?: $business->name));
+            $name = trim((string) $business->name);
             if ($name === '') {
-                $name = 'Checkout';
+                $name = trim((string) ($business->rubies_business_account_name ?: 'Checkout'));
             }
 
             return [

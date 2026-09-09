@@ -171,6 +171,48 @@ class ConsumerWalletBankTransferNarrationTest extends TestCase
         $this->assertNotSame('1111222233', $capturedDebitNumber);
     }
 
+    public function test_business_bank_transfer_prefers_business_name_over_va_account_name(): void
+    {
+        $capturedNarration = null;
+        $capturedDebitName = null;
+        $capturedDebitNumber = null;
+        $this->mockPayout($capturedNarration, $capturedDebitName, $capturedDebitNumber);
+
+        $business = \App\Models\Business::query()->create([
+            'name' => 'Acme Ventures Ltd',
+            'email' => 'acme-name@example.com',
+            'password' => bcrypt('secret'),
+            'business_id' => 'RUB02',
+            'phone' => '08012345681',
+            'balance' => 100000,
+            'rubies_business_account_number' => '8888777766',
+            'rubies_business_account_name' => 'ACME VENTURES LTD-VA',
+        ]);
+
+        $wallet = $this->makeNigeriaWallet([
+            'phone_e164' => '2348012345679',
+            'linked_business_id' => $business->id,
+            'business_balance' => 100000,
+            'sender_name' => 'John Personal',
+            'mevon_virtual_account_number' => '1111222233',
+            'tier' => WhatsappWallet::TIER_RUBIES_VA,
+        ]);
+
+        app(ConsumerWalletTransferService::class)->bankTransfer(
+            $wallet,
+            1000,
+            '0123456789',
+            '058',
+            'GTBank',
+            'Test Beneficiary',
+            null,
+            ConsumerWalletTransactionScope::SCOPE_BUSINESS,
+        );
+
+        $this->assertSame('Acme Ventures Ltd', $capturedDebitName);
+        $this->assertSame('8888777766', $capturedDebitNumber);
+    }
+
     public function test_business_bank_transfer_uses_merchant_va_without_personal_mevon_va(): void
     {
         $capturedNarration = null;

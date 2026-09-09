@@ -108,9 +108,9 @@ final class ConsumerBusinessWalletLedgerService
 
         if ($accountNumber !== '') {
             return [
-                'debit_account_name' => $accountName !== ''
-                    ? $accountName
-                    : ($businessName !== '' ? $businessName : $this->checkoutPoolDebitName()),
+                'debit_account_name' => $businessName !== ''
+                    ? $businessName
+                    : ($accountName !== '' ? $accountName : $this->checkoutPoolDebitName()),
                 'debit_account_number' => $accountNumber,
             ];
         }
