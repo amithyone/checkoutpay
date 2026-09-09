@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use App\Models\WithdrawalRequest;
 use App\Services\NubanValidationService;
+use App\Services\Payout\MerchantWithdrawalFeeService;
 use App\Services\WithdrawalMavonPayPayoutService;
 
 class WithdrawalController extends Controller
@@ -109,7 +110,11 @@ class WithdrawalController extends Controller
             return redirect()->route('business.withdrawals.create')->with('info', 'Please select or enter your account details first.');
         }
         $business = Auth::guard('business')->user();
-        return view('business.withdrawals.create-confirm', compact('business', 'account'));
+        $withdrawalFees = app(MerchantWithdrawalFeeService::class);
+        $platformFee = $withdrawalFees->feeForSource(WithdrawalRequest::SOURCE_DASHBOARD);
+        $maxPayout = $withdrawalFees->maxPayoutAmount((float) $business->getAvailableBalance(), WithdrawalRequest::SOURCE_DASHBOARD);
+
+        return view('business.withdrawals.create-confirm', compact('business', 'account', 'platformFee', 'maxPayout'));
     }
 
     public function validateAccount(Request $request)
@@ -239,12 +244,16 @@ class WithdrawalController extends Controller
         }
 
         $maxWithdraw = $business->getAvailableBalance();
-        if ($maxWithdraw < 1) {
-            return back()->withErrors(['amount' => 'Insufficient balance. Available: ₦' . number_format($maxWithdraw, 2)])->withInput();
+        $withdrawalFees = app(MerchantWithdrawalFeeService::class);
+        $platformFee = $withdrawalFees->feeForSource(WithdrawalRequest::SOURCE_DASHBOARD);
+        $maxPayout = $withdrawalFees->maxPayoutAmount((float) $maxWithdraw, WithdrawalRequest::SOURCE_DASHBOARD);
+
+        if ($maxPayout < 1) {
+            return back()->withErrors(['amount' => 'Insufficient balance. Available: ₦'.number_format($maxWithdraw, 2).($platformFee > 0 ? ' (includes ₦'.number_format($platformFee, 2).' withdrawal fee).' : '')])->withInput();
         }
 
         $rules = [
-            'amount' => 'required|numeric|min:1|max:' . max(0, $maxWithdraw),
+            'amount' => 'required|numeric|min:1|max:'.max(0, $maxPayout),
             'password' => 'required',
             'notes' => 'nullable|string|max:1000',
             'bank_narration' => 'nullable|string|max:255',
@@ -363,6 +372,7 @@ class WithdrawalController extends Controller
 
         $withdrawal = $business->withdrawalRequests()->create([
             'amount' => $validated['amount'],
+            'platform_fee' => $platformFee,
             'bank_name' => $bankName,
             'account_number' => $accountNumber,
             'account_name' => $accountName,

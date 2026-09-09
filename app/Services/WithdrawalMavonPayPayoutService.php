@@ -10,6 +10,7 @@ use App\Services\MevonPay\MevonPayLedgerRecorder;
 use App\Services\MevonPay\MevonPayPayoutService;
 use App\Services\Payout\BankPayoutNarration;
 use App\Services\Payout\MerchantPayoutMessageSanitizer;
+use App\Services\Payout\MerchantWithdrawalFeeService;
 use Illuminate\Support\Str;
 
 /**
@@ -29,6 +30,7 @@ class WithdrawalMavonPayPayoutService
         protected MavonPayTransferService $mavon,
         protected MevonPayPayoutService $payout,
         protected MevonPayLedgerRecorder $ledger,
+        protected MerchantWithdrawalFeeService $withdrawalFees,
     ) {}
 
     public function isMavonConfigured(): bool
@@ -194,12 +196,25 @@ class WithdrawalMavonPayPayoutService
                 'response_code' => $result['response_code'] ?? null,
                 'debit_source' => $debit['source'],
                 'debit_account_name' => $debit['debit_account_name'],
+                'platform_fee' => round((float) ($withdrawal->platform_fee ?? 0), 2),
             ],
         );
 
         if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
-            $business->decrement('balance', $withdrawal->amount);
+            $platformFee = round((float) ($withdrawal->platform_fee ?? 0), 2);
+            $totalDebit = round((float) $withdrawal->amount + $platformFee, 2);
+            $business->decrement('balance', $totalDebit);
         }
+    }
+
+    public function platformFeeForSource(?string $source): float
+    {
+        return $this->withdrawalFees->feeForSource($source);
+    }
+
+    public function maxPayoutAmount(Business $business, ?string $source): float
+    {
+        return $this->withdrawalFees->maxPayoutAmount((float) $business->getAvailableBalance(), $source);
     }
 
     /**

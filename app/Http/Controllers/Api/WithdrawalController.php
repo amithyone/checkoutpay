@@ -46,12 +46,17 @@ class WithdrawalController extends Controller
             ], 429);
         }
 
-        $maxWithdraw = $business->getAvailableBalance();
+        $maxWithdraw = $this->payout->maxPayoutAmount($business, WithdrawalRequestModel::SOURCE_PAYOUT_API);
         if ($request->amount > $maxWithdraw) {
+            $platformFee = $this->payout->platformFeeForSource(WithdrawalRequestModel::SOURCE_PAYOUT_API);
             return response()->json([
                 'success' => false,
-                'message' => 'Insufficient balance',
-                'available_balance' => (float) $maxWithdraw,
+                'message' => $platformFee > 0
+                    ? 'Insufficient balance (withdrawal amount plus platform fee).'
+                    : 'Insufficient balance',
+                'available_balance' => (float) $business->getAvailableBalance(),
+                'max_withdrawal_amount' => (float) $maxWithdraw,
+                'platform_fee' => (float) $platformFee,
             ], 400);
         }
 
@@ -82,9 +87,12 @@ class WithdrawalController extends Controller
             return response()->json($precheck, 422);
         }
 
+        $platformFee = $this->payout->platformFeeForSource(WithdrawalRequestModel::SOURCE_PAYOUT_API);
+
         $withdrawal = WithdrawalRequestModel::create([
             'business_id' => $business->id,
             'amount' => $request->amount,
+            'platform_fee' => $platformFee,
             'account_number' => $request->account_number,
             'account_name' => $request->account_name,
             'bank_name' => $request->bank_name,
@@ -190,6 +198,8 @@ class WithdrawalController extends Controller
             'data' => [
                 'balance' => (float) $business->balance,
                 'available_balance' => (float) $business->getAvailableBalance(),
+                'max_withdrawal_amount' => (float) $this->payout->maxPayoutAmount($business, WithdrawalRequestModel::SOURCE_PAYOUT_API),
+                'platform_fee' => (float) $this->payout->platformFeeForSource(WithdrawalRequestModel::SOURCE_PAYOUT_API),
                 'currency' => 'NGN',
             ],
         ]);
@@ -237,9 +247,14 @@ class WithdrawalController extends Controller
     /** @return array<string, mixed> */
     private function withdrawalPayload(WithdrawalRequestModel $withdrawal): array
     {
+        $amount = (float) $withdrawal->amount;
+        $platformFee = round((float) ($withdrawal->platform_fee ?? 0), 2);
+
         return [
             'id' => $withdrawal->id,
-            'amount' => (float) $withdrawal->amount,
+            'amount' => $amount,
+            'platform_fee' => $platformFee,
+            'total_debited' => round($amount + $platformFee, 2),
             'status' => $withdrawal->status,
             'source' => $withdrawal->source,
             'payout_status' => $withdrawal->payout_status,

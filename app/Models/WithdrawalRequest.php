@@ -28,6 +28,7 @@ class WithdrawalRequest extends Model
     protected $fillable = [
         'business_id',
         'amount',
+        'platform_fee',
         'account_number',
         'account_name',
         'bank_name',
@@ -51,6 +52,7 @@ class WithdrawalRequest extends Model
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'platform_fee' => 'decimal:2',
         'processed_at' => 'datetime',
         'payout_raw_response' => 'array',
         'payout_attempted_at' => 'datetime',
