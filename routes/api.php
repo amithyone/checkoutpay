@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\ConsumerVirtualCardController;
 use App\Http\Controllers\Api\ConsumerMoneyRequestController;
 use App\Http\Controllers\Api\ConsumerSaveTogetherController;
 use App\Http\Controllers\Api\ConsumerDeviceAuthController;
+use App\Http\Controllers\Api\ConsumerFaceController;
 use App\Http\Controllers\Api\ConsumerWalletApiController;
 use App\Http\Controllers\Api\ConsumerWalletAuthController;
 use App\Http\Controllers\Api\ConsumerWalletConversationController;
@@ -218,6 +219,19 @@ Route::prefix('v1')->group(function () {
         Route::post('transfers/p2p', [ConsumerWalletApiController::class, 'transferP2p']);
         Route::post('transfers/bank', [ConsumerWalletApiController::class, 'transferBank']);
         Route::post('transfers/fee-quote', [ConsumerWalletApiController::class, 'transferFeeQuote']);
+        Route::get('security/face', [ConsumerFaceController::class, 'status']);
+        Route::post('security/face/enroll', [ConsumerFaceController::class, 'enroll'])
+            ->middleware('throttle:10,1');
+        Route::post('security/face/verify', [ConsumerFaceController::class, 'verify'])
+            ->middleware('throttle:20,1');
+        Route::post('security/face/liveness/session', [ConsumerFaceController::class, 'livenessSession'])
+            ->middleware('throttle:20,1');
+        Route::post('security/face/liveness/video', [ConsumerFaceController::class, 'livenessVideo'])
+            ->middleware('throttle:20,1');
+        Route::get('transfer-beneficiaries', [ConsumerFaceController::class, 'listBeneficiaries']);
+        Route::post('transfer-beneficiaries', [ConsumerFaceController::class, 'storeBeneficiary']);
+        Route::delete('transfer-beneficiaries/{id}', [ConsumerFaceController::class, 'destroyBeneficiary'])
+            ->whereNumber('id');
         Route::get('banks', [ConsumerWalletApiController::class, 'banks']);
         Route::get('banks/name-enquiry', [ConsumerWalletApiController::class, 'bankNameEnquiry']);
         Route::get('vtu/networks', [ConsumerWalletApiController::class, 'vtuNetworks']);

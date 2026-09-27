@@ -28,6 +28,7 @@ use App\Services\Consumer\ConsumerWalletPinVerifier;
 use App\Services\Consumer\ConsumerWalletSavingsService;
 use App\Services\Consumer\ConsumerWalletStatementService;
 use App\Services\Consumer\ConsumerWalletTransactionStatusNormalizer;
+use App\Services\Consumer\WalletFaceCheckService;
 use App\Services\Credit\OverdraftEligibilityService;
 use App\Services\MevonPay\PrivateAccountProvisionService;
 use App\Services\MavonPayTransferService;
@@ -81,6 +82,7 @@ class ConsumerWalletApiController extends Controller
         private ConsumerPaymentAuthService $paymentAuth,
         private BroadcastSessionService $broadcastSessions,
         private ConsumerWalletTransactionStatusNormalizer $txStatusNormalizer,
+        private WalletFaceCheckService $faceCheck,
     ) {}
 
     private function vtu(): VtuProviderContract
@@ -229,6 +231,9 @@ class ConsumerWalletApiController extends Controller
                 'sender_name' => $wallet->normalizedSenderName(),
                 'needs_quick_setup' => $wallet->needsQuickWalletSetup(),
                 'is_pin_locked' => $wallet->isPinLocked(),
+                'face_enrolled' => $wallet->face_enrolled_at !== null,
+                'face_check_enabled' => $this->faceCheck->isEnabled(),
+                'face_threshold_ngn' => $this->faceCheck->amountThreshold(),
                 'mevon_virtual_account_number' => $isNg ? $wallet->mevon_virtual_account_number : null,
                 'mevon_bank_name' => $isNg ? $wallet->mevon_bank_name : null,
                 'mevon_bank_code' => $isNg ? $wallet->mevon_bank_code : null,
@@ -1124,6 +1129,7 @@ class ConsumerWalletApiController extends Controller
         $request->validate(array_merge([
             'to_phone' => 'required|string|min:10|max:20',
             'amount' => 'required|numeric|min:1',
+            'face_token' => 'nullable|string|max:128',
         ], $this->paymentAuth->validationRules()));
 
         $user = $request->user();
@@ -1133,6 +1139,17 @@ class ConsumerWalletApiController extends Controller
         }
 
         $wallet = $this->walletFor($request)->fresh();
+        if ($faceBlock = $this->faceCheck->rejectIfRequired(
+            $wallet,
+            $amount,
+            'p2p',
+            $request->filled('face_token') ? (string) $request->input('face_token') : null,
+            null,
+            null,
+            (string) $request->input('to_phone'),
+        )) {
+            return $faceBlock;
+        }
         if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
             return $authResponse;
         }
@@ -1205,9 +1222,18 @@ class ConsumerWalletApiController extends Controller
             ], 422);
         }
 
+        $faceMeta = $this->faceCheck->feeQuoteFaceMeta(
+            $wallet,
+            (float) $validated['amount'],
+            $kind,
+            isset($validated['account_number']) ? (string) $validated['account_number'] : null,
+            isset($validated['bank_code']) ? (string) $validated['bank_code'] : null,
+            isset($validated['to_phone']) ? (string) $validated['to_phone'] : null,
+        );
+
         return response()->json([
             'success' => true,
-            'data' => $result['data'],
+            'data' => array_merge($result['data'], $faceMeta),
         ]);
     }
 
@@ -1222,6 +1248,7 @@ class ConsumerWalletApiController extends Controller
             'remark' => 'nullable|string|max:255',
             'from_ledger' => 'nullable|string|in:personal,business',
             'idempotency_key' => 'nullable|uuid',
+            'face_token' => 'nullable|string|max:128',
         ], $this->paymentAuth->validationRules()));
 
         $user = $request->user();
@@ -1231,6 +1258,17 @@ class ConsumerWalletApiController extends Controller
         }
 
         $wallet = $this->walletFor($request)->fresh();
+        if ($faceBlock = $this->faceCheck->rejectIfRequired(
+            $wallet,
+            $amount,
+            'bank',
+            $request->filled('face_token') ? (string) $request->input('face_token') : null,
+            (string) $request->input('account_number'),
+            (string) $request->input('bank_code'),
+            null,
+        )) {
+            return $faceBlock;
+        }
         if ($authResponse = $this->authorizeWalletPaymentOrFail($request, $wallet)) {
             return $authResponse;
         }
