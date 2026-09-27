@@ -12,6 +12,8 @@ class BusinessAccountApplication extends Model
 
     public const PLAN_PAYMENTS_AND_WEB = 'payments_and_web';
 
+    public const STATUS_DRAFT = 'draft';
+
     public const STATUS_SUBMITTED = 'submitted';
 
     public const STATUS_UNDER_REVIEW = 'under_review';
@@ -58,6 +60,24 @@ class BusinessAccountApplication extends Model
         'approved_at',
         'password_set_at',
         'meta',
+        'cac_number',
+        'tin',
+        'registered_address',
+        'operating_address',
+        'actual_activity',
+        'sector',
+        'source_of_funds',
+        'source_of_wealth',
+        'expected_profile',
+        'kyb_status',
+        'memart_path',
+        'cac_status_report_path',
+        'licence_path',
+        'address_evidence_path',
+        'cac_status_confirmed_at',
+        'edd_required',
+        'edd_approved_at',
+        'daily_limit_ngn',
     ];
 
     protected $casts = [
@@ -68,6 +88,11 @@ class BusinessAccountApplication extends Model
         'approved_at' => 'datetime',
         'password_set_at' => 'datetime',
         'meta' => 'array',
+        'expected_profile' => 'array',
+        'cac_status_confirmed_at' => 'datetime',
+        'edd_required' => 'boolean',
+        'edd_approved_at' => 'datetime',
+        'daily_limit_ngn' => 'decimal:2',
     ];
 
     public function wallet(): BelongsTo
@@ -78,6 +103,11 @@ class BusinessAccountApplication extends Model
     public function linkedBusiness(): BelongsTo
     {
         return $this->belongsTo(Business::class, 'linked_business_id');
+    }
+
+    public function kycParties(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(BusinessKycParty::class, 'business_account_application_id');
     }
 
     public function feeTransaction(): BelongsTo
@@ -93,6 +123,7 @@ class BusinessAccountApplication extends Model
     public function isBlockingNewApplication(): bool
     {
         return in_array($this->status, [
+            self::STATUS_DRAFT,
             self::STATUS_SUBMITTED,
             self::STATUS_UNDER_REVIEW,
             self::STATUS_APPROVED,
@@ -106,6 +137,7 @@ class BusinessAccountApplication extends Model
     public static function defaultProgressForStatus(string $status): int
     {
         return match ($status) {
+            self::STATUS_DRAFT => 10,
             self::STATUS_SUBMITTED => 20,
             self::STATUS_UNDER_REVIEW => 50,
             self::STATUS_APPROVED => 75,
@@ -130,6 +162,7 @@ class BusinessAccountApplication extends Model
         }
 
         return match ($this->status) {
+            self::STATUS_DRAFT => 'Draft',
             self::STATUS_SUBMITTED => 'Submitted',
             self::STATUS_UNDER_REVIEW => 'Under review',
             self::STATUS_APPROVED => 'Approved',

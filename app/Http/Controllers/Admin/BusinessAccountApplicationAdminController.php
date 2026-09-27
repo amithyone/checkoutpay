@@ -83,6 +83,15 @@ class BusinessAccountApplicationAdminController extends Controller
         return Storage::disk('local')->response($path);
     }
 
+    public function confirmCac(BusinessAccountApplication $application): RedirectResponse
+    {
+        app(\App\Services\Consumer\BusinessKybComplianceService::class)->confirmCacActive($application);
+
+        return redirect()
+            ->route('admin.business-account-applications.show', $application)
+            ->with('success', 'CAC status marked active.');
+    }
+
     public function updateStatus(Request $request, BusinessAccountApplication $application): RedirectResponse
     {
         $validated = $request->validate([

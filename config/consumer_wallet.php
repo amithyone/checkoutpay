@@ -106,6 +106,15 @@ return [
      */
     'kenya_tier2_enabled' => filter_var(env('CONSUMER_KENYA_TIER2_ENABLED', false), FILTER_VALIDATE_BOOL),
 
+    /** Mevon/Rubies fail-closed KYC/KYB on consumer API (NG). */
+    'kyc_fail_closed' => filter_var(env('CONSUMER_KYC_FAIL_CLOSED', false), FILTER_VALIDATE_BOOL),
+    'kyc_tier1_daily_limit' => (float) env('CONSUMER_KYC_TIER1_DAILY_LIMIT', 50000),
+    'kyc_tier2_daily_limit' => (float) env('CONSUMER_KYC_TIER2_DAILY_LIMIT', 200000),
+    'kyc_tier3_daily_limit' => (float) env('CONSUMER_KYC_TIER3_DAILY_LIMIT', 1000000),
+    'kyc_tier1_max_balance' => (float) env('CONSUMER_KYC_TIER1_MAX_BALANCE', 50000),
+    'kyc_tier2_max_balance' => (float) env('CONSUMER_KYC_TIER2_MAX_BALANCE', 200000),
+    'kyc_tier3_max_balance' => (float) env('CONSUMER_KYC_TIER3_MAX_BALANCE', 1000000),
+
     /** P2P money requests (ask someone to pay you). */
     'money_request_enabled' => filter_var(env('CONSUMER_MONEY_REQUEST_ENABLED', true), FILTER_VALIDATE_BOOL),
     'money_request_expiry_days' => (int) env('CONSUMER_MONEY_REQUEST_EXPIRY_DAYS', 7),

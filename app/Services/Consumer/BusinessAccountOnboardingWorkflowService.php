@@ -72,6 +72,17 @@ final class BusinessAccountOnboardingWorkflowService
      */
     private function approve(BusinessAccountApplication $application, array $options = []): array
     {
+        $kyb = app(BusinessKybComplianceService::class);
+        if ($kyb->failClosedEnabled()) {
+            $application->load('kycParties.children');
+            if (! $kyb->isReadyToApprove($application)) {
+                return [
+                    'ok' => false,
+                    'message' => 'KYB is incomplete. Confirm CAC status, UBOs, and required parties before approval.',
+                ];
+            }
+        }
+
         if (Business::query()->where('email', $application->email)->exists()) {
             return ['ok' => false, 'message' => 'A business with this email already exists.'];
         }
@@ -130,12 +141,18 @@ final class BusinessAccountOnboardingWorkflowService
 
                 $this->businessLedger->syncBalanceFromLinkedBusiness($wallet, $business);
 
+                app(BusinessKybComplianceService::class)->mapEvidenceToBusiness($row->fresh(['kycParties']), $business);
+                $row->kyb_status = 'verified';
+                $row->daily_limit_ngn = $row->daily_limit_ngn ?: BusinessKybComplianceService::STANDARD_DAILY_LIMIT;
+
                 $row->update([
                     'linked_business_id' => $business->id,
                     'status' => BusinessAccountApplication::STATUS_AWAITING_PASSWORD,
                     'progress_percent' => BusinessAccountApplication::defaultProgressForStatus(BusinessAccountApplication::STATUS_AWAITING_PASSWORD),
                     'status_label' => $options['status_label'] ?? null,
                     'approved_at' => now(),
+                    'kyb_status' => 'verified',
+                    'daily_limit_ngn' => $row->daily_limit_ngn ?: BusinessKybComplianceService::STANDARD_DAILY_LIMIT,
                 ]);
 
                 $wallet->update(['active_business_account_application_id' => $row->id]);

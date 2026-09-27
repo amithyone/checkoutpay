@@ -264,6 +264,10 @@ class AdminSidebarMenu
                 $this->link('External APIs', 'admin.external-apis.index', 'fas fa-plug', ['admin.external-apis.*']),
                 ['visible' => $admin->canManageAccountNumbers()]
             ),
+            'partner_licenses' => array_merge(
+                $this->link('Partner licenses', 'admin.partner-licenses.index', 'fas fa-key text-indigo-600', ['admin.partner-licenses.*']),
+                ['visible' => $admin->isSuperAdmin()]
+            ),
             'processed_emails' => $this->link('Inbox', 'admin.processed-emails.index', 'fas fa-inbox', ['admin.processed-emails.*']),
             'transaction_logs' => $this->link('Transaction Logs', 'admin.transaction-logs.index', 'fas fa-history', ['admin.transaction-logs.*']),
             'api_hits' => $this->link('API hits', 'admin.api-hits.index', 'fas fa-network-wired', ['admin.api-hits.*']),

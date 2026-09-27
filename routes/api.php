@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\ConsumerBusinessOverdraftController;
 use App\Http\Controllers\Api\ConsumerCreditFacilityController;
 use App\Http\Controllers\Api\ConsumerBusinessNameRegistrationController;
 use App\Http\Controllers\Api\ConsumerBusinessAccountOnboardingController;
+use App\Http\Controllers\Api\ConsumerKycController;
 use App\Http\Controllers\Api\ConsumerSupportController;
 use App\Http\Controllers\Api\ConsumerChatController;
 use App\Http\Controllers\Api\PublicSupportController;
@@ -56,12 +57,14 @@ Route::prefix('v1')->middleware([
 
     // Withdrawal / payout routes (require API key; POST /withdrawal and GET /banks need payout_api_enabled)
     Route::post('/withdrawal', [\App\Http\Controllers\Api\WithdrawalController::class, 'store'])
-        ->middleware('throttle:merchant_payout');
+        ->middleware(['throttle:merchant_payout', 'partner.license']);
     Route::get('/withdrawals', [\App\Http\Controllers\Api\WithdrawalController::class, 'index']);
-    Route::get('/balance', [\App\Http\Controllers\Api\WithdrawalController::class, 'balance']);
-    Route::get('/banks', [\App\Http\Controllers\Api\WithdrawalController::class, 'banks']);
+    Route::get('/balance', [\App\Http\Controllers\Api\WithdrawalController::class, 'balance'])
+        ->middleware('partner.license');
+    Route::get('/banks', [\App\Http\Controllers\Api\WithdrawalController::class, 'banks'])
+        ->middleware('partner.license');
     Route::post('/validate-account', [\App\Http\Controllers\Api\WithdrawalController::class, 'validateAccount'])
-        ->middleware('throttle:merchant_payout');
+        ->middleware(['throttle:merchant_payout', 'partner.license']);
 
     Route::middleware('throttle:30,1')->group(function () {
         Route::post('/whatsapp-wallet/lookup', [WhatsappWalletApiController::class, 'lookup']);
@@ -76,6 +79,9 @@ Route::prefix('v1')->middleware([
 Route::prefix('v1')->group(function () {
     // GET /api/v1 — JSON status; webhook_base_url from WHATSAPP_APP_URL or APP_URL (see config/whatsapp.php)
     Route::get('/', V1StatusController::class)->name('api.v1.status');
+
+    Route::post('partner-license/ping', [\App\Http\Controllers\Api\PartnerLicenseController::class, 'ping'])
+        ->middleware('throttle:30,1');
 
     /**
      * Checkout Broadcast verify API (CheckoutNow + merchant POS).
@@ -130,7 +136,7 @@ Route::prefix('v1')->group(function () {
             ->middleware('throttle:support-write');
     });
 
-    Route::prefix('consumer')->middleware('throttle:consumer_wallet_otp')->group(function () {
+    Route::prefix('consumer')->middleware(['throttle:consumer_wallet_otp', 'partner.license'])->group(function () {
         Route::get('referrals/rules', [\App\Http\Controllers\Api\ConsumerReferralController::class, 'rules']);
         Route::post('auth/otp/options', [ConsumerWalletAuthController::class, 'otpOptions']);
         Route::post('auth/otp/request', [ConsumerWalletAuthController::class, 'requestOtp']);
@@ -163,7 +169,7 @@ Route::prefix('v1')->group(function () {
             ->middleware('throttle:60,1');
     });
 
-    Route::prefix('consumer')->middleware(['auth:sanctum', 'touch.consumer.app.session', 'throttle:consumer_wallet'])->group(function () {
+    Route::prefix('consumer')->middleware(['auth:sanctum', 'touch.consumer.app.session', 'throttle:consumer_wallet', 'partner.license'])->group(function () {
         Route::post('auth/logout', [ConsumerWalletAuthController::class, 'logout']);
         Route::post('auth/session/end', [ConsumerWalletAuthController::class, 'endAppSession']);
         Route::post('auth/passkey/register/options', [ConsumerDeviceAuthController::class, 'passkeyRegisterOptions']);
@@ -238,6 +244,12 @@ Route::prefix('v1')->group(function () {
         Route::post('cards/details', [ConsumerVirtualCardController::class, 'details']);
         Route::get('cards', [ConsumerVirtualCardController::class, 'index']);
         Route::get('cards/transactions', [ConsumerVirtualCardController::class, 'transactions']);
+        Route::get('kyc', [ConsumerKycController::class, 'show']);
+        Route::post('kyc/email/request', [ConsumerKycController::class, 'requestEmail']);
+        Route::post('kyc/email/verify', [ConsumerKycController::class, 'verifyEmail']);
+        Route::post('kyc/identity', [ConsumerKycController::class, 'identity']);
+        Route::post('kyc/id-document', [ConsumerKycController::class, 'idDocument']);
+        Route::post('kyc/address', [ConsumerKycController::class, 'address']);
         Route::get('kyc/tier2', [ConsumerWalletApiController::class, 'kycTier2Status']);
         Route::post('kyc/tier2/personal', [ConsumerWalletApiController::class, 'kycTier2Personal']);
         Route::post('kyc/tier2/business', [ConsumerWalletApiController::class, 'kycTier2Business']);
@@ -246,6 +258,12 @@ Route::prefix('v1')->group(function () {
         Route::get('business-account/onboarding', [ConsumerBusinessAccountOnboardingController::class, 'index']);
         Route::post('business-account/onboarding', [ConsumerBusinessAccountOnboardingController::class, 'store']);
         Route::post('business-account/onboarding/password', [ConsumerBusinessAccountOnboardingController::class, 'setPassword']);
+        Route::post('business-account/onboarding/documents', [ConsumerBusinessAccountOnboardingController::class, 'storeDocument']);
+        Route::post('business-account/onboarding/parties', [ConsumerBusinessAccountOnboardingController::class, 'storeParty']);
+        Route::patch('business-account/onboarding/parties/{id}', [ConsumerBusinessAccountOnboardingController::class, 'updateParty']);
+        Route::delete('business-account/onboarding/parties/{id}', [ConsumerBusinessAccountOnboardingController::class, 'destroyParty']);
+        Route::post('business-account/onboarding/parties/{id}/documents', [ConsumerBusinessAccountOnboardingController::class, 'storePartyDocument']);
+        Route::post('business-account/onboarding/submit', [ConsumerBusinessAccountOnboardingController::class, 'submitForReview']);
         Route::get('business/overdraft', [ConsumerBusinessOverdraftController::class, 'show']);
         Route::post('business/overdraft/apply', [ConsumerBusinessOverdraftController::class, 'apply']);
         Route::post('wallet/credit-facility/request', [ConsumerCreditFacilityController::class, 'request']);

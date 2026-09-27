@@ -85,6 +85,13 @@ class Kernel extends ConsoleKernel
                 ->cron("*/{$minutes} * * * *")
                 ->withoutOverlapping(10);
         }
+
+        if ((bool) config('partner_license.enforced', false)) {
+            $schedule->command('partner:license-ping')
+                ->dailyAt('04:15')
+                ->timezone('Africa/Lagos')
+                ->withoutOverlapping(30);
+        }
     }
 
     /**

@@ -1,0 +1,33 @@
+{
+    "encode_directories": [
+        "app/Http/Controllers",
+        "app/Http/Middleware",
+        "app/Services",
+        "app/Jobs",
+        "app/Console/Commands",
+        "app/Models",
+        "app/Providers",
+        "app/Support",
+        "app/Exceptions",
+        "app/Listeners",
+        "app/Notifications"
+    ],
+    "exclude_files": [
+        "app/Console/Commands/PartnerLicensePingCommand.php",
+        "app/Console/Commands/PartnerVerifyBuildCommand.php"
+    ],
+    "readable_command_sources": [
+        "app/Console/Commands/PartnerLicensePingCommand.php",
+        "app/Console/Commands/PartnerVerifyBuildCommand.php"
+    ],
+    "always_readable_paths": [
+        "config",
+        "routes",
+        "resources/views",
+        "database/migrations",
+        "public",
+        "scripts/partner-build",
+        "partner-build-manifest.json",
+        "PARTNER.md"
+    ]
+}

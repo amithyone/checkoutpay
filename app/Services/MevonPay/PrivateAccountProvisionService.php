@@ -384,7 +384,7 @@ final class PrivateAccountProvisionService
         $bvn = preg_replace('/\D+/', '', (string) ($input['bvn'] ?? $wallet->kyc_bvn ?? '')) ?? '';
         $nin = preg_replace('/\D+/', '', (string) ($input['nin'] ?? $wallet->kyc_nin ?? '')) ?? '';
         $useBvn = strlen($bvn) === 11;
-        $useNin = ! $useBvn && strlen($nin) === 11;
+        $useNin = strlen($nin) === 11;
 
         $fname = trim((string) ($input['fname'] ?? $wallet->kyc_fname ?? ''));
         $lname = trim((string) ($input['lname'] ?? $wallet->kyc_lname ?? ''));
@@ -398,8 +398,8 @@ final class PrivateAccountProvisionService
             'kyc_lname' => $lname !== '' ? $lname : null,
             'kyc_gender' => in_array($gender, ['male', 'female'], true) ? $gender : null,
             'kyc_dob' => $dob !== '' ? $dob : null,
-            'kyc_bvn' => $useBvn ? $bvn : null,
-            'kyc_nin' => $useNin ? $nin : null,
+            'kyc_bvn' => $useBvn ? $bvn : $wallet->kyc_bvn,
+            'kyc_nin' => $useNin ? $nin : $wallet->kyc_nin,
             'kyc_email' => $email !== '' ? $email : null,
             'kyc_verified_at' => now(),
             'rubies_account_type' => 'personal',

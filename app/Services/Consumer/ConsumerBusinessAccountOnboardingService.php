@@ -18,6 +18,9 @@ use Illuminate\Support\Str;
 
 final class ConsumerBusinessAccountOnboardingService
 {
+    public function __construct(
+        private BusinessKybComplianceService $kyb,
+    ) {}
     /**
      * @return array<string, mixed>
      */
@@ -68,6 +71,7 @@ final class ConsumerBusinessAccountOnboardingService
         $wallet = $wallet->fresh(['linkedBusiness']);
         $applications = BusinessAccountApplication::query()
             ->where('whatsapp_wallet_id', $wallet->id)
+            ->with('kycParties')
             ->orderByDesc('id')
             ->get()
             ->map(fn (BusinessAccountApplication $row) => $this->serializeApplication($row))
@@ -77,6 +81,7 @@ final class ConsumerBusinessAccountOnboardingService
         $active = collect($applications)->first(fn (array $row) => in_array(
             $row['status'] ?? '',
             [
+                BusinessAccountApplication::STATUS_DRAFT,
                 BusinessAccountApplication::STATUS_SUBMITTED,
                 BusinessAccountApplication::STATUS_UNDER_REVIEW,
                 BusinessAccountApplication::STATUS_APPROVED,
@@ -113,7 +118,7 @@ final class ConsumerBusinessAccountOnboardingService
             ];
         }
 
-        if (! $this->canApply($wallet)) {
+        if (! $this->canApply($wallet) && ! $this->editableDraft($wallet)) {
             if ($wallet->linked_business_id) {
                 return ['ok' => false, 'message' => 'This wallet already has a linked business account.', 'http_status' => 422];
             }
@@ -143,6 +148,9 @@ final class ConsumerBusinessAccountOnboardingService
         }
         if ($address === '') {
             return ['ok' => false, 'message' => 'Business address is required.', 'http_status' => 422];
+        }
+        if ($this->kyb->failClosedEnabled() && ! $cacDocument instanceof UploadedFile && $this->editableDraft($wallet) === null) {
+            return ['ok' => false, 'message' => 'CAC certificate is required.', 'error_code' => 'kyb_incomplete', 'http_status' => 422];
         }
         if ($plan === BusinessAccountApplication::PLAN_PAYMENTS_AND_WEB && $websiteUrl === '') {
             return ['ok' => false, 'message' => 'Website URL is required for web service plans.', 'http_status' => 422];
@@ -178,6 +186,7 @@ final class ConsumerBusinessAccountOnboardingService
                 $publicId,
                 $cacDocument,
                 $clientIp,
+                $input,
                 &$cacPath,
                 &$application,
             ) {
@@ -192,6 +201,38 @@ final class ConsumerBusinessAccountOnboardingService
                     if (! ($check['ok'] ?? false)) {
                         throw new \RuntimeException('insufficient_balance');
                     }
+                }
+
+                $failClosed = $this->kyb->failClosedEnabled();
+                $draft = BusinessAccountApplication::query()
+                    ->where('whatsapp_wallet_id', $w->id)
+                    ->where('status', BusinessAccountApplication::STATUS_DRAFT)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($draft) {
+                    $draft->fill([
+                        'account_plan' => $plan,
+                        'service_categories' => $categories,
+                        'business_name' => $businessName,
+                        'email' => $email,
+                        'phone' => $phone !== '' ? $phone : null,
+                        'address' => $address,
+                        'website_url' => $websiteUrl !== '' ? $websiteUrl : null,
+                    ]);
+                    $this->kyb->applyCoreFields($draft, $input);
+                    if ($cacDocument instanceof UploadedFile) {
+                        $cacPath = $cacDocument->store(
+                            'business-account-applications/'.$w->id.'/'.$draft->id,
+                            'local'
+                        );
+                        $draft->cac_document_path = $cacPath;
+                        $draft->save();
+                    }
+                    $application = $draft->fresh();
+                    $w->update(['active_business_account_application_id' => $application->id]);
+
+                    return;
                 }
 
                 if (BusinessAccountApplication::query()
@@ -248,14 +289,19 @@ final class ConsumerBusinessAccountOnboardingService
                     'address' => $address,
                     'website_url' => $websiteUrl !== '' ? $websiteUrl : null,
                     'cac_document_path' => '',
-                    'status' => BusinessAccountApplication::STATUS_SUBMITTED,
-                    'progress_percent' => BusinessAccountApplication::defaultProgressForStatus(BusinessAccountApplication::STATUS_SUBMITTED),
+                    'status' => $failClosed ? BusinessAccountApplication::STATUS_DRAFT : BusinessAccountApplication::STATUS_SUBMITTED,
+                    'progress_percent' => BusinessAccountApplication::defaultProgressForStatus(
+                        $failClosed ? BusinessAccountApplication::STATUS_DRAFT : BusinessAccountApplication::STATUS_SUBMITTED
+                    ),
                     'fee_amount' => $fee,
                     'fee_currency' => $currency,
                     'fee_transaction_id' => $txnId,
-                    'submitted_at' => now(),
+                    'submitted_at' => $failClosed ? null : now(),
+                    'kyb_status' => 'incomplete',
                     'meta' => $clientIp !== '' ? ['registration_ip' => $clientIp] : null,
                 ]);
+
+                $this->kyb->applyCoreFields($application, $input);
 
                 if ($cacDocument instanceof UploadedFile) {
                     $cacPath = $cacDocument->store(
@@ -288,10 +334,12 @@ final class ConsumerBusinessAccountOnboardingService
         }
 
         /** @var BusinessAccountApplication $application */
+        $application = $application->fresh(['kycParties']);
+
         return [
             'ok' => true,
-            'message' => 'Application submitted.',
-            'data' => $this->serializeApplication($application->fresh()),
+            'message' => $this->kyb->failClosedEnabled() ? 'Application saved.' : 'Application submitted.',
+            'data' => $this->serializeApplication($application),
         ];
     }
 
@@ -357,6 +405,7 @@ final class ConsumerBusinessAccountOnboardingService
         return ! BusinessAccountApplication::query()
             ->where('whatsapp_wallet_id', $wallet->id)
             ->whereIn('status', [
+                BusinessAccountApplication::STATUS_DRAFT,
                 BusinessAccountApplication::STATUS_SUBMITTED,
                 BusinessAccountApplication::STATUS_UNDER_REVIEW,
                 BusinessAccountApplication::STATUS_APPROVED,
@@ -392,6 +441,13 @@ final class ConsumerBusinessAccountOnboardingService
             'fee_currency' => $row->fee_currency,
             'linked_business_id' => $row->linked_business_id,
             'dashboard_login_url' => $this->dashboardLoginUrl(),
+            'kyb' => $this->kyb->kybPayload($row->relationLoaded('kycParties') ? $row : $row->load('kycParties')),
+            'cac_number' => $row->cac_number,
+            'tin' => $row->tin,
+            'registered_address' => $row->registered_address,
+            'operating_address' => $row->operating_address,
+            'actual_activity' => $row->actual_activity,
+            'sector' => $row->sector,
         ];
     }
 
@@ -466,6 +522,30 @@ final class ConsumerBusinessAccountOnboardingService
         }
 
         return $normalized;
+    }
+
+    public function editableDraft(WhatsappWallet $wallet): ?BusinessAccountApplication
+    {
+        return BusinessAccountApplication::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->where('status', BusinessAccountApplication::STATUS_DRAFT)
+            ->first();
+    }
+
+    public function currentApplication(WhatsappWallet $wallet): ?BusinessAccountApplication
+    {
+        return BusinessAccountApplication::query()
+            ->where('whatsapp_wallet_id', $wallet->id)
+            ->whereIn('status', [
+                BusinessAccountApplication::STATUS_DRAFT,
+                BusinessAccountApplication::STATUS_SUBMITTED,
+                BusinessAccountApplication::STATUS_UNDER_REVIEW,
+                BusinessAccountApplication::STATUS_APPROVED,
+                BusinessAccountApplication::STATUS_AWAITING_PASSWORD,
+            ])
+            ->with('kycParties')
+            ->orderByDesc('id')
+            ->first();
     }
 
     private function nextReference(): string

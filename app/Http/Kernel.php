@@ -84,6 +84,7 @@ class Kernel extends HttpKernel
         'cron.token' => \App\Http\Middleware\VerifyCronToken::class,
         'ops.monitor' => \App\Http\Middleware\VerifyOpsMonitorKey::class,
         'api.key' => \App\Http\Middleware\AuthenticateApiKey::class,
+        'partner.license' => \App\Http\Middleware\EnsurePartnerLicenseValid::class,
         'setup.allowed' => \App\Http\Middleware\EnsureSetupNotComplete::class,
     ];
 }

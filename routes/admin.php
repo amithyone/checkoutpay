@@ -32,6 +32,7 @@ use App\Http\Controllers\Admin\WhatsappWalletTransactionAdminController;
 use App\Http\Controllers\Admin\WhatsappWalletMoneyRequestAdminController;
 use App\Http\Controllers\Admin\WhatsappSaveTogetherAdminController;
 use App\Http\Controllers\Admin\HoneypotAdminController;
+use App\Http\Controllers\Admin\PartnerLicenseAdminController;
 use App\Http\Controllers\Admin\WithdrawalController;
 use Illuminate\Support\Facades\Route;
 
@@ -90,6 +91,12 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
             Route::get('external-apis/mevonpay/webhook-sources', [ExternalApiController::class, 'mevonpayWebhookSources'])
                 ->middleware('super_admin')
                 ->name('external-apis.mevonpay-webhook-sources');
+
+            Route::middleware('super_admin')->group(function () {
+                Route::get('partner-licenses', [PartnerLicenseAdminController::class, 'index'])->name('partner-licenses.index');
+                Route::post('partner-licenses', [PartnerLicenseAdminController::class, 'store'])->name('partner-licenses.store');
+                Route::delete('partner-licenses/{partnerLicense}', [PartnerLicenseAdminController::class, 'revoke'])->name('partner-licenses.revoke');
+            });
         });
 
         // Businesses
@@ -396,7 +403,8 @@ Route::prefix(\App\Support\AdminPath::prefix())->name('admin.')->group(function 
 
             Route::get('business-account-applications', [BusinessAccountApplicationAdminController::class, 'index'])->name('business-account-applications.index');
             Route::get('business-account-applications/{application}', [BusinessAccountApplicationAdminController::class, 'show'])->name('business-account-applications.show');
-            Route::get('business-account-applications/{application}/cac-document', [BusinessAccountApplicationAdminController::class, 'cacDocument'])->name('business-account-applications.cac-document');
+            Route::post('business-account-applications/{application}/confirm-cac', [BusinessAccountApplicationAdminController::class, 'confirmCac'])
+                ->name('business-account-applications.confirm-cac');
 
             Route::get('app-sessions', [ConsumerAppSessionAdminController::class, 'index'])->name('app-sessions.index');
             Route::get('app-sessions/events', [ConsumerAppSessionAdminController::class, 'events'])->name('app-sessions.events');

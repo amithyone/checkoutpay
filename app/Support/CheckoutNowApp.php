@@ -46,7 +46,9 @@ final class CheckoutNowApp
 
     public static function brandName(): string
     {
-        return 'CheckoutNow';
+        $name = trim((string) config('brand.app_name', ''));
+
+        return $name !== '' ? $name : 'CheckoutNow';
     }
 
     /**

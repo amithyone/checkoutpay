@@ -145,6 +145,12 @@ return [
             'route_patterns' => ['admin.external-apis.*'],
             'default_roles' => ['super_admin', 'admin'],
         ],
+        'partner_licenses' => [
+            'label' => 'Partner licenses',
+            'group' => 'System',
+            'route_patterns' => ['admin.partner-licenses.*'],
+            'default_roles' => ['super_admin'],
+        ],
         'processed_emails' => [
             'label' => 'Inbox',
             'group' => 'System',

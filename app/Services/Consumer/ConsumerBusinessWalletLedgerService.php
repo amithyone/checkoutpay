@@ -212,6 +212,11 @@ final class ConsumerBusinessWalletLedgerService
             return ['ok' => false, 'message' => 'Invalid amount.'];
         }
 
+        $guard = $wallet->canDebitBusiness($amount);
+        if (! ($guard['ok'] ?? false)) {
+            return $guard;
+        }
+
         if ($this->usesLinkedMerchantBalance($wallet)) {
             return $this->debitLinkedBusinessLocked($wallet, $amount);
         }
@@ -355,6 +360,9 @@ final class ConsumerBusinessWalletLedgerService
         $business->save();
 
         $wallet->business_balance = $newBal;
+        $wallet->resetDailyBusinessTransferIfNeeded();
+        $wallet->daily_business_transfer_total = round((float) $wallet->daily_business_transfer_total + $amount, 2);
+        $wallet->daily_business_transfer_for_date = now()->toDateString();
 
         return ['ok' => true, 'balance_after' => $newBal];
     }
@@ -393,6 +401,9 @@ final class ConsumerBusinessWalletLedgerService
 
         $newBal = round((float) $wallet->business_balance - $amount, 2);
         $wallet->business_balance = $newBal;
+        $wallet->resetDailyBusinessTransferIfNeeded();
+        $wallet->daily_business_transfer_total = round((float) $wallet->daily_business_transfer_total + $amount, 2);
+        $wallet->daily_business_transfer_for_date = now()->toDateString();
 
         return ['ok' => true, 'balance_after' => $newBal];
     }

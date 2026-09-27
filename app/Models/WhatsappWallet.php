@@ -18,6 +18,14 @@ class WhatsappWallet extends Model
 
     public const TIER_RUBIES_VA = 2;
 
+    public const KYC_STATUS_INCOMPLETE = 'incomplete';
+
+    public const KYC_STATUS_REVIEW = 'review';
+
+    public const KYC_STATUS_RESTRICTED = 'restricted';
+
+    public const KYC_STATUS_VERIFIED = 'verified';
+
     protected $fillable = [
         'phone_e164',
         'pay_code',
@@ -79,6 +87,30 @@ class WhatsappWallet extends Model
         'support_whatsapp_welcome_sent_at',
         'referral_launch_notified_at',
         'wallet_signup_notified_at',
+        'kyc_status',
+        'kyc_tier',
+        'kyc_nationality',
+        'kyc_occupation',
+        'kyc_employer',
+        'kyc_purpose_of_account',
+        'kyc_source_of_funds',
+        'kyc_residential_address',
+        'kyc_expected_profile',
+        'kyc_id_document_type',
+        'kyc_id_document_path',
+        'kyc_id_document_status',
+        'kyc_id_verified_at',
+        'kyc_address_evidence_path',
+        'kyc_address_status',
+        'kyc_address_verified_at',
+        'kyc_email_verified_at',
+        'kyc_bvn_verified_at',
+        'kyc_nin_verified_at',
+        'kyc_mevon_full_name',
+        'kyc_identity_reference',
+        'kyc_identity_snapshot',
+        'daily_business_transfer_total',
+        'daily_business_transfer_for_date',
     ];
 
     protected $casts = [
@@ -109,6 +141,17 @@ class WhatsappWallet extends Model
         'referral_launch_notified_at' => 'datetime',
         'wallet_signup_notified_at' => 'datetime',
         'locked_down_at' => 'datetime',
+        'kyc_tier' => 'integer',
+        'kyc_residential_address' => 'array',
+        'kyc_expected_profile' => 'array',
+        'kyc_identity_snapshot' => 'array',
+        'kyc_id_verified_at' => 'datetime',
+        'kyc_address_verified_at' => 'datetime',
+        'kyc_email_verified_at' => 'datetime',
+        'kyc_bvn_verified_at' => 'datetime',
+        'kyc_nin_verified_at' => 'datetime',
+        'daily_business_transfer_total' => 'decimal:2',
+        'daily_business_transfer_for_date' => 'date',
     ];
 
     public static function findByPhoneE164(string $e164): ?self
@@ -243,12 +286,44 @@ class WhatsappWallet extends Model
             return ['ok' => false, 'message' => 'Insufficient business balance.'];
         }
 
+        if (app(\App\Services\Consumer\WalletKycComplianceService::class)->failClosedEnabled()) {
+            $this->resetDailyBusinessTransferIfNeeded();
+            $cap = app(\App\Services\Consumer\BusinessKybComplianceService::class)->dailyLimitForWallet($this);
+            if ($cap <= 0) {
+                return ['ok' => false, 'message' => 'Business KYB is incomplete. Transfers are restricted.', 'error_code' => 'kyb_incomplete'];
+            }
+            if ((float) $this->daily_business_transfer_total + $amount > $cap + 0.0001) {
+                return [
+                    'ok' => false,
+                    'message' => 'Business daily limit is ₦'.number_format($cap, 2).'.',
+                    'error_code' => 'kyc_tier_blocked',
+                ];
+            }
+        }
+
         return ['ok' => true];
+    }
+
+    public function resetDailyBusinessTransferIfNeeded(): void
+    {
+        $today = Carbon::today()->toDateString();
+        $for = $this->daily_business_transfer_for_date;
+        $forStr = $for instanceof Carbon ? $for->toDateString() : (string) $for;
+        if ($forStr !== $today) {
+            $this->daily_business_transfer_total = 0;
+            $this->daily_business_transfer_for_date = $today;
+            $this->save();
+        }
     }
 
     public function consumerApiAccount(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(ConsumerWalletApiAccount::class, 'whatsapp_wallet_id');
+    }
+
+    public function kycAuditEvents(): HasMany
+    {
+        return $this->hasMany(KycAuditEvent::class, 'whatsapp_wallet_id');
     }
 
     public function inactiveReminders(): HasMany
@@ -616,7 +691,13 @@ class WhatsappWallet extends Model
             return ['ok' => false, 'message' => 'Invalid amount.'];
         }
 
-        if ((int) $this->tier === self::TIER_WHATSAPP_ONLY) {
+        $kyc = app(\App\Services\Consumer\WalletKycComplianceService::class)->assertCanCredit($this, $amount);
+        if (! ($kyc['ok'] ?? false)) {
+            return $kyc;
+        }
+
+        if (! app(\App\Services\Consumer\WalletKycComplianceService::class)->appliesTo($this)
+            && (int) $this->tier === self::TIER_WHATSAPP_ONLY) {
             $newBal = (float) $this->balance + $amount;
             if ($newBal > $this->tier1MaxBalance() + 0.0001) {
                 return [
@@ -643,7 +724,12 @@ class WhatsappWallet extends Model
             return ['ok' => false, 'message' => 'Insufficient balance.'];
         }
 
-        if ($this->isTier1()) {
+        $kyc = app(\App\Services\Consumer\WalletKycComplianceService::class)->assertCanDebit($this, $amount);
+        if (! ($kyc['ok'] ?? false)) {
+            return $kyc;
+        }
+
+        if (! app(\App\Services\Consumer\WalletKycComplianceService::class)->appliesTo($this) && $this->isTier1()) {
             $this->resetDailyTransferIfNeeded();
             if ($this->daily_transfer_total + $amount > $this->tier1DailyOutLimit() + 0.0001) {
                 $remaining = max(0.0, $this->tier1DailyOutLimit() - (float) $this->daily_transfer_total);

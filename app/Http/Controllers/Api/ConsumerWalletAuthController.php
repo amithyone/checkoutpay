@@ -228,7 +228,9 @@ class ConsumerWalletAuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => $result['message'],
-            ], 422);
+                'error_code' => $result['error_code'] ?? null,
+                'data' => isset($result['kyc']) ? ['kyc' => $result['kyc']] : null,
+            ], (int) ($result['http_status'] ?? 422));
         }
 
         $account = ConsumerWalletApiAccount::query()->where('phone_e164', $result['phone_e164'])->first();
@@ -263,6 +265,8 @@ class ConsumerWalletAuthController extends Controller
                 'wallet_id' => $result['wallet_id'],
                 'app_session_id' => $appSessionId,
                 'region' => $regions->forPhone((string) ($result['phone_e164'] ?? $request->input('phone'))),
+                'kyc' => $result['kyc'] ?? null,
+                'error_code' => $result['error_code'] ?? null,
             ], fn ($v) => $v !== null),
         ]);
     }

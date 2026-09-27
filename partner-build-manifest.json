@@ -1,0 +1,8 @@
+{
+    "product": "checkoutpay-partner",
+    "version": "0.0.0-dev",
+    "build_id": "plaintext-development",
+    "requires_ioncube": false,
+    "generated_at": null,
+    "checksums": {}
+}

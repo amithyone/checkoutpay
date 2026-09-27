@@ -78,12 +78,67 @@ class MevonIdentityVerificationService
             ];
         }
 
+        $providerDob = $this->normalizeDob((string) ($result['dob'] ?? ''));
+        if ($providerDob === null) {
+            $providerDob = $this->dobFromRaw($result['raw'] ?? []);
+        }
+        if ($providerDob !== null && $providerDob !== $dobYmd) {
+            return [
+                'ok' => false,
+                'message' => 'Date of birth mismatch: submitted "'.$dobYmd.'" does not match identity record "'.$providerDob.'".',
+                'full_name' => $providerName,
+                'reference' => (string) ($result['reference'] ?? ''),
+                'raw' => $result['raw'] ?? [],
+                'error_code' => 'identity_mismatch',
+            ];
+        }
+
         return [
             'ok' => true,
             'message' => 'Identity verified via Mevon.',
             'full_name' => $providerName,
+            'dob' => $providerDob ?? $dobYmd,
             'reference' => (string) ($result['reference'] ?? ''),
             'raw' => $result['raw'] ?? [],
         ];
+    }
+
+    private function normalizeDob(string $value): ?string
+    {
+        $value = trim($value);
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
+            return $value;
+        }
+        if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $value, $m)) {
+            return $m[3].'-'.$m[2].'-'.$m[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $raw
+     */
+    private function dobFromRaw(array $raw): ?string
+    {
+        $details = [];
+        if (is_array($raw['bvn_details'] ?? null)) {
+            $details = $raw['bvn_details'];
+        } elseif (is_array($raw['nin_details'] ?? null)) {
+            $details = $raw['nin_details'];
+        } elseif (is_array($raw['data'] ?? null)) {
+            $details = $raw['data'];
+        }
+
+        foreach (['dob', 'dateOfBirth', 'date_of_birth', 'birthdate'] as $key) {
+            if (isset($details[$key])) {
+                $n = $this->normalizeDob((string) $details[$key]);
+                if ($n !== null) {
+                    return $n;
+                }
+            }
+        }
+
+        return null;
     }
 }

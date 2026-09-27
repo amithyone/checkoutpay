@@ -279,6 +279,7 @@ class ConsumerWalletApiController extends Controller
                 'savings_balance' => (float) ($wallet->savings_balance ?? 0),
                 'savings_enabled' => (bool) ($savingsSummary['product_enabled'] ?? false),
                 'savings_next_maturity_at' => $savingsSummary['next_maturity_at'] ?? null,
+                'kyc' => app(\App\Services\Consumer\WalletKycComplianceService::class)->payload($wallet),
             ], $transferLock),
         ]);
     }
@@ -841,6 +842,16 @@ class ConsumerWalletApiController extends Controller
             ], 422);
         }
 
+        $kyc = app(\App\Services\Consumer\WalletKycComplianceService::class);
+        if (! $kyc->canTransact($wallet)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This wallet is restricted until KYC is complete.',
+                'error_code' => 'account_restricted',
+                'data' => $kyc->payload($wallet),
+            ], 423);
+        }
+
         if ($wallet->tier >= WhatsappWallet::TIER_RUBIES_VA) {
             $acct = trim((string) $wallet->mevon_virtual_account_number);
             if ($acct === '') {
@@ -1325,7 +1336,6 @@ class ConsumerWalletApiController extends Controller
             ],
         ]);
     }
-
 
     /**
      * GET /api/v1/consumer/banks/suggestions
@@ -1847,11 +1857,13 @@ class ConsumerWalletApiController extends Controller
     {
         $wallet = $this->walletFor($request)->fresh();
         $out = $this->kyc->tier2Status($wallet);
+        $data = $out['data'] ?? [];
+        $data['kyc'] = app(\App\Services\Consumer\WalletKycComplianceService::class)->payload($wallet);
 
         return response()->json([
             'success' => $out['ok'],
             'message' => $out['message'],
-            'data' => $out['data'] ?? null,
+            'data' => $data,
         ]);
     }
 
@@ -1887,6 +1899,19 @@ class ConsumerWalletApiController extends Controller
         }
         if ($g === 'f') {
             $g = 'female';
+        }
+
+        $compliance = app(\App\Services\Consumer\WalletKycComplianceService::class);
+        if ($iso !== 'KE' && $compliance->failClosedEnabled()) {
+            $out = $compliance->submitIdentity($wallet, array_merge($request->all(), ['gender' => $g]));
+            $status = ($out['ok'] ?? false) ? 200 : (int) ($out['http_status'] ?? 422);
+
+            return response()->json([
+                'success' => $out['ok'],
+                'message' => $out['message'],
+                'error_code' => $out['error_code'] ?? null,
+                'data' => $out['data'] ?? null,
+            ], $status);
         }
 
         $fields = $iso === 'KE'

@@ -64,17 +64,19 @@ Route::prefix('dashboard')->name('business.')->group(function () {
         Route::get('/transactions/loan/{loanTransaction}', [TransactionController::class, 'showLoanRepayment'])->name('transactions.loan.show');
         Route::get('/transactions/{transaction}', [TransactionController::class, 'show'])->name('transactions.show');
 
-        // Withdrawals
-        Route::get('/withdrawals', [WithdrawalController::class, 'index'])->name('withdrawals.index');
-        Route::get('/withdrawals/create', [WithdrawalController::class, 'create'])->name('withdrawals.create');
-        Route::post('/withdrawals/create/account', [WithdrawalController::class, 'storeAccountStep'])->name('withdrawals.create.account');
-        Route::get('/withdrawals/create/confirm', [WithdrawalController::class, 'createConfirm'])->name('withdrawals.create.confirm');
-        Route::post('/withdrawals', [WithdrawalController::class, 'store'])->name('withdrawals.store');
-        Route::get('/withdrawals/{withdrawal}', [WithdrawalController::class, 'show'])->name('withdrawals.show');
-        Route::post('/withdrawals/validate-account', [WithdrawalController::class, 'validateAccount'])->name('withdrawals.validate-account');
-        Route::post('/withdrawals/save-account', [WithdrawalController::class, 'saveAccount'])->name('withdrawals.save-account');
-        Route::put('/withdrawals/auto-withdraw-settings', [WithdrawalController::class, 'updateAutoWithdrawSettings'])->name('withdrawals.auto-withdraw-settings');
-        Route::delete('/withdrawals/accounts/{account}', [WithdrawalController::class, 'deleteAccount'])->name('withdrawals.delete-account');
+        // Withdrawals (merchant balance payout — license enforced on partner drops)
+        Route::middleware('partner.license')->group(function () {
+            Route::get('/withdrawals', [WithdrawalController::class, 'index'])->name('withdrawals.index');
+            Route::get('/withdrawals/create', [WithdrawalController::class, 'create'])->name('withdrawals.create');
+            Route::post('/withdrawals/create/account', [WithdrawalController::class, 'storeAccountStep'])->name('withdrawals.create.account');
+            Route::get('/withdrawals/create/confirm', [WithdrawalController::class, 'createConfirm'])->name('withdrawals.create.confirm');
+            Route::post('/withdrawals', [WithdrawalController::class, 'store'])->name('withdrawals.store');
+            Route::get('/withdrawals/{withdrawal}', [WithdrawalController::class, 'show'])->name('withdrawals.show');
+            Route::post('/withdrawals/validate-account', [WithdrawalController::class, 'validateAccount'])->name('withdrawals.validate-account');
+            Route::post('/withdrawals/save-account', [WithdrawalController::class, 'saveAccount'])->name('withdrawals.save-account');
+            Route::put('/withdrawals/auto-withdraw-settings', [WithdrawalController::class, 'updateAutoWithdrawSettings'])->name('withdrawals.auto-withdraw-settings');
+            Route::delete('/withdrawals/accounts/{account}', [WithdrawalController::class, 'deleteAccount'])->name('withdrawals.delete-account');
+        });
 
         // Overdraft
         Route::get('/overdraft', [\App\Http\Controllers\Business\OverdraftController::class, 'index'])->name('overdraft.index');
