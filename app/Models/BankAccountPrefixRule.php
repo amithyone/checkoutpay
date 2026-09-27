@@ -34,7 +34,7 @@ class BankAccountPrefixRule extends Model
 
     public static function cacheKey(): string
     {
-        return 'bank_account_prefix_rules:v1';
+        return 'bank_account_prefix_rules:v3';
     }
 
     /** @param  \Illuminate\Database\Eloquent\Builder<self>  $query */
@@ -49,39 +49,57 @@ class BankAccountPrefixRule extends Model
     }
 
     /**
-     * @return list<array{prefix: string, code: string, name: string}>
+     * Flat prefix→bank rows for matching (config ∪ active DB; DB wins on same prefix+code).
+     *
+     * @return list<array{prefix: string, code: string, name: string, category?: string}>
      */
     public static function rulesForSuggestions(): array
     {
         return Cache::remember(self::cacheKey(), now()->addMinutes(10), function () {
-            if (! Schema::hasTable('bank_account_prefix_rules')) {
-                return self::rulesFromConfig();
+            /** @var array<string, array{prefix: string, code: string, name: string, category?: string}> $byKey */
+            $byKey = [];
+
+            foreach (self::rulesFromConfig() as $rule) {
+                $byKey[$rule['prefix'].'|'.$rule['code']] = $rule;
             }
 
-            $rows = self::query()
-                ->active()
-                ->orderByDesc('prefix')
-                ->get(['prefix', 'bank_code', 'bank_name']);
+            if (Schema::hasTable('bank_account_prefix_rules')) {
+                $rows = self::query()
+                    ->active()
+                    ->orderByDesc('prefix')
+                    ->get(['prefix', 'bank_code', 'bank_name']);
 
-            if ($rows->isEmpty()) {
-                return self::rulesFromConfig();
+                foreach ($rows as $row) {
+                    $prefix = preg_replace('/\D+/', '', (string) $row->prefix) ?? '';
+                    $code = trim((string) $row->bank_code);
+                    if ($prefix === '' || strlen($prefix) < 2 || $code === '') {
+                        continue;
+                    }
+                    $key = $prefix.'|'.$code;
+                    $byKey[$key] = [
+                        'prefix' => $prefix,
+                        'code' => $code,
+                        'name' => trim((string) ($row->bank_name ?? '')),
+                    ];
+                }
             }
 
-            $rules = [];
-            foreach ($rows as $row) {
-                $rules[] = [
-                    'prefix' => (string) $row->prefix,
-                    'code' => (string) $row->bank_code,
-                    'name' => trim((string) ($row->bank_name ?? '')),
-                ];
-            }
+            $rules = array_values($byKey);
+            usort($rules, function (array $a, array $b) {
+                $len = strlen($b['prefix']) <=> strlen($a['prefix']);
+                if ($len !== 0) {
+                    return $len;
+                }
+
+                return strcmp($a['code'], $b['code']);
+            });
 
             return $rules;
         });
     }
 
     /**
-     * @return list<array{prefix: string, code: string, name: string}>
+     * @return list<array{prefix: string, code: string, name: string, category?: string}>
      */
     private static function rulesFromConfig(): array
     {
@@ -100,11 +118,16 @@ class BankAccountPrefixRule extends Model
             if ($prefix === '' || strlen($prefix) < 2 || $code === '') {
                 continue;
             }
-            $rules[] = [
+            $row = [
                 'prefix' => $prefix,
                 'code' => $code,
                 'name' => trim((string) ($rule['name'] ?? '')),
             ];
+            $category = trim((string) ($rule['category'] ?? ''));
+            if ($category !== '') {
+                $row['category'] = $category;
+            }
+            $rules[] = $row;
         }
 
         return $rules;

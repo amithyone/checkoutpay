@@ -715,6 +715,11 @@ class ConsumerWalletTransferService
                 $this->savings->applySpendToSave($wallet->fresh(), $amount, (int) $txnRow->id, 'bank_transfer');
             }
 
+            if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
+                app(\App\Services\BankAccountPrefixLearner::class)
+                    ->learnLaterFromSuccessfulBankTransfer($acct, $bankCode, $bankName);
+            }
+
             return [
                 'ok' => true,
                 'message' => $bucket === MavonPayTransferService::BUCKET_PENDING

@@ -10,6 +10,7 @@ use App\Services\BankLogoService;
 use App\Services\NigerianBankCodeNormalizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class BankAccountPrefixController extends Controller
@@ -100,13 +101,18 @@ class BankAccountPrefixController extends Controller
             $bankName = $bank ? (string) $bank->name : '';
         }
 
-        $uniqueRule = 'unique:bank_account_prefix_rules,prefix';
+        $uniqueRule = Rule::unique('bank_account_prefix_rules', 'prefix')
+            ->where(fn ($q) => $q->where('bank_code', $bankCode));
         if ($existing !== null) {
-            $uniqueRule .= ','.$existing->id;
+            $uniqueRule = $uniqueRule->ignore($existing->id);
         }
 
-        $request->merge(['prefix' => $prefix]);
-        $request->validate(['prefix' => $uniqueRule]);
+        $request->merge(['prefix' => $prefix, 'bank_code' => $bankCode]);
+        $request->validate([
+            'prefix' => [$uniqueRule],
+        ], [
+            'prefix.unique' => 'This bank is already mapped to that prefix.',
+        ]);
 
         return [
             'prefix' => $prefix,

@@ -44,6 +44,7 @@ use App\Services\Whatsapp\WhatsappWalletTier1TopupVaService;
 use App\Services\Whatsapp\WhatsappWalletVtuPurchaseService;
 use App\Services\WhatsappWalletBankPayoutService;
 use App\Services\BankLogoService;
+use App\Services\BankAccountSuggestionService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -1322,6 +1323,59 @@ class ConsumerWalletApiController extends Controller
             'data' => [
                 'banks' => $this->bankLogos->listForApi(),
             ],
+        ]);
+    }
+
+
+    /**
+     * GET /api/v1/consumer/banks/suggestions
+     * Wallet transfer picker: prefix rules catalog (no account) or live ?account= fallback.
+     */
+    public function bankSuggestions(Request $request, BankAccountSuggestionService $suggestions): JsonResponse
+    {
+        $account = trim((string) $request->query('account', ''));
+
+        if ($account === '') {
+            $catalog = $suggestions->rulesCatalog();
+
+            return response()->json([
+                'success' => true,
+                'data' => $catalog,
+                'suggestions' => $catalog['suggestions'],
+                'rules' => $catalog['rules'],
+                'prefix_map' => $catalog['prefix_map'],
+                'updated_at' => $catalog['updated_at'],
+            ]);
+        }
+
+        $validated = $request->validate([
+            'account' => [
+                'required',
+                'string',
+                'max:20',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $digits = preg_replace('/\D+/', '', (string) $value) ?? '';
+                    if (strlen($digits) < 2) {
+                        $fail('The account must contain at least 2 digits.');
+                    }
+                },
+            ],
+        ]);
+
+        $banks = $suggestions->suggest((string) $validated['account']);
+        $codes = array_values(array_filter(array_map(
+            static fn (array $row) => (string) ($row['code'] ?? ''),
+            $banks
+        )));
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'banks' => $banks,
+                'codes' => $codes,
+            ],
+            'banks' => $banks,
+            'codes' => $codes,
         ]);
     }
 

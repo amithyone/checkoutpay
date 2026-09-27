@@ -158,6 +158,9 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/device/bind/kyc', [ConsumerDeviceAuthController::class, 'bindKycDevice']);
         Route::post('auth/device/bind/options', [ConsumerDeviceAuthController::class, 'bindOptions']);
         Route::post('auth/device/bind', [ConsumerDeviceAuthController::class, 'bindDevice']);
+        // Public warm/prefetch for Choose Bank (same catalog as authenticated route).
+        Route::get('banks/suggestions', [ConsumerWalletApiController::class, 'bankSuggestions'])
+            ->middleware('throttle:60,1');
     });
 
     Route::prefix('consumer')->middleware(['auth:sanctum', 'touch.consumer.app.session', 'throttle:consumer_wallet'])->group(function () {
@@ -427,7 +430,7 @@ Route::prefix('v1')->group(function () {
         Route::post('kyc/verify', [\App\Http\Controllers\Api\Rentals\KycController::class, 'verify']);
         // Dynamic possible banks for an account number (NUBAN-backed)
         Route::post('kyc/banks', [\App\Http\Controllers\Api\Rentals\KycController::class, 'banksForAccount']);
-        // All known banks from Checkout DB (cached from NUBAN responses)
+        // Deprecated alias — prefer GET /api/v1/consumer/banks/suggestions for the wallet app.
         Route::get('banks/suggestions', [\App\Http\Controllers\Api\Rentals\KycController::class, 'bankSuggestionsForAccount']);
         Route::get('banks', [\App\Http\Controllers\Api\Rentals\KycController::class, 'banksFromDatabase']);
 

@@ -156,6 +156,15 @@ class WhatsappWalletPendingPayoutReconciliationService
 
         $this->syncLedgerPayoutBucket($transaction->fresh() ?? $transaction, $reference, $payoutApi, $meta);
 
+        if ($newBucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
+            try {
+                app(\App\Services\BankAccountPrefixLearner::class)
+                    ->learnFromTransaction($transaction->fresh() ?? $transaction);
+            } catch (\Throwable) {
+                // non-fatal
+            }
+        }
+
         $fresh = $transaction->fresh() ?? $transaction;
         $failedConfirmations = (int) ((is_array($fresh->meta) ? $fresh->meta : [])['provider_failed_confirmations'] ?? 0);
         $requiredConfirmations = $this->failedConfirmationsRequired();

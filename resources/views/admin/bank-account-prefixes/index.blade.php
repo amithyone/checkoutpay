@@ -23,9 +23,13 @@
     <div>
         <h3 class="text-lg font-semibold text-gray-900">App bank suggestions (fallback)</h3>
         <p class="text-sm text-gray-600 mt-1 max-w-3xl">
-            CheckoutNow uses a built-in prefix table first. These rows are returned by
-            <code class="text-xs bg-gray-100 px-1 rounded">GET /api/v1/rentals/banks/suggestions</code>
-            when the app has no local match — add new banks or prefixes here without an app rebuild.
+            Wallet Choose Bank loads rules from
+            <code class="text-xs bg-gray-100 px-1 rounded">GET /api/v1/consumer/banks/suggestions</code>
+            (prefetch, no account) and live
+            <code class="text-xs bg-gray-100 px-1 rounded">?account=</code>
+            when local+cached rules miss.             Same prefix may map to multiple banks.
+            Successful transfers auto-add the first 4 digits of the destination account when that bank has no rule yet.
+            <span class="text-gray-500">(<code class="text-xs">rentals/banks/suggestions</code> is a deprecated alias.)</span>
         </p>
     </div>
 

@@ -57,11 +57,27 @@ class KycController extends Controller
     }
 
     /**
-     * GET /api/v1/rentals/banks/suggestions?account={digits}
-     * Fallback bank suggestions from server-side account prefixes (CheckoutNow app).
+     * GET /api/v1/rentals/banks/suggestions
+     * - no query: full prefix rules catalog for offline cache
+     * - ?account={digits}: ordered bank rows for live fallback
      */
     public function bankSuggestionsForAccount(Request $request)
     {
+        $account = trim((string) $request->query('account', ''));
+
+        if ($account === '') {
+            $catalog = $this->accountSuggestions->rulesCatalog();
+
+            return response()->json([
+                'success' => true,
+                'data' => $catalog,
+                'suggestions' => $catalog['suggestions'],
+                'rules' => $catalog['rules'],
+                'prefix_map' => $catalog['prefix_map'],
+                'updated_at' => $catalog['updated_at'],
+            ]);
+        }
+
         $validated = $request->validate([
             'account' => [
                 'required',
@@ -77,12 +93,19 @@ class KycController extends Controller
         ]);
 
         $banks = $this->accountSuggestions->suggest((string) $validated['account']);
+        $codes = array_values(array_filter(array_map(
+            static fn (array $row) => (string) ($row['code'] ?? ''),
+            $banks
+        )));
 
         return response()->json([
             'success' => true,
             'data' => [
                 'banks' => $banks,
+                'codes' => $codes,
             ],
+            'banks' => $banks,
+            'codes' => $codes,
         ]);
     }
 

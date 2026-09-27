@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Bank;
 use App\Models\BankAccountPrefixRule;
+use Illuminate\Support\Carbon;
 
 final class BankAccountSuggestionService
 {
@@ -13,7 +14,184 @@ final class BankAccountSuggestionService
     ) {}
 
     /**
-     * @return list<array{code: string, name: string, logo_url: string|null}>
+     * Full prefix-rules catalog for CheckoutNow offline cache
+     * (GET /rentals/banks/suggestions with no account).
+     *
+     * Same prefix may appear under multiple banks (and in flat `rules` / `prefix_map`).
+     *
+     * @return array{
+     *   suggestions: list<array{name: string, codes: list<string>, category: string, prefixes: list<string>}>,
+     *   rules: list<array{prefix: string, code: string, name: string, codes: list<string>, category: string}>,
+     *   prefix_map: array<string, list<array{code: string, name: string, codes: list<string>, category: string}>>,
+     *   updated_at: string
+     * }
+     */
+    public function rulesCatalog(): array
+    {
+        $directory = $this->directoryIndex();
+        $legacyByNip = $this->legacyCodesByNip();
+        $defaultCategory = (string) config('bank_account_prefixes.default_category', 'Fintech & Neo-Bank');
+
+        /** @var array<string, array{name: string, codes: array<string, true>, prefixes: array<string, true>, category: string}> $groups */
+        $groups = [];
+        /** @var list<array{prefix: string, nip: string, name: string, category: string}> $flat */
+        $flat = [];
+
+        foreach (BankAccountPrefixRule::rulesForSuggestions() as $rule) {
+            $prefix = preg_replace('/\D+/', '', (string) ($rule['prefix'] ?? '')) ?? '';
+            $rawCode = trim((string) ($rule['code'] ?? ''));
+            if ($prefix === '' || strlen($prefix) < 2 || $rawCode === '') {
+                continue;
+            }
+
+            $nip = NigerianBankCodeNormalizer::toNipTransferCode($rawCode);
+            if ($nip === '') {
+                continue;
+            }
+
+            $name = trim((string) ($rule['name'] ?? ''));
+            $category = trim((string) ($rule['category'] ?? '')) ?: $defaultCategory;
+
+            if (! isset($groups[$nip])) {
+                $dirCode = $directory[$nip]['code'] ?? $nip;
+                if ($name === '') {
+                    $name = (string) ($directory[$nip]['name'] ?? $nip);
+                }
+
+                $codes = [$dirCode => true, $nip => true, $rawCode => true];
+                foreach ($legacyByNip[$nip] ?? [] as $legacy) {
+                    $codes[$legacy] = true;
+                }
+
+                $groups[$nip] = [
+                    'name' => $name,
+                    'codes' => $codes,
+                    'prefixes' => [],
+                    'category' => $category,
+                ];
+            }
+
+            $groups[$nip]['prefixes'][$prefix] = true;
+            if (trim((string) ($rule['name'] ?? '')) !== '') {
+                $groups[$nip]['name'] = trim((string) $rule['name']);
+                $name = $groups[$nip]['name'];
+            }
+            if (trim((string) ($rule['category'] ?? '')) !== '') {
+                $groups[$nip]['category'] = trim((string) $rule['category']);
+                $category = $groups[$nip]['category'];
+            }
+
+            $flat[] = [
+                'prefix' => $prefix,
+                'nip' => $nip,
+                'name' => $name !== '' ? $name : $groups[$nip]['name'],
+                'category' => $category,
+            ];
+        }
+
+        $suggestions = [];
+        /** @var array<string, list<string>> $codesByNip */
+        $codesByNip = [];
+        foreach ($groups as $nip => $group) {
+            $prefixes = array_keys($group['prefixes']);
+            sort($prefixes, SORT_STRING);
+            $codes = $this->sortedCodeList(array_keys($group['codes']));
+            $codesByNip[$nip] = $codes;
+
+            $suggestions[] = [
+                'name' => $group['name'],
+                'codes' => $codes,
+                'category' => $group['category'],
+                'prefixes' => array_map('strval', array_values($prefixes)),
+            ];
+        }
+
+        usort($suggestions, fn (array $a, array $b) => strcasecmp($a['name'], $b['name']));
+
+        $rules = [];
+        /** @var array<string, array<string, array{code: string, name: string, codes: list<string>, category: string}>> $prefixMapBuild */
+        $prefixMapBuild = [];
+        foreach ($flat as $row) {
+            $nip = $row['nip'];
+            $codes = $codesByNip[$nip] ?? [$nip];
+            // Prefer directory / NIP code for `code` (exists on GET rentals/banks); keep aliases in `codes`.
+            $primaryCode = (string) ($directory[$nip]['code'] ?? $nip);
+            if (! in_array($primaryCode, $codes, true)) {
+                array_unshift($codes, $primaryCode);
+                $codes = array_values(array_unique($codes));
+            }
+            $rules[] = [
+                'prefix' => (string) $row['prefix'],
+                'code' => $primaryCode,
+                'name' => (string) $row['name'],
+                'codes' => $codes,
+                'category' => (string) $row['category'],
+            ];
+            $prefixMapBuild[$row['prefix']][$nip] = [
+                'code' => $primaryCode,
+                'name' => (string) $row['name'],
+                'codes' => $codes,
+                'category' => (string) $row['category'],
+            ];
+        }
+
+        usort($rules, function (array $a, array $b) {
+            $len = strlen($b['prefix']) <=> strlen($a['prefix']);
+            if ($len !== 0) {
+                return $len;
+            }
+            $p = strcmp($a['prefix'], $b['prefix']);
+            if ($p !== 0) {
+                return $p;
+            }
+
+            return strcasecmp($a['name'], $b['name']);
+        });
+
+        $prefixMap = [];
+        ksort($prefixMapBuild, SORT_STRING);
+        foreach ($prefixMapBuild as $prefix => $banks) {
+            $list = array_values($banks);
+            usort($list, fn (array $a, array $b) => strcasecmp($a['name'], $b['name']));
+            $prefixMap[(string) $prefix] = $list;
+        }
+
+        $updatedAt = null;
+        if (\Illuminate\Support\Facades\Schema::hasTable('bank_account_prefix_rules')) {
+            $updatedAt = BankAccountPrefixRule::query()->max('updated_at');
+        }
+
+        return [
+            'suggestions' => $suggestions,
+            'rules' => $rules,
+            'prefix_map' => $prefixMap,
+            'updated_at' => $updatedAt
+                ? Carbon::parse($updatedAt)->utc()->toIso8601String()
+                : now()->utc()->toIso8601String(),
+        ];
+    }
+
+    /**
+     * @param  list<string>  $codes
+     * @return list<string>
+     */
+    private function sortedCodeList(array $codes): array
+    {
+        usort($codes, function (string $a, string $b) {
+            $la = strlen(preg_replace('/\D+/', '', $a) ?? '');
+            $lb = strlen(preg_replace('/\D+/', '', $b) ?? '');
+            if ($la !== $lb) {
+                return $la <=> $lb;
+            }
+
+            return strcmp($a, $b);
+        });
+
+        return array_map('strval', array_values($codes));
+    }
+
+    /**
+     * @return list<array{code: string, name: string, prefix: string|null, logo_url: string|null}>
      */
     public function suggest(string $accountInput): array
     {
@@ -23,34 +201,36 @@ final class BankAccountSuggestionService
         }
 
         $limit = max(1, min(12, (int) config('bank_account_prefixes.max_suggestions', 12)));
-        $orderedNips = [];
+        /** @var list<array{nip: string, prefix: string, name: string}> $ordered */
+        $ordered = [];
 
-        foreach ($this->prefixMatches($digits) as $nip) {
-            $orderedNips[] = $nip;
+        foreach ($this->prefixMatches($digits) as $match) {
+            $ordered[] = $match;
         }
 
         if (strlen($digits) === 10 && $this->nuban->isConfigured()) {
             foreach ($this->nubanNipsForAccount($digits) as $nip) {
-                $orderedNips[] = $nip;
+                $ordered[] = ['nip' => $nip, 'prefix' => '', 'name' => ''];
             }
         }
 
-        $uniqueNips = [];
-        foreach ($orderedNips as $nip) {
-            if ($nip === '' || isset($uniqueNips[$nip])) {
+        $unique = [];
+        foreach ($ordered as $row) {
+            $nip = $row['nip'];
+            if ($nip === '' || isset($unique[$nip])) {
                 continue;
             }
-            $uniqueNips[$nip] = true;
-            if (count($uniqueNips) >= $limit) {
+            $unique[$nip] = $row;
+            if (count($unique) >= $limit) {
                 break;
             }
         }
 
-        return $this->resolveBankRows(array_keys($uniqueNips));
+        return $this->resolveBankRows(array_values($unique));
     }
 
     /**
-     * @return list<string> NIP codes, longest prefix match first.
+     * @return list<array{nip: string, prefix: string, name: string}>
      */
     private function prefixMatches(string $digits): array
     {
@@ -79,6 +259,7 @@ final class BankAccountSuggestionService
             $matches[] = [
                 'prefix_len' => strlen($prefix),
                 'nip' => $nip,
+                'prefix' => $prefix,
                 'name' => isset($rule['name']) ? trim((string) $rule['name']) : '',
             ];
         }
@@ -87,10 +268,17 @@ final class BankAccountSuggestionService
 
         $out = [];
         foreach ($matches as $match) {
-            $out[$match['nip']] = true;
+            if (isset($out[$match['nip']])) {
+                continue;
+            }
+            $out[$match['nip']] = [
+                'nip' => $match['nip'],
+                'prefix' => $match['prefix'],
+                'name' => $match['name'],
+            ];
         }
 
-        return array_keys($out);
+        return array_values($out);
     }
 
     /**
@@ -122,12 +310,12 @@ final class BankAccountSuggestionService
     }
 
     /**
-     * @param  list<string>  $nips
-     * @return list<array{code: string, name: string, logo_url: string|null}>
+     * @param  list<array{nip: string, prefix: string, name: string}>  $matches
+     * @return list<array{code: string, name: string, prefix: string|null, logo_url: string|null}>
      */
-    private function resolveBankRows(array $nips): array
+    private function resolveBankRows(array $matches): array
     {
-        if ($nips === []) {
+        if ($matches === []) {
             return [];
         }
 
@@ -136,14 +324,25 @@ final class BankAccountSuggestionService
         $fallbackNames = $this->fallbackNamesByNip();
         $rows = [];
 
-        foreach ($nips as $nip) {
+        foreach ($matches as $match) {
+            $nip = $match['nip'];
+            $prefix = $match['prefix'] !== '' ? $match['prefix'] : null;
+            $ruleName = trim((string) ($match['name'] ?? ''));
+
             if (isset($directory[$nip])) {
-                $rows[] = $directory[$nip];
+                $rows[] = [
+                    'code' => $directory[$nip]['code'],
+                    'name' => $ruleName !== '' ? $ruleName : $directory[$nip]['name'],
+                    'prefix' => $prefix,
+                    'logo_url' => $directory[$nip]['logo_url'],
+                ];
 
                 continue;
             }
 
-            $name = $fallbackNames[$nip] ?? $quickNames[$nip] ?? $this->lookupBankName($nip);
+            $name = $ruleName !== ''
+                ? $ruleName
+                : ($fallbackNames[$nip] ?? $quickNames[$nip] ?? $this->lookupBankName($nip));
             if ($name === null || $name === '') {
                 continue;
             }
@@ -151,6 +350,7 @@ final class BankAccountSuggestionService
             $rows[] = [
                 'code' => $nip,
                 'name' => $name,
+                'prefix' => $prefix,
                 'logo_url' => $this->lookupLogoUrl($nip),
             ];
         }
@@ -183,6 +383,29 @@ final class BankAccountSuggestionService
         }
 
         return $index;
+    }
+
+    /**
+     * @return array<string, list<string>>
+     */
+    private function legacyCodesByNip(): array
+    {
+        $map = config('nigerian_bank_legacy_to_nip', []);
+        if (! is_array($map)) {
+            return [];
+        }
+
+        $byNip = [];
+        foreach ($map as $legacy => $nipRaw) {
+            $nip = NigerianBankCodeNormalizer::toNipTransferCode((string) $nipRaw);
+            $legacyDigits = preg_replace('/\D+/', '', (string) $legacy) ?? '';
+            if ($nip === '' || $legacyDigits === '') {
+                continue;
+            }
+            $byNip[$nip][] = $legacyDigits;
+        }
+
+        return $byNip;
     }
 
     /**

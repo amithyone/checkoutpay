@@ -617,6 +617,9 @@ class WhatsappWalletTransferCompletionService
         );
 
         if ($bucket === MavonPayTransferService::BUCKET_SUCCESSFUL) {
+            app(\App\Services\BankAccountPrefixLearner::class)
+                ->learnLaterFromSuccessfulBankTransfer($acct, $bankCode, $bankName);
+
             $receiptOk = $this->maybeSendBankTransferReceiptImage(
                 $instance,
                 $phone,
