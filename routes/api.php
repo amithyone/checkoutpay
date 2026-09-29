@@ -164,6 +164,10 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/device/stepup/otp/verify', [ConsumerDeviceAuthController::class, 'stepupOtpVerify']);
         Route::post('auth/device/stepup/face/verify', [ConsumerDeviceAuthController::class, 'stepupFaceVerify'])
             ->middleware('throttle:20,1');
+        Route::post('auth/device/stepup/face/liveness/session', [ConsumerDeviceAuthController::class, 'stepupFaceLivenessSession'])
+            ->middleware('throttle:20,1');
+        Route::post('auth/device/stepup/face/liveness/video', [ConsumerDeviceAuthController::class, 'stepupFaceLivenessVideo'])
+            ->middleware('throttle:20,1');
         Route::post('auth/device/bind/kyc', [ConsumerDeviceAuthController::class, 'bindKycDevice']);
         Route::post('auth/device/bind/options', [ConsumerDeviceAuthController::class, 'bindOptions']);
         Route::post('auth/device/bind', [ConsumerDeviceAuthController::class, 'bindDevice']);

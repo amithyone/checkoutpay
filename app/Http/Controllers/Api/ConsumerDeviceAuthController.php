@@ -13,6 +13,7 @@ use App\Services\Consumer\ConsumerDeviceTrustService;
 use App\Services\Consumer\ConsumerWebAuthnService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 
 class ConsumerDeviceAuthController extends Controller
 {
@@ -382,27 +383,88 @@ class ConsumerDeviceAuthController extends Controller
     {
         $request->validate([
             'stepup_session' => 'required|string|max:64',
-            'photo' => 'required_without:selfie|file|mimes:jpeg,jpg,png,webp|max:5120',
-            'selfie' => 'required_without:photo|file|mimes:jpeg,jpg,png,webp|max:5120',
+            'photo' => 'nullable|file|mimes:jpeg,jpg,png,webp|max:5120',
+            'selfie' => 'nullable|file|mimes:jpeg,jpg,png,webp|max:5120',
             'device_id' => 'nullable|string|max:128',
         ]);
 
         $photo = $request->file('photo') ?? $request->file('selfie');
-        if ($photo === null) {
+        // Still-photo unlock is disabled; always point clients at guided liveness.
+        $result = $stepup->verifyFace(
+            (string) $request->input('stepup_session'),
+            $photo instanceof UploadedFile ? $photo : null,
+            $sessions->deviceIdFromRequest($request),
+            $sessions->clientContextFromRequest($request)['platform'],
+            $sessions->clientContextFromRequest($request)['device_label'],
+        );
+
+        $http = (int) ($result['http'] ?? 422);
+
+        return response()->json([
+            'success' => false,
+            'message' => $result['message'] ?? 'A live video check is required.',
+            'data' => array_filter([
+                'error_code' => $result['error_code'] ?? 'face_liveness_required',
+                'stepup_session' => $result['stepup_session'] ?? $request->input('stepup_session'),
+                'face_challenge' => $result['face_challenge'] ?? 'liveness',
+                'next_step' => $result['next_step'] ?? 'face_liveness',
+            ], fn ($v) => $v !== null),
+        ], $http >= 400 ? $http : 422);
+    }
+
+    public function stepupFaceLivenessSession(Request $request, ConsumerDeviceStepupService $stepup): JsonResponse
+    {
+        $request->validate([
+            'stepup_session' => 'required|string|max:64',
+        ]);
+
+        $result = $stepup->startFaceLiveness((string) $request->input('stepup_session'));
+
+        if (! ($result['ok'] ?? false)) {
+            $http = (int) ($result['http'] ?? 422);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Upload a selfie photo.',
-                'data' => ['error_code' => 'photo_required'],
-            ], 422);
+                'message' => $result['message'] ?? 'Could not start liveness.',
+                'data' => array_filter([
+                    'error_code' => $result['error_code'] ?? null,
+                    'stepup_session' => $result['stepup_session'] ?? $request->input('stepup_session'),
+                ], fn ($v) => $v !== null),
+            ], $http >= 400 ? $http : 422);
         }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Liveness session created.',
+            'data' => [
+                'stepup_session' => $result['stepup_session'],
+                'session_id' => $result['session_id'],
+                'challenges' => $result['challenges'] ?? [],
+                'expires_in' => $result['expires_in'] ?? null,
+                'capture' => $result['capture'] ?? 'video',
+                'seconds_per_challenge' => $result['seconds_per_challenge'] ?? null,
+                'face_challenge' => 'liveness',
+            ],
+        ]);
+    }
+
+    public function stepupFaceLivenessVideo(Request $request, ConsumerDeviceStepupService $stepup, ConsumerAppSessionService $sessions): JsonResponse
+    {
+        $request->validate([
+            'stepup_session' => 'required|string|max:64',
+            'session_id' => 'required|string|max:128',
+            'clip' => 'required|file|mimetypes:video/mp4,video/webm,video/quicktime|max:8192',
+            'device_id' => 'nullable|string|max:128',
+        ]);
 
         $ctx = $sessions->clientContextFromRequest($request);
         $deviceId = $sessions->deviceIdFromRequest($request)
             ?? ($request->input('device_id') ? (string) $request->input('device_id') : null);
 
-        $result = $stepup->verifyFace(
+        $result = $stepup->completeFaceLiveness(
             (string) $request->input('stepup_session'),
-            $photo,
+            (string) $request->input('session_id'),
+            $request->file('clip'),
             $deviceId,
             $ctx['platform'],
             $ctx['device_label'],
@@ -413,7 +475,7 @@ class ConsumerDeviceAuthController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => $result['message'] ?? 'Face verification failed.',
+                'message' => $result['message'] ?? 'Liveness check failed.',
                 'data' => array_filter([
                     'error_code' => $result['error_code'] ?? null,
                     'stepup_session' => $result['stepup_session'] ?? $request->input('stepup_session'),
@@ -430,7 +492,9 @@ class ConsumerDeviceAuthController extends Controller
                 'next_step' => $result['next_step'] ?? 'bind',
                 'pin_reset_required' => (bool) ($result['pin_reset_required'] ?? true),
                 'score' => $result['score'] ?? null,
-                'liveness_passed' => (bool) ($result['liveness_passed'] ?? true),
+                'liveness_score' => $result['liveness_score'] ?? null,
+                'liveness_passed' => true,
+                'matched_via' => $result['matched_via'] ?? null,
             ],
         ]);
     }

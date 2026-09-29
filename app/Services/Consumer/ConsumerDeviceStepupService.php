@@ -7,6 +7,7 @@ use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
 use App\Services\Whatsapp\PhoneNormalizer;
 use App\Services\Whatsapp\WhatsappWalletPinResetService;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 
 class ConsumerDeviceStepupService
@@ -232,17 +233,185 @@ class ConsumerDeviceStepupService
     }
 
     /**
-     * CheckFace during device_mismatch step-up (no Sanctum). Face substitutes for BVN+OTP.
+     * Still-photo step-up is disabled — guided liveness is required.
      *
-     * @return array{ok: bool, message?: string, http?: int, error_code?: string, stepup_session?: string, stepup_token?: string, pin_reset_required?: bool, next_step?: string, stepup_mode?: string, score?: float|null, liveness_passed?: bool}
+     * @return array{ok: bool, message?: string, http?: int, error_code?: string, stepup_session?: string, face_challenge?: string, next_step?: string}
      */
     public function verifyFace(
         string $sessionToken,
-        \Illuminate\Http\UploadedFile $photo,
+        ?UploadedFile $photo = null,
         ?string $deviceId = null,
         ?string $platform = null,
         ?string $deviceLabel = null,
     ): array {
+        $session = $this->resolveFaceStepupSession($sessionToken);
+        if (! ($session['ok'] ?? false)) {
+            return $session;
+        }
+
+        /** @var ConsumerDeviceStepupSession $row */
+        $row = $session['session'];
+
+        return [
+            'ok' => false,
+            'message' => 'A live video check is required. Start face liveness, then upload the clip.',
+            'http' => 422,
+            'error_code' => 'face_liveness_required',
+            'stepup_session' => $row->session_token,
+            'face_challenge' => 'liveness',
+            'next_step' => 'face_liveness',
+        ];
+    }
+
+    /**
+     * Start CheckFace guided liveness for device_mismatch step-up (no Sanctum).
+     *
+     * @return array{ok: bool, message?: string, http?: int, error_code?: string, stepup_session?: string, session_id?: string, challenges?: mixed, expires_in?: mixed, capture?: string, seconds_per_challenge?: mixed}
+     */
+    public function startFaceLiveness(string $sessionToken): array
+    {
+        $resolved = $this->resolveFaceStepupSession($sessionToken);
+        if (! ($resolved['ok'] ?? false)) {
+            return $resolved;
+        }
+
+        /** @var ConsumerDeviceStepupSession $session */
+        $session = $resolved['session'];
+        $wallet = $session->wallet;
+        if (! $wallet) {
+            return ['ok' => false, 'message' => 'Wallet not found.', 'http' => 422];
+        }
+
+        $face = app(WalletFaceCheckService::class);
+        if (! $face->isAvailableForStepUp($wallet)) {
+            return [
+                'ok' => false,
+                'message' => 'Face is not enrolled for this wallet. Use BVN instead.',
+                'http' => 422,
+                'error_code' => 'face_not_available',
+                'stepup_session' => $session->session_token,
+            ];
+        }
+
+        $started = $face->startLiveness($wallet);
+        if (! ($started['ok'] ?? false)) {
+            return [
+                'ok' => false,
+                'message' => $started['message'] ?? 'Could not start liveness.',
+                'http' => (int) ($started['http'] ?? 422),
+                'error_code' => $started['data']['error_code'] ?? 'liveness_start_failed',
+                'stepup_session' => $session->session_token,
+            ];
+        }
+
+        $livenessId = (string) ($started['data']['session_id'] ?? '');
+        if ($livenessId !== '') {
+            \Illuminate\Support\Facades\Cache::put(
+                $this->faceLivenessCacheKey($session->session_token),
+                $livenessId,
+                now()->addMinutes(10),
+            );
+        }
+
+        return [
+            'ok' => true,
+            'stepup_session' => $session->session_token,
+            'session_id' => $livenessId,
+            'challenges' => $started['data']['challenges'] ?? [],
+            'expires_in' => $started['data']['expires_in'] ?? null,
+            'capture' => $started['data']['capture'] ?? 'video',
+            'seconds_per_challenge' => $started['data']['seconds_per_challenge'] ?? null,
+            'face_challenge' => 'liveness',
+        ];
+    }
+
+    /**
+     * Complete guided liveness and mint stepup_token for bind (substitutes BVN+OTP).
+     *
+     * @return array{ok: bool, message?: string, http?: int, error_code?: string, stepup_session?: string, stepup_token?: string, pin_reset_required?: bool, next_step?: string, stepup_mode?: string, score?: float|null, liveness_passed?: bool, liveness_score?: mixed}
+     */
+    public function completeFaceLiveness(
+        string $sessionToken,
+        string $livenessSessionId,
+        \Illuminate\Http\UploadedFile $clip,
+        ?string $deviceId = null,
+        ?string $platform = null,
+        ?string $deviceLabel = null,
+    ): array {
+        $resolved = $this->resolveFaceStepupSession($sessionToken);
+        if (! ($resolved['ok'] ?? false)) {
+            return $resolved;
+        }
+
+        /** @var ConsumerDeviceStepupSession $session */
+        $session = $resolved['session'];
+        $wallet = $session->wallet;
+        if (! $wallet) {
+            return ['ok' => false, 'message' => 'Wallet not found.', 'http' => 422];
+        }
+
+        $expected = \Illuminate\Support\Facades\Cache::get($this->faceLivenessCacheKey($session->session_token));
+        if (! is_string($expected) || $expected === '' || ! hash_equals($expected, $livenessSessionId)) {
+            return [
+                'ok' => false,
+                'message' => 'Start a new face liveness session for this step-up first.',
+                'http' => 422,
+                'error_code' => 'liveness_session_mismatch',
+                'stepup_session' => $session->session_token,
+            ];
+        }
+
+        $face = app(WalletFaceCheckService::class);
+        $matched = $face->completeLivenessForStepUp($wallet, $livenessSessionId, $clip);
+        if (! ($matched['ok'] ?? false)) {
+            return [
+                'ok' => false,
+                'message' => $matched['message'] ?? 'Liveness check failed. Try again or use BVN.',
+                'http' => (int) ($matched['http'] ?? 422),
+                'error_code' => $matched['data']['error_code'] ?? 'liveness_failed',
+                'stepup_session' => $session->session_token,
+            ];
+        }
+
+        \Illuminate\Support\Facades\Cache::forget($this->faceLivenessCacheKey($session->session_token));
+
+        $incomingDeviceId = $this->trust->normalizeDeviceId($deviceId);
+        if ($incomingDeviceId !== null) {
+            $session->pending_device_id = $incomingDeviceId;
+        }
+        if ($platform !== null && $platform !== '') {
+            $session->pending_platform = $platform;
+        }
+        if ($deviceLabel !== null && $deviceLabel !== '') {
+            $session->pending_device_label = $deviceLabel;
+        }
+
+        // Live face proof substitutes for BVN + OTP on this step-up session.
+        $session->bvn_verified_at = $session->bvn_verified_at ?? now();
+        $session->otp_verified_at = now();
+        $token = 'bind_'.Str::random(48);
+        $session->stepup_token = $token;
+        $session->stepup_token_expires_at = now()->addMinutes(15);
+        $session->save();
+
+        return [
+            'ok' => true,
+            'stepup_mode' => 'device_mismatch',
+            'stepup_token' => $token,
+            'pin_reset_required' => true,
+            'next_step' => 'bind',
+            'score' => $matched['data']['score'] ?? null,
+            'liveness_score' => $matched['data']['liveness_score'] ?? null,
+            'liveness_passed' => true,
+            'matched_via' => $matched['data']['matched_via'] ?? null,
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, message?: string, http?: int, error_code?: string, stepup_session?: string, session?: ConsumerDeviceStepupSession}
+     */
+    private function resolveFaceStepupSession(string $sessionToken): array
+    {
         $session = ConsumerDeviceStepupSession::query()
             ->where('session_token', $sessionToken)
             ->first();
@@ -276,61 +445,12 @@ class ConsumerDeviceStepupService
             ];
         }
 
-        $wallet = $session->wallet;
-        if (! $wallet) {
-            return ['ok' => false, 'message' => 'Wallet not found.', 'http' => 422];
-        }
+        return ['ok' => true, 'session' => $session];
+    }
 
-        $face = app(WalletFaceCheckService::class);
-        if (! $face->isAvailableForStepUp($wallet)) {
-            return [
-                'ok' => false,
-                'message' => 'Face is not enrolled for this wallet. Use BVN instead.',
-                'http' => 422,
-                'error_code' => 'face_not_available',
-                'stepup_session' => $session->session_token,
-            ];
-        }
-
-        $matched = $face->matchSelfieForStepUp($wallet, $photo);
-        if (! ($matched['ok'] ?? false)) {
-            return [
-                'ok' => false,
-                'message' => $matched['message'] ?? 'Face did not match. Try again or use BVN.',
-                'http' => (int) ($matched['http'] ?? 422),
-                'error_code' => $matched['data']['error_code'] ?? 'face_mismatch',
-                'stepup_session' => $session->session_token,
-            ];
-        }
-
-        $incomingDeviceId = $this->trust->normalizeDeviceId($deviceId);
-        if ($incomingDeviceId !== null) {
-            $session->pending_device_id = $incomingDeviceId;
-        }
-        if ($platform !== null && $platform !== '') {
-            $session->pending_platform = $platform;
-        }
-        if ($deviceLabel !== null && $deviceLabel !== '') {
-            $session->pending_device_label = $deviceLabel;
-        }
-
-        // Face proof substitutes for BVN + OTP on this step-up session.
-        $session->bvn_verified_at = $session->bvn_verified_at ?? now();
-        $session->otp_verified_at = now();
-        $token = 'bind_'.Str::random(48);
-        $session->stepup_token = $token;
-        $session->stepup_token_expires_at = now()->addMinutes(15);
-        $session->save();
-
-        return [
-            'ok' => true,
-            'stepup_mode' => 'device_mismatch',
-            'stepup_token' => $token,
-            'pin_reset_required' => true,
-            'next_step' => 'bind',
-            'score' => $matched['data']['score'] ?? null,
-            'liveness_passed' => (bool) ($matched['data']['liveness_passed'] ?? true),
-        ];
+    private function faceLivenessCacheKey(string $sessionToken): string
+    {
+        return 'consumer_stepup_face_liveness:'.$sessionToken;
     }
 
     public function findSessionByStepupToken(string $token): ?ConsumerDeviceStepupSession

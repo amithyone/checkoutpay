@@ -48,7 +48,8 @@ class ConsumerDeviceStepupFaceTest extends TestCase
             'X-Device-Id' => 'cn_other_install',
         ])->assertStatus(403)
             ->assertJsonPath('data.stepup_mode', 'device_mismatch')
-            ->assertJsonPath('data.face_available', true);
+            ->assertJsonPath('data.face_available', true)
+            ->assertJsonPath('data.face_challenge', 'liveness');
     }
 
     public function test_first_device_email_forces_face_available_false(): void
@@ -66,7 +67,7 @@ class ConsumerDeviceStepupFaceTest extends TestCase
             ->assertJsonPath('data.face_available', false);
     }
 
-    public function test_stepup_face_verify_mints_bind_token(): void
+    public function test_stepup_face_photo_requires_liveness(): void
     {
         [$wallet, $account] = $this->seedTrustedWallet();
         $wallet->forceFill(['face_enrolled_at' => now()])->save();
@@ -82,29 +83,79 @@ class ConsumerDeviceStepupFaceTest extends TestCase
             'expires_at' => now()->addMinutes(30),
         ]);
 
+        $this->post('/api/v1/consumer/auth/device/stepup/face/verify', [
+            'stepup_session' => $session->session_token,
+            'photo' => UploadedFile::fake()->image('selfie.jpg', 400, 400),
+        ], [
+            'Accept' => 'application/json',
+            'X-Device-Id' => 'cn_new_phone',
+        ])->assertStatus(422)
+            ->assertJsonPath('data.error_code', 'face_liveness_required')
+            ->assertJsonPath('data.face_challenge', 'liveness');
+    }
+
+    public function test_stepup_face_liveness_video_mints_bind_token(): void
+    {
+        [$wallet, $account] = $this->seedTrustedWallet();
+        $wallet->forceFill(['face_enrolled_at' => now()])->save();
+
+        $session = ConsumerDeviceStepupSession::query()->create([
+            'session_token' => 'sess_face_live_1',
+            'consumer_wallet_api_account_id' => $account->id,
+            'phone_e164' => self::PHONE,
+            'whatsapp_wallet_id' => $wallet->id,
+            'pending_device_id' => 'cn_new_phone',
+            'stepup_mode' => 'device_mismatch',
+            'auth_verified_at' => now(),
+            'expires_at' => now()->addMinutes(30),
+        ]);
+
         $this->mock(WalletFaceCheckService::class, function ($face) {
             $face->shouldReceive('isAvailableForStepUp')->andReturn(true);
-            $face->shouldReceive('matchSelfieForStepUp')->once()->andReturn([
+            $face->shouldReceive('startLiveness')->once()->andReturn([
                 'ok' => true,
-                'message' => 'Face matched.',
-                'data' => ['score' => 94.0, 'liveness_passed' => true],
+                'message' => 'Liveness session created.',
+                'data' => [
+                    'session_id' => 'lv_test_abc',
+                    'challenges' => ['center', 'blink'],
+                    'expires_in' => 120,
+                    'capture' => 'video',
+                    'seconds_per_challenge' => 2,
+                ],
+            ]);
+            $face->shouldReceive('completeLivenessForStepUp')->once()->andReturn([
+                'ok' => true,
+                'message' => 'Liveness passed.',
+                'data' => [
+                    'score' => 94.0,
+                    'liveness_score' => 88.0,
+                    'liveness_passed' => true,
+                    'matched_via' => 'latest',
+                ],
             ]);
         });
 
-        $file = UploadedFile::fake()->image('selfie.jpg', 400, 400);
-
-        $this->post('/api/v1/consumer/auth/device/stepup/face/verify', [
+        $this->postJson('/api/v1/consumer/auth/device/stepup/face/liveness/session', [
             'stepup_session' => $session->session_token,
-            'photo' => $file,
+        ], [
+            'X-Device-Id' => 'cn_new_phone',
+        ])->assertOk()
+            ->assertJsonPath('data.session_id', 'lv_test_abc')
+            ->assertJsonPath('data.face_challenge', 'liveness');
+
+        $clip = UploadedFile::fake()->create('clip.mp4', 200, 'video/mp4');
+
+        $this->post('/api/v1/consumer/auth/device/stepup/face/liveness/video', [
+            'stepup_session' => $session->session_token,
+            'session_id' => 'lv_test_abc',
+            'clip' => $clip,
         ], [
             'Accept' => 'application/json',
             'X-Device-Id' => 'cn_new_phone',
         ])->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.stepup_mode', 'device_mismatch')
             ->assertJsonPath('data.next_step', 'bind')
-            ->assertJsonPath('data.pin_reset_required', true)
-            ->assertJsonPath('data.score', 94)
+            ->assertJsonPath('data.liveness_passed', true)
             ->assertJsonStructure(['data' => ['stepup_token']]);
 
         $session->refresh();
@@ -113,7 +164,7 @@ class ConsumerDeviceStepupFaceTest extends TestCase
         $this->assertNotNull($session->bvn_verified_at);
     }
 
-    public function test_stepup_face_verify_rejects_when_not_enrolled(): void
+    public function test_stepup_face_liveness_rejects_when_not_enrolled(): void
     {
         [$wallet, $account] = $this->seedTrustedWallet();
 
@@ -132,11 +183,9 @@ class ConsumerDeviceStepupFaceTest extends TestCase
             $face->shouldReceive('isAvailableForStepUp')->andReturn(false);
         });
 
-        $this->post('/api/v1/consumer/auth/device/stepup/face/verify', [
+        $this->postJson('/api/v1/consumer/auth/device/stepup/face/liveness/session', [
             'stepup_session' => $session->session_token,
-            'photo' => UploadedFile::fake()->image('selfie.jpg'),
         ], [
-            'Accept' => 'application/json',
             'X-Device-Id' => 'cn_new_phone',
         ])->assertStatus(422)
             ->assertJsonPath('data.error_code', 'face_not_available');

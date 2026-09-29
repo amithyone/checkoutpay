@@ -131,6 +131,7 @@ class ConsumerDeviceTrustService
                 'email_masked' => $emailMasked,
                 'device_id' => $session->pending_device_id,
                 'face_available' => false,
+                'face_challenge' => null,
                 'push_approval_available' => false,
                 'push_approval_expires_at' => null,
             ];
@@ -160,6 +161,7 @@ class ConsumerDeviceTrustService
             'email_masked' => $emailMasked,
             'device_id' => $session->pending_device_id,
             'face_available' => $faceAvailable,
+            'face_challenge' => $faceAvailable ? 'liveness' : null,
         ], $pushMeta);
     }
 
