@@ -48,19 +48,18 @@ class ConsumerDeviceTrustService
             return null;
         }
 
+        $incoming = $this->normalizeDeviceId($deviceId);
+        // Legacy builds omit X-Device-Id / device_id — allow login until they upgrade.
+        // New builds that send an install id are gated against the trusted row.
+        if ($incoming === null) {
+            return null;
+        }
+
         $trusted = $this->activeTrustedDevice($account);
         if ($trusted === null) {
             return (bool) config('consumer_wallet.device_first_trust_email_otp', true)
                 ? 'first_device_email'
                 : null;
-        }
-
-        $incoming = $this->normalizeDeviceId($deviceId);
-        if ($incoming === null) {
-            // Native apps often omit X-Device-Id. Use email OTP to mint/bind instead of KYC mismatch.
-            return (bool) config('consumer_wallet.device_first_trust_email_otp', true)
-                ? 'first_device_email'
-                : 'device_mismatch';
         }
 
         $trustedId = $this->normalizeDeviceId($trusted->device_id);

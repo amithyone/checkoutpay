@@ -59,10 +59,10 @@ class ConsumerDeviceTrustServiceTest extends TestCase
 
         $this->assertTrue($service->requiresStepUp($account, 'device-a'));
         $this->assertSame('first_device_email', $service->stepUpMode($account, 'device-a'));
-        $this->assertSame('first_device_email', $service->stepUpMode($account, null));
+        $this->assertNull($service->stepUpMode($account, null));
     }
 
-    public function test_missing_device_id_uses_email_rebind_when_trusted_exists(): void
+    public function test_missing_device_id_allows_legacy_app_login(): void
     {
         config([
             'consumer_wallet.device_trust_enabled' => true,
@@ -80,9 +80,29 @@ class ConsumerDeviceTrustServiceTest extends TestCase
         $account = new ConsumerWalletApiAccount(['id' => 3]);
         $account->setRelation('trustedDevices', collect([$trusted]));
 
-        $this->assertSame('first_device_email', $service->stepUpMode($account, null));
+        // Old app: no install id → no gate.
+        $this->assertNull($service->stepUpMode($account, null));
+        $this->assertFalse($service->requiresStepUp($account, null));
+
+        // New app: wrong / matching install id.
         $this->assertSame('device_mismatch', $service->stepUpMode($account, 'phone-two'));
         $this->assertNull($service->stepUpMode($account, 'phone-one'));
+    }
+
+    public function test_device_id_present_without_trusted_requires_first_email(): void
+    {
+        config([
+            'consumer_wallet.device_trust_enabled' => true,
+            'consumer_wallet.device_stepup_required_on_login' => true,
+            'consumer_wallet.device_first_trust_email_otp' => true,
+        ]);
+
+        $service = $this->app->make(ConsumerDeviceTrustService::class);
+        $account = new ConsumerWalletApiAccount(['id' => 4]);
+        $account->setRelation('trustedDevices', collect());
+
+        $this->assertNull($service->stepUpMode($account, null));
+        $this->assertSame('first_device_email', $service->stepUpMode($account, 'cn_new_install_abc'));
     }
 
     public function test_first_device_email_stepup_can_be_disabled(): void

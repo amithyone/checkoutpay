@@ -120,7 +120,11 @@ class ConsumerAppSessionService
             'app_version' => $this->trimNullable((string) ($ctx['app_version'] ?? $request->header('X-App-Version', ''))),
             'device_label' => $this->trimNullable((string) ($ctx['device_label'] ?? $request->header('X-Device-Label', ''))),
             'device_id' => $this->normalizeDeviceId(
-                (string) ($ctx['device_id'] ?? $request->input('device_id') ?? $request->header('X-Device-Id', ''))
+                (string) (
+                    $request->header('X-Device-Id', '')
+                    ?: ($request->input('device_id') ?? '')
+                    ?: ($ctx['device_id'] ?? '')
+                )
             ),
         ];
     }

@@ -5,8 +5,10 @@ return [
     'device_trust_enabled' => filter_var(env('CONSUMER_DEVICE_TRUST_ENABLED', true), FILTER_VALIDATE_BOOL),
 
     /**
-     * When true, PIN/OTP login returns 403 “Verify this device” if the account already has a
-     * KYC-trusted device and the request X-Device-Id does not match.
+     * When true, PIN/OTP login returns 403 if the request includes an install id
+     * (X-Device-Id / device_id) that does not match the trusted device, or when
+     * first-trust email OTP is required. Requests with no install id (legacy apps)
+     * are allowed through so older builds keep working until users upgrade.
      */
     'device_stepup_required_on_login' => filter_var(env('CONSUMER_DEVICE_STEPUP_REQUIRED_ON_LOGIN', true), FILTER_VALIDATE_BOOL),
 
