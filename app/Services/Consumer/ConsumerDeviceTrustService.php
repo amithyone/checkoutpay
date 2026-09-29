@@ -33,48 +33,97 @@ class ConsumerDeviceTrustService
     }
 
     /**
-     * Lock login only when the account already has a KYC-trusted device and this request
-     * is from a different (or missing) device_id.
+     * Step-up mode for this login attempt, or null when login may proceed.
+     *
+     * - first_device_email: no trusted device yet → email OTP only, then trust this device
+     * - device_mismatch: different device than the trusted one → full KYC/OTP/PIN flow
      */
-    public function requiresStepUp(ConsumerWalletApiAccount $account, ?string $deviceId = null): bool
+    public function stepUpMode(ConsumerWalletApiAccount $account, ?string $deviceId = null): ?string
     {
         if (! $this->isEnabled()) {
-            return false;
+            return null;
         }
 
         if (! (bool) config('consumer_wallet.device_stepup_required_on_login', true)) {
-            return false;
+            return null;
         }
 
         $trusted = $this->activeTrustedDevice($account);
         if ($trusted === null) {
-            return false;
+            return (bool) config('consumer_wallet.device_first_trust_email_otp', true)
+                ? 'first_device_email'
+                : null;
         }
 
         $incoming = $this->normalizeDeviceId($deviceId);
         if ($incoming === null) {
-            return true;
+            return 'device_mismatch';
         }
 
         $trustedId = $this->normalizeDeviceId($trusted->device_id);
 
-        return $trustedId === null || ! hash_equals($trustedId, $incoming);
+        return ($trustedId === null || ! hash_equals($trustedId, $incoming))
+            ? 'device_mismatch'
+            : null;
     }
 
     /**
-     * @return array{stepup_required: bool, stepup_session: string, other_device_label: string|null, channels: string[], push_approval_available: bool, push_approval_expires_at: string|null, pin_reset_required?: bool, next_step?: string}
+     * Lock login when the account needs device verification (first trust or mismatch).
+     */
+    public function requiresStepUp(ConsumerWalletApiAccount $account, ?string $deviceId = null): bool
+    {
+        return $this->stepUpMode($account, $deviceId) !== null;
+    }
+
+    public function isFirstDeviceEmailStepUp(?ConsumerWalletApiAccount $account): bool
+    {
+        if ($account === null || ! $this->isEnabled()) {
+            return false;
+        }
+
+        if (! (bool) config('consumer_wallet.device_first_trust_email_otp', true)) {
+            return false;
+        }
+
+        return $this->activeTrustedDevice($account) === null;
+    }
+
+    /**
+     * @return array{stepup_required: bool, stepup_session: string, stepup_mode: string, other_device_label: string|null, channels: string[], push_approval_available: bool, push_approval_expires_at: string|null, pin_reset_required?: bool, next_step?: string, email_masked?: string|null}
      */
     public function stepUpPayload(ConsumerDeviceStepupSession $session, WhatsappWallet $wallet): array
     {
         $pushMeta = app(ConsumerDeviceStepupPushService::class)->metaForSession($session);
+        $mode = $this->isFirstDeviceEmailStepUp($session->account) ? 'first_device_email' : 'device_mismatch';
+        $email = $wallet->resolveOtpEmail();
+        $emailMasked = is_string($email) && $email !== ''
+            ? $this->maskEmail($email)
+            : null;
+
+        if ($mode === 'first_device_email') {
+            return [
+                'stepup_required' => true,
+                'stepup_session' => $session->session_token,
+                'stepup_mode' => 'first_device_email',
+                'other_device_label' => null,
+                'channels' => ['email'],
+                'pin_reset_required' => false,
+                'next_step' => 'verify_email_otp',
+                'email_masked' => $emailMasked,
+                'push_approval_available' => false,
+                'push_approval_expires_at' => null,
+            ];
+        }
 
         return array_merge([
             'stepup_required' => true,
             'stepup_session' => $session->session_token,
+            'stepup_mode' => 'device_mismatch',
             'other_device_label' => $this->otherDeviceLabel($session->account),
             'channels' => $this->stepUpChannels($wallet),
             'pin_reset_required' => true,
             'next_step' => 'verify_kyc',
+            'email_masked' => $emailMasked,
         ], $pushMeta);
     }
 
@@ -91,7 +140,7 @@ class ConsumerDeviceTrustService
     public function stepUpChannels(WhatsappWallet $wallet): array
     {
         $channels = ['whatsapp'];
-        if ($wallet->isTier2() && $wallet->resolveOtpEmail() !== null) {
+        if ($wallet->resolveOtpEmail() !== null) {
             $channels[] = 'email';
         }
 
@@ -125,7 +174,77 @@ class ConsumerDeviceTrustService
     }
 
     /**
+     * After email OTP for first-device trust: bind this install (no transfer lock / no PIN reset).
+     *
+     * @return array{ok: bool, message?: string, token?: string, wallet_id?: int, phone_e164?: string, trusted_device_id?: int}
+     */
+    public function bindFirstDeviceAfterEmailOtp(
+        ConsumerDeviceStepupSession $session,
+        ?string $deviceId = null,
+        ?string $platform = null,
+        ?string $deviceLabel = null,
+    ): array {
+        $account = $session->account;
+        $wallet = $session->wallet;
+        if (! $account || ! $wallet) {
+            return ['ok' => false, 'message' => 'Account not found.'];
+        }
+
+        if ($session->otp_verified_at === null) {
+            return ['ok' => false, 'message' => 'Verify the email OTP first.'];
+        }
+
+        $normalized = $this->normalizeDeviceId($deviceId ?? $session->pending_device_id);
+        if ($normalized === null) {
+            return ['ok' => false, 'message' => 'device_id is required (send X-Device-Id).'];
+        }
+
+        return DB::transaction(function () use ($session, $account, $normalized, $platform, $deviceLabel) {
+            $device = $this->upsertTrustedDevice(
+                $account,
+                $normalized,
+                $platform ?? $session->pending_platform,
+                $deviceLabel ?? $session->pending_device_label,
+                applyTransferLock: false,
+                revokeOthers: false,
+            );
+
+            $account->pin_reset_required = false;
+            $account->save();
+
+            $session->delete();
+
+            $account->tokens()->delete();
+            $plain = app(ConsumerAppSessionService::class)->createAccessToken($account)->plainTextToken;
+
+            return [
+                'ok' => true,
+                'token' => $plain,
+                'wallet_id' => (int) $account->whatsapp_wallet_id,
+                'phone_e164' => (string) $account->phone_e164,
+                'trusted_device_id' => (int) $device->id,
+            ];
+        });
+    }
+
+    private function maskEmail(string $email): string
+    {
+        $email = strtolower(trim($email));
+        $parts = explode('@', $email, 2);
+        if (count($parts) !== 2 || $parts[0] === '') {
+            return '***';
+        }
+        $local = $parts[0];
+        $domain = $parts[1];
+        $visible = strlen($local) <= 2 ? $local[0].'*' : substr($local, 0, 2).str_repeat('*', max(1, strlen($local) - 2));
+
+        return $visible.'@'.$domain;
+    }
+
+    /**
      * First login with a device_id and no trusted device yet → bind this install (no transfer lock).
+     * Prefer email OTP first-trust (`device_first_trust_email_otp`) on normal login; this remains
+     * for registration bootstrap when that flag is off or registration explicitly trusts the device.
      */
     public function bootstrapTrustedDeviceIfEligible(
         ConsumerWalletApiAccount $account,

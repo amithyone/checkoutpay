@@ -10,6 +10,12 @@ return [
      */
     'device_stepup_required_on_login' => filter_var(env('CONSUMER_DEVICE_STEPUP_REQUIRED_ON_LOGIN', true), FILTER_VALIDATE_BOOL),
 
+    /**
+     * Existing wallets with no trusted device must verify an email OTP once before the
+     * current install becomes trusted (devices stay untrusted until then).
+     */
+    'device_first_trust_email_otp' => filter_var(env('CONSUMER_DEVICE_FIRST_TRUST_EMAIL_OTP', true), FILTER_VALIDATE_BOOL),
+
     /** WebAuthn relying party ID (must match associated domains / asset links). */
     'webauthn_rp_id' => env('CONSUMER_WEBAUTHN_RP_ID', 'check-outpay.com'),
 

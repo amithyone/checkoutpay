@@ -154,11 +154,15 @@ class ConsumerWalletAuthController extends Controller
                 $ctx['platform'],
                 $ctx['device_label'],
             );
+            $payload = $trust->stepUpPayload($session, $wallet);
+            $message = ($payload['stepup_mode'] ?? '') === 'first_device_email'
+                ? 'Enter the email code to trust this device'
+                : 'Verify this device to continue';
 
             return response()->json([
                 'success' => false,
-                'message' => 'Verify this device to continue',
-                'data' => array_merge($trust->stepUpPayload($session, $wallet), [
+                'message' => $message,
+                'data' => array_merge($payload, [
                     'region' => $region,
                 ]),
             ], 403);
@@ -359,11 +363,15 @@ class ConsumerWalletAuthController extends Controller
                 $ctx['platform'],
                 $ctx['device_label'],
             );
+            $payload = $trust->stepUpPayload($session, $wallet);
+            $message = ($payload['stepup_mode'] ?? '') === 'first_device_email'
+                ? 'Enter the email code to trust this device'
+                : 'Verify this device to continue';
 
             return response()->json([
                 'success' => false,
-                'message' => 'Verify this device to continue',
-                'data' => $trust->stepUpPayload($session, $wallet),
+                'message' => $message,
+                'data' => $payload,
             ], 403);
         }
 
