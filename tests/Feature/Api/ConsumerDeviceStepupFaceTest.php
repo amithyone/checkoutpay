@@ -91,7 +91,8 @@ class ConsumerDeviceStepupFaceTest extends TestCase
             'X-Device-Id' => 'cn_new_phone',
         ])->assertStatus(422)
             ->assertJsonPath('data.error_code', 'face_liveness_required')
-            ->assertJsonPath('data.face_challenge', 'liveness');
+            ->assertJsonPath('data.face_challenge', 'liveness')
+            ->assertJsonPath('data.next_step', 'liveness_session');
     }
 
     public function test_stepup_face_liveness_video_mints_bind_token(): void
@@ -117,10 +118,10 @@ class ConsumerDeviceStepupFaceTest extends TestCase
                 'message' => 'Liveness session created.',
                 'data' => [
                     'session_id' => 'lv_test_abc',
-                    'challenges' => ['center', 'blink'],
-                    'expires_in' => 120,
+                    'challenges' => ['center', 'turn_left', 'turn_right', 'smile'],
+                    'expires_in' => 180,
                     'capture' => 'video',
-                    'seconds_per_challenge' => 2,
+                    'seconds_per_challenge' => 2.4,
                 ],
             ]);
             $face->shouldReceive('completeLivenessForStepUp')->once()->andReturn([
@@ -135,13 +136,20 @@ class ConsumerDeviceStepupFaceTest extends TestCase
             ]);
         });
 
-        $this->postJson('/api/v1/consumer/auth/device/stepup/face/liveness/session', [
+        $start = $this->postJson('/api/v1/consumer/auth/device/stepup/face/liveness/session', [
             'stepup_session' => $session->session_token,
         ], [
             'X-Device-Id' => 'cn_new_phone',
         ])->assertOk()
             ->assertJsonPath('data.session_id', 'lv_test_abc')
-            ->assertJsonPath('data.face_challenge', 'liveness');
+            ->assertJsonPath('data.face_challenge', 'liveness')
+            ->assertJsonPath('data.instructions', 'Follow the on-screen prompts')
+            ->assertJsonPath('data.challenges.0.id', 'center')
+            ->assertJsonPath('data.challenges.1.id', 'left')
+            ->assertJsonPath('data.challenges.1.prompt', 'Look left');
+
+        $this->assertNotEmpty($start->json('data.expires_at'));
+        $this->assertIsInt($start->json('data.challenges.0.duration_ms'));
 
         $clip = UploadedFile::fake()->create('clip.mp4', 200, 'video/mp4');
 

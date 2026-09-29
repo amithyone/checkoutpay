@@ -402,12 +402,12 @@ class ConsumerDeviceAuthController extends Controller
 
         return response()->json([
             'success' => false,
-            'message' => $result['message'] ?? 'A live video check is required.',
+            'message' => $result['message'] ?? 'Liveness video required',
             'data' => array_filter([
                 'error_code' => $result['error_code'] ?? 'face_liveness_required',
                 'stepup_session' => $result['stepup_session'] ?? $request->input('stepup_session'),
                 'face_challenge' => $result['face_challenge'] ?? 'liveness',
-                'next_step' => $result['next_step'] ?? 'face_liveness',
+                'next_step' => $result['next_step'] ?? 'liveness_session',
             ], fn ($v) => $v !== null),
         ], $http >= 400 ? $http : 422);
     }
@@ -439,8 +439,10 @@ class ConsumerDeviceAuthController extends Controller
             'data' => [
                 'stepup_session' => $result['stepup_session'],
                 'session_id' => $result['session_id'],
-                'challenges' => $result['challenges'] ?? [],
+                'expires_at' => $result['expires_at'] ?? null,
                 'expires_in' => $result['expires_in'] ?? null,
+                'instructions' => $result['instructions'] ?? 'Follow the on-screen prompts',
+                'challenges' => $result['challenges'] ?? [],
                 'capture' => $result['capture'] ?? 'video',
                 'seconds_per_challenge' => $result['seconds_per_challenge'] ?? null,
                 'face_challenge' => 'liveness',

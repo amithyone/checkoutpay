@@ -254,12 +254,12 @@ class ConsumerDeviceStepupService
 
         return [
             'ok' => false,
-            'message' => 'A live video check is required. Start face liveness, then upload the clip.',
+            'message' => 'Liveness video required',
             'http' => 422,
             'error_code' => 'face_liveness_required',
             'stepup_session' => $row->session_token,
             'face_challenge' => 'liveness',
-            'next_step' => 'face_liveness',
+            'next_step' => 'liveness_session',
         ];
     }
 
@@ -305,24 +305,90 @@ class ConsumerDeviceStepupService
         }
 
         $livenessId = (string) ($started['data']['session_id'] ?? '');
+        $expiresIn = isset($started['data']['expires_in']) ? (int) $started['data']['expires_in'] : 180;
+        $secondsPer = isset($started['data']['seconds_per_challenge'])
+            ? (float) $started['data']['seconds_per_challenge']
+            : 2.4;
         if ($livenessId !== '') {
             \Illuminate\Support\Facades\Cache::put(
                 $this->faceLivenessCacheKey($session->session_token),
                 $livenessId,
-                now()->addMinutes(10),
+                now()->addSeconds(max(60, $expiresIn)),
             );
         }
+
+        $challenges = $this->formatFaceLivenessChallenges(
+            $started['data']['challenges'] ?? [],
+            $secondsPer,
+        );
 
         return [
             'ok' => true,
             'stepup_session' => $session->session_token,
             'session_id' => $livenessId,
-            'challenges' => $started['data']['challenges'] ?? [],
-            'expires_in' => $started['data']['expires_in'] ?? null,
+            'challenges' => $challenges,
+            'expires_in' => $expiresIn,
+            'expires_at' => now()->addSeconds(max(1, $expiresIn))->toIso8601String(),
+            'instructions' => 'Follow the on-screen prompts',
             'capture' => $started['data']['capture'] ?? 'video',
-            'seconds_per_challenge' => $started['data']['seconds_per_challenge'] ?? null,
+            'seconds_per_challenge' => $secondsPer,
             'face_challenge' => 'liveness',
         ];
+    }
+
+    /**
+     * Map CheckFace challenge ids into app UX objects (prompts are on-device; clip is one continuous video).
+     *
+     * @param  list<string|array<string, mixed>>  $raw
+     * @return list<array{id: string, prompt: string, duration_ms: int}>
+     */
+    private function formatFaceLivenessChallenges(array $raw, float $secondsPerChallenge): array
+    {
+        $defaultMs = (int) round(max($secondsPerChallenge, 2.4) * 1000);
+        $centerMs = max($defaultMs, 2800);
+
+        $prompts = [
+            'center' => 'Position your face in the circle',
+            'left' => 'Look left',
+            'right' => 'Look right',
+            'turn_left' => 'Look left',
+            'turn_right' => 'Look right',
+            'smile' => 'Smile',
+            'blink' => 'Blink',
+            'mouth' => 'Open your mouth',
+        ];
+
+        $idAlias = [
+            'turn_left' => 'left',
+            'turn_right' => 'right',
+        ];
+
+        $out = [];
+        foreach ($raw as $item) {
+            if (is_array($item)) {
+                $rawId = (string) ($item['id'] ?? $item['name'] ?? '');
+                $prompt = (string) ($item['prompt'] ?? '');
+                $duration = isset($item['duration_ms']) ? (int) $item['duration_ms'] : null;
+            } else {
+                $rawId = (string) $item;
+                $prompt = '';
+                $duration = null;
+            }
+            if ($rawId === '') {
+                continue;
+            }
+            $id = $idAlias[$rawId] ?? $rawId;
+            if ($prompt === '') {
+                $prompt = $prompts[$rawId] ?? $prompts[$id] ?? ucfirst(str_replace('_', ' ', $id));
+            }
+            $out[] = [
+                'id' => $id,
+                'prompt' => $prompt,
+                'duration_ms' => $duration ?? ($id === 'center' ? $centerMs : $defaultMs),
+            ];
+        }
+
+        return $out;
     }
 
     /**
