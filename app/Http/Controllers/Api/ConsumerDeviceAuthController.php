@@ -378,6 +378,63 @@ class ConsumerDeviceAuthController extends Controller
         ], $result['ok'] ? 200 : 422);
     }
 
+    public function stepupFaceVerify(Request $request, ConsumerDeviceStepupService $stepup, ConsumerAppSessionService $sessions): JsonResponse
+    {
+        $request->validate([
+            'stepup_session' => 'required|string|max:64',
+            'photo' => 'required_without:selfie|file|mimes:jpeg,jpg,png,webp|max:5120',
+            'selfie' => 'required_without:photo|file|mimes:jpeg,jpg,png,webp|max:5120',
+            'device_id' => 'nullable|string|max:128',
+        ]);
+
+        $photo = $request->file('photo') ?? $request->file('selfie');
+        if ($photo === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Upload a selfie photo.',
+                'data' => ['error_code' => 'photo_required'],
+            ], 422);
+        }
+
+        $ctx = $sessions->clientContextFromRequest($request);
+        $deviceId = $sessions->deviceIdFromRequest($request)
+            ?? ($request->input('device_id') ? (string) $request->input('device_id') : null);
+
+        $result = $stepup->verifyFace(
+            (string) $request->input('stepup_session'),
+            $photo,
+            $deviceId,
+            $ctx['platform'],
+            $ctx['device_label'],
+        );
+
+        if (! ($result['ok'] ?? false)) {
+            $http = (int) ($result['http'] ?? 422);
+
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'] ?? 'Face verification failed.',
+                'data' => array_filter([
+                    'error_code' => $result['error_code'] ?? null,
+                    'stepup_session' => $result['stepup_session'] ?? $request->input('stepup_session'),
+                ], fn ($v) => $v !== null),
+            ], $http >= 400 ? $http : 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Face matched. Secure this device.',
+            'data' => [
+                'stepup_mode' => $result['stepup_mode'] ?? 'device_mismatch',
+                'stepup_token' => $result['stepup_token'],
+                'next_step' => $result['next_step'] ?? 'bind',
+                'pin_reset_required' => (bool) ($result['pin_reset_required'] ?? true),
+                'score' => $result['score'] ?? null,
+                'liveness_passed' => (bool) ($result['liveness_passed'] ?? true),
+            ],
+        ]);
+    }
+
     public function stepupOtpVerify(Request $request, ConsumerDeviceStepupService $stepup, ConsumerAppSessionService $sessions): JsonResponse
     {
         $request->validate([

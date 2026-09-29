@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
 /**
  * Wallet face enrollment + challenge tokens + ≥₦30k unfamiliar-recipient gate.
  */
-final class WalletFaceCheckService
+class WalletFaceCheckService
 {
     private const CACHE_PREFIX = 'wallet_face_challenge:';
 
@@ -79,6 +79,66 @@ final class WalletFaceCheckService
             'enrolled' => $enrolled,
             'gallery_size' => $gallery,
             'threshold_ngn' => $this->amountThreshold(),
+        ];
+    }
+
+    /**
+     * Whether device step-up can offer CheckFace (enabled + enrolled template).
+     * Uses the local enrollment flag only — no remote sync on the login hot path.
+     */
+    public function isAvailableForStepUp(WhatsappWallet $wallet): bool
+    {
+        try {
+            return $this->isEnabled() && $wallet->face_enrolled_at !== null;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Match a selfie against the enrolled template without issuing a transfer face_token.
+     *
+     * @return array{ok: bool, message: string, data?: array<string, mixed>, http?: int}
+     */
+    public function matchSelfieForStepUp(WhatsappWallet $wallet, UploadedFile $selfie): array
+    {
+        if (! $this->isEnabled()) {
+            return ['ok' => false, 'message' => 'Face check is not available.', 'http' => 503];
+        }
+
+        if (! $this->isAvailableForStepUp($wallet)) {
+            return [
+                'ok' => false,
+                'message' => 'Face is not enrolled for this wallet. Use BVN instead.',
+                'http' => 422,
+                'data' => ['face_enrolled' => false, 'error_code' => 'face_not_available'],
+            ];
+        }
+
+        $result = $this->client->verifyFace($this->checkfaceUserId($wallet), $selfie);
+        $authenticated = (bool) ($result['data']['authenticated'] ?? false);
+        if (! $result['ok'] || ! $authenticated) {
+            return [
+                'ok' => false,
+                'message' => $result['message'] ?: 'Face did not match. Try again or use BVN.',
+                'http' => $result['status'] === 404 ? 422 : ($result['status'] >= 400 ? $result['status'] : 422),
+                'data' => array_merge($result['data'] ?? [], ['error_code' => 'face_mismatch']),
+            ];
+        }
+
+        $score = $result['data']['confidence_score']
+            ?? $result['data']['score']
+            ?? $result['data']['match_score']
+            ?? null;
+
+        return [
+            'ok' => true,
+            'message' => 'Face matched.',
+            'data' => [
+                'score' => is_numeric($score) ? (float) $score : null,
+                'liveness_passed' => (bool) ($result['data']['liveness_passed'] ?? $result['data']['liveness_checked'] ?? true),
+                'confidence_score' => $result['data']['confidence_score'] ?? null,
+            ],
         ];
     }
 

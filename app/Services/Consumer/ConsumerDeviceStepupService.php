@@ -231,6 +231,108 @@ class ConsumerDeviceStepupService
         ];
     }
 
+    /**
+     * CheckFace during device_mismatch step-up (no Sanctum). Face substitutes for BVN+OTP.
+     *
+     * @return array{ok: bool, message?: string, http?: int, error_code?: string, stepup_session?: string, stepup_token?: string, pin_reset_required?: bool, next_step?: string, stepup_mode?: string, score?: float|null, liveness_passed?: bool}
+     */
+    public function verifyFace(
+        string $sessionToken,
+        \Illuminate\Http\UploadedFile $photo,
+        ?string $deviceId = null,
+        ?string $platform = null,
+        ?string $deviceLabel = null,
+    ): array {
+        $session = ConsumerDeviceStepupSession::query()
+            ->where('session_token', $sessionToken)
+            ->first();
+
+        if ($session === null) {
+            return [
+                'ok' => false,
+                'message' => 'Step-up session not found.',
+                'http' => 410,
+                'error_code' => 'stepup_session_invalid',
+            ];
+        }
+
+        if ($session->isExpired()) {
+            return [
+                'ok' => false,
+                'message' => 'Step-up session expired.',
+                'http' => 410,
+                'error_code' => 'stepup_session_expired',
+                'stepup_session' => $session->session_token,
+            ];
+        }
+
+        if ($session->stepup_mode === 'first_device_email' || $this->trust->isEmailOnlyStepUpSession($session)) {
+            return [
+                'ok' => false,
+                'message' => 'CheckFace is not used for first-device email trust. Enter the email code.',
+                'http' => 422,
+                'error_code' => 'face_not_available',
+                'stepup_session' => $session->session_token,
+            ];
+        }
+
+        $wallet = $session->wallet;
+        if (! $wallet) {
+            return ['ok' => false, 'message' => 'Wallet not found.', 'http' => 422];
+        }
+
+        $face = app(WalletFaceCheckService::class);
+        if (! $face->isAvailableForStepUp($wallet)) {
+            return [
+                'ok' => false,
+                'message' => 'Face is not enrolled for this wallet. Use BVN instead.',
+                'http' => 422,
+                'error_code' => 'face_not_available',
+                'stepup_session' => $session->session_token,
+            ];
+        }
+
+        $matched = $face->matchSelfieForStepUp($wallet, $photo);
+        if (! ($matched['ok'] ?? false)) {
+            return [
+                'ok' => false,
+                'message' => $matched['message'] ?? 'Face did not match. Try again or use BVN.',
+                'http' => (int) ($matched['http'] ?? 422),
+                'error_code' => $matched['data']['error_code'] ?? 'face_mismatch',
+                'stepup_session' => $session->session_token,
+            ];
+        }
+
+        $incomingDeviceId = $this->trust->normalizeDeviceId($deviceId);
+        if ($incomingDeviceId !== null) {
+            $session->pending_device_id = $incomingDeviceId;
+        }
+        if ($platform !== null && $platform !== '') {
+            $session->pending_platform = $platform;
+        }
+        if ($deviceLabel !== null && $deviceLabel !== '') {
+            $session->pending_device_label = $deviceLabel;
+        }
+
+        // Face proof substitutes for BVN + OTP on this step-up session.
+        $session->bvn_verified_at = $session->bvn_verified_at ?? now();
+        $session->otp_verified_at = now();
+        $token = 'bind_'.Str::random(48);
+        $session->stepup_token = $token;
+        $session->stepup_token_expires_at = now()->addMinutes(15);
+        $session->save();
+
+        return [
+            'ok' => true,
+            'stepup_mode' => 'device_mismatch',
+            'stepup_token' => $token,
+            'pin_reset_required' => true,
+            'next_step' => 'bind',
+            'score' => $matched['data']['score'] ?? null,
+            'liveness_passed' => (bool) ($matched['data']['liveness_passed'] ?? true),
+        ];
+    }
+
     public function findSessionByStepupToken(string $token): ?ConsumerDeviceStepupSession
     {
         $session = ConsumerDeviceStepupSession::query()

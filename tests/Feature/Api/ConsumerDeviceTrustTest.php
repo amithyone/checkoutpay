@@ -204,6 +204,7 @@ class ConsumerDeviceTrustTest extends TestCase
                 $table->string('status', 32)->default('active');
                 $table->decimal('savings_balance', 14, 2)->default(0);
                 $table->boolean('transfer_email_otp_enabled')->default(false);
+                $table->timestamp('face_enrolled_at')->nullable();
                 $table->timestamps();
             });
         }

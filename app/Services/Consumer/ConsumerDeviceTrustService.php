@@ -96,6 +96,10 @@ class ConsumerDeviceTrustService
             return true;
         }
 
+        if ($session->stepup_mode === 'device_mismatch') {
+            return false;
+        }
+
         // Legacy sessions created before stepup_mode was stored.
         return $this->isFirstDeviceEmailStepUp($session->account, $session->pending_device_id);
     }
@@ -126,6 +130,7 @@ class ConsumerDeviceTrustService
                 'next_step' => 'verify_email_otp',
                 'email_masked' => $emailMasked,
                 'device_id' => $session->pending_device_id,
+                'face_available' => false,
                 'push_approval_available' => false,
                 'push_approval_expires_at' => null,
             ];
@@ -135,6 +140,13 @@ class ConsumerDeviceTrustService
             }
 
             return $payload;
+        }
+
+        $faceAvailable = false;
+        try {
+            $faceAvailable = app(WalletFaceCheckService::class)->isAvailableForStepUp($wallet);
+        } catch (\Throwable) {
+            $faceAvailable = false;
         }
 
         return array_merge([
@@ -147,6 +159,7 @@ class ConsumerDeviceTrustService
             'next_step' => 'verify_kyc',
             'email_masked' => $emailMasked,
             'device_id' => $session->pending_device_id,
+            'face_available' => $faceAvailable,
         ], $pushMeta);
     }
 
