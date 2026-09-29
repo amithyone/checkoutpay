@@ -57,7 +57,10 @@ class ConsumerDeviceTrustService
 
         $incoming = $this->normalizeDeviceId($deviceId);
         if ($incoming === null) {
-            return 'device_mismatch';
+            // Native apps often omit X-Device-Id. Use email OTP to mint/bind instead of KYC mismatch.
+            return (bool) config('consumer_wallet.device_first_trust_email_otp', true)
+                ? 'first_device_email'
+                : 'device_mismatch';
         }
 
         $trustedId = $this->normalizeDeviceId($trusted->device_id);
@@ -75,7 +78,7 @@ class ConsumerDeviceTrustService
         return $this->stepUpMode($account, $deviceId) !== null;
     }
 
-    public function isFirstDeviceEmailStepUp(?ConsumerWalletApiAccount $account): bool
+    public function isFirstDeviceEmailStepUp(?ConsumerWalletApiAccount $account, ?string $deviceId = null): bool
     {
         if ($account === null || ! $this->isEnabled()) {
             return false;
@@ -85,23 +88,36 @@ class ConsumerDeviceTrustService
             return false;
         }
 
-        return $this->activeTrustedDevice($account) === null;
+        return $this->stepUpMode($account, $deviceId) === 'first_device_email';
+    }
+
+    public function isEmailOnlyStepUpSession(ConsumerDeviceStepupSession $session): bool
+    {
+        if ($session->stepup_mode === 'first_device_email') {
+            return true;
+        }
+
+        // Legacy sessions created before stepup_mode was stored.
+        return $this->isFirstDeviceEmailStepUp($session->account, $session->pending_device_id);
     }
 
     /**
-     * @return array{stepup_required: bool, stepup_session: string, stepup_mode: string, other_device_label: string|null, channels: string[], push_approval_available: bool, push_approval_expires_at: string|null, pin_reset_required?: bool, next_step?: string, email_masked?: string|null}
+     * @param  array{email_sent?: bool|null, email_message?: string|null}|null  $emailOtp
+     * @return array{stepup_required: bool, stepup_session: string, stepup_mode: string, other_device_label: string|null, channels: string[], push_approval_available: bool, push_approval_expires_at: string|null, pin_reset_required?: bool, next_step?: string, email_masked?: string|null, device_id?: string|null, email_sent?: bool|null, email_message?: string|null}
      */
-    public function stepUpPayload(ConsumerDeviceStepupSession $session, WhatsappWallet $wallet): array
+    public function stepUpPayload(ConsumerDeviceStepupSession $session, WhatsappWallet $wallet, ?array $emailOtp = null): array
     {
         $pushMeta = app(ConsumerDeviceStepupPushService::class)->metaForSession($session);
-        $mode = $this->isFirstDeviceEmailStepUp($session->account) ? 'first_device_email' : 'device_mismatch';
+        $mode = ($session->stepup_mode === 'first_device_email' || $session->stepup_mode === 'device_mismatch')
+            ? $session->stepup_mode
+            : ($this->isEmailOnlyStepUpSession($session) ? 'first_device_email' : 'device_mismatch');
         $email = $wallet->resolveOtpEmail();
         $emailMasked = is_string($email) && $email !== ''
             ? $this->maskEmail($email)
             : null;
 
         if ($mode === 'first_device_email') {
-            return [
+            $payload = [
                 'stepup_required' => true,
                 'stepup_session' => $session->session_token,
                 'stepup_mode' => 'first_device_email',
@@ -110,9 +126,16 @@ class ConsumerDeviceTrustService
                 'pin_reset_required' => false,
                 'next_step' => 'verify_email_otp',
                 'email_masked' => $emailMasked,
+                'device_id' => $session->pending_device_id,
                 'push_approval_available' => false,
                 'push_approval_expires_at' => null,
             ];
+            if ($emailOtp !== null) {
+                $payload['email_sent'] = $emailOtp['email_sent'] ?? null;
+                $payload['email_message'] = $emailOtp['email_message'] ?? null;
+            }
+
+            return $payload;
         }
 
         return array_merge([
@@ -124,6 +147,7 @@ class ConsumerDeviceTrustService
             'pin_reset_required' => true,
             'next_step' => 'verify_kyc',
             'email_masked' => $emailMasked,
+            'device_id' => $session->pending_device_id,
         ], $pushMeta);
     }
 
@@ -176,7 +200,7 @@ class ConsumerDeviceTrustService
     /**
      * After email OTP for first-device trust: bind this install (no transfer lock / no PIN reset).
      *
-     * @return array{ok: bool, message?: string, token?: string, wallet_id?: int, phone_e164?: string, trusted_device_id?: int}
+     * @return array{ok: bool, message?: string, token?: string, wallet_id?: int, phone_e164?: string, trusted_device_id?: int, device_id?: string}
      */
     public function bindFirstDeviceAfterEmailOtp(
         ConsumerDeviceStepupSession $session,
@@ -206,7 +230,8 @@ class ConsumerDeviceTrustService
                 $platform ?? $session->pending_platform,
                 $deviceLabel ?? $session->pending_device_label,
                 applyTransferLock: false,
-                revokeOthers: false,
+                // Replace prior trust so email re-bind (missing X-Device-Id) stays single-device.
+                revokeOthers: true,
             );
 
             $account->pin_reset_required = false;
@@ -223,6 +248,7 @@ class ConsumerDeviceTrustService
                 'wallet_id' => (int) $account->whatsapp_wallet_id,
                 'phone_e164' => (string) $account->phone_e164,
                 'trusted_device_id' => (int) $device->id,
+                'device_id' => $normalized,
             ];
         });
     }

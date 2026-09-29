@@ -366,7 +366,9 @@ class ConsumerWalletOtpService
                 'ok' => false,
                 'message' => $fromWhatsappFallback
                     ? 'WhatsApp and email both failed to send your code. Try again later.'
-                    : 'Could not send OTP email. Try WhatsApp instead.',
+                    : ($forDeviceTrust
+                        ? 'Could not send the device verification email. Tap resend or try again later.'
+                        : 'Could not send OTP email. Try WhatsApp instead.'),
                 'fallback_from_whatsapp' => $fromWhatsappFallback ?: null,
             ];
         }

@@ -15,6 +15,7 @@ class ConsumerDeviceStepupSession extends Model
         'pending_device_id',
         'pending_platform',
         'pending_device_label',
+        'stepup_mode',
         'auth_verified_at',
         'bvn_verified_at',
         'otp_verified_at',

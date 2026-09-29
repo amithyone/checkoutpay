@@ -134,7 +134,7 @@ class ConsumerDeviceAuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Verify this device to continue',
-                'data' => $trust->stepUpPayload($session, $wallet),
+                'data' => $trust->stepUpPayload($session, $wallet, $stepup->lastCreateEmailOtp()),
             ], 403);
         }
 
@@ -383,11 +383,19 @@ class ConsumerDeviceAuthController extends Controller
         $request->validate([
             'stepup_session' => 'required|string|max:64',
             'code' => 'required|string|max:12',
+            'device_id' => 'nullable|string|max:128',
         ]);
+
+        $ctx = $sessions->clientContextFromRequest($request);
+        $deviceId = $sessions->deviceIdFromRequest($request)
+            ?? ($request->input('device_id') ? (string) $request->input('device_id') : null);
 
         $result = $stepup->verifyOtp(
             (string) $request->input('stepup_session'),
             (string) $request->input('code'),
+            $deviceId,
+            $ctx['platform'],
+            $ctx['device_label'],
         );
 
         if (! ($result['ok'] ?? false)) {
@@ -429,6 +437,7 @@ class ConsumerDeviceAuthController extends Controller
                     'phone_e164' => $result['phone_e164'] ?? null,
                     'wallet_id' => $result['wallet_id'] ?? null,
                     'trusted_device_id' => $result['trusted_device_id'] ?? null,
+                    'device_id' => $result['device_id'] ?? null,
                     'pin_reset_required' => false,
                     'next_step' => 'done',
                     'app_session_id' => $appSessionId,

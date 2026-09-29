@@ -154,9 +154,12 @@ class ConsumerWalletAuthController extends Controller
                 $ctx['platform'],
                 $ctx['device_label'],
             );
-            $payload = $trust->stepUpPayload($session, $wallet);
+            $payload = $trust->stepUpPayload($session, $wallet, $stepup->lastCreateEmailOtp());
+            $emailSent = $payload['email_sent'] ?? null;
             $message = ($payload['stepup_mode'] ?? '') === 'first_device_email'
-                ? 'Enter the email code to trust this device'
+                ? ($emailSent === false
+                    ? ($payload['email_message'] ?? 'Could not send the email code. Tap resend.')
+                    : 'Enter the email code to trust this device')
                 : 'Verify this device to continue';
 
             return response()->json([
@@ -363,9 +366,12 @@ class ConsumerWalletAuthController extends Controller
                 $ctx['platform'],
                 $ctx['device_label'],
             );
-            $payload = $trust->stepUpPayload($session, $wallet);
+            $payload = $trust->stepUpPayload($session, $wallet, $stepup->lastCreateEmailOtp());
+            $emailSent = $payload['email_sent'] ?? null;
             $message = ($payload['stepup_mode'] ?? '') === 'first_device_email'
-                ? 'Enter the email code to trust this device'
+                ? ($emailSent === false
+                    ? ($payload['email_message'] ?? 'Could not send the email code. Tap resend.')
+                    : 'Enter the email code to trust this device')
                 : 'Verify this device to continue';
 
             return response()->json([

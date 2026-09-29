@@ -29,6 +29,7 @@ class ConsumerDeviceTrustTest extends TestCase
         config([
             'consumer_wallet.device_trust_enabled' => true,
             'consumer_wallet.device_stepup_required_on_login' => true,
+            'consumer_wallet.device_first_trust_email_otp' => false,
             'consumer_wallet.high_value_single_transfer_cap' => 10000,
             'consumer_wallet.transfer_lock_hours' => 24,
             'consumer_wallet.web_daily_transfer_cap_enabled' => true,
@@ -258,6 +259,7 @@ class ConsumerDeviceTrustTest extends TestCase
                 $table->string('pending_device_id', 128)->nullable();
                 $table->string('pending_platform', 32)->nullable();
                 $table->string('pending_device_label', 120)->nullable();
+                $table->string('stepup_mode', 32)->nullable();
                 $table->timestamp('auth_verified_at')->nullable();
                 $table->timestamp('bvn_verified_at')->nullable();
                 $table->timestamp('otp_verified_at')->nullable();

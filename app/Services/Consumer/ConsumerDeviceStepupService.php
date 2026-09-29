@@ -11,6 +11,9 @@ use Illuminate\Support\Str;
 
 class ConsumerDeviceStepupService
 {
+    /** @var array{email_sent: bool|null, email_message: string|null}|null */
+    private ?array $lastCreateEmailOtp = null;
+
     public function __construct(
         private ConsumerWalletOtpService $otp,
         private ConsumerWalletPinVerifier $pinVerifier,
@@ -18,6 +21,16 @@ class ConsumerDeviceStepupService
         private ConsumerDeviceTrustService $trust,
         private ConsumerDeviceStepupPushService $stepupPush,
     ) {}
+
+    /**
+     * Email OTP outcome from the most recent createSession() call (first-device flow).
+     *
+     * @return array{email_sent: bool|null, email_message: string|null}|null
+     */
+    public function lastCreateEmailOtp(): ?array
+    {
+        return $this->lastCreateEmailOtp;
+    }
 
     /**
      * @return array{ok: bool, message?: string, stepup_required?: bool, stepup_session?: string, stepup_mode?: string, other_device_label?: string|null, channels?: string[], pin_reset_required?: bool, next_step?: string, email_masked?: string|null}
@@ -73,7 +86,10 @@ class ConsumerDeviceStepupService
 
         $session = $this->createSession($account, $wallet, $deviceId, $platform, $deviceLabel);
 
-        return array_merge(['ok' => true], $this->trust->stepUpPayload($session, $wallet));
+        return array_merge(
+            ['ok' => true],
+            $this->trust->stepUpPayload($session, $wallet, $this->lastCreateEmailOtp),
+        );
     }
 
     /**
@@ -86,7 +102,7 @@ class ConsumerDeviceStepupService
             return ['ok' => false, 'message' => 'Step-up session expired.'];
         }
 
-        if ($this->trust->isFirstDeviceEmailStepUp($session->account)) {
+        if ($this->trust->isEmailOnlyStepUpSession($session)) {
             return ['ok' => false, 'message' => 'BVN is not required. Enter the email OTP we sent.'];
         }
 
@@ -111,7 +127,7 @@ class ConsumerDeviceStepupService
             return ['ok' => false, 'message' => 'Step-up session expired.'];
         }
 
-        $firstDevice = $this->trust->isFirstDeviceEmailStepUp($session->account);
+        $firstDevice = $this->trust->isEmailOnlyStepUpSession($session);
         if ($firstDevice) {
             $channel = 'email';
         } elseif ($session->bvn_verified_at === null) {
@@ -138,16 +154,21 @@ class ConsumerDeviceStepupService
     }
 
     /**
-     * @return array{ok: bool, message?: string, stepup_token?: string, pin_reset_required?: bool, next_step?: string, token?: string, token_type?: string, phone_e164?: string, wallet_id?: int, trusted_device_id?: int, stepup_mode?: string}
+     * @return array{ok: bool, message?: string, stepup_token?: string, pin_reset_required?: bool, next_step?: string, token?: string, token_type?: string, phone_e164?: string, wallet_id?: int, trusted_device_id?: int, device_id?: string|null, stepup_mode?: string}
      */
-    public function verifyOtp(string $sessionToken, string $code): array
-    {
+    public function verifyOtp(
+        string $sessionToken,
+        string $code,
+        ?string $deviceId = null,
+        ?string $platform = null,
+        ?string $deviceLabel = null,
+    ): array {
         $session = $this->findActiveSession($sessionToken);
         if ($session === null) {
             return ['ok' => false, 'message' => 'Step-up session expired.'];
         }
 
-        $firstDevice = $this->trust->isFirstDeviceEmailStepUp($session->account);
+        $firstDevice = $this->trust->isEmailOnlyStepUpSession($session);
         if (! $firstDevice && $session->bvn_verified_at === null) {
             return ['ok' => false, 'message' => 'Verify BVN/NIN first.'];
         }
@@ -155,6 +176,17 @@ class ConsumerDeviceStepupService
         $verified = $this->otp->verifyOtp((string) $session->phone_e164, $code);
         if (! $verified['ok']) {
             return ['ok' => false, 'message' => $verified['message']];
+        }
+
+        $incomingDeviceId = $this->trust->normalizeDeviceId($deviceId);
+        if ($incomingDeviceId !== null) {
+            $session->pending_device_id = $incomingDeviceId;
+        }
+        if ($platform !== null && $platform !== '') {
+            $session->pending_platform = $platform;
+        }
+        if ($deviceLabel !== null && $deviceLabel !== '') {
+            $session->pending_device_label = $deviceLabel;
         }
 
         $session->otp_verified_at = now();
@@ -179,6 +211,7 @@ class ConsumerDeviceStepupService
                 'phone_e164' => $bound['phone_e164'] ?? null,
                 'wallet_id' => $bound['wallet_id'] ?? null,
                 'trusted_device_id' => $bound['trusted_device_id'] ?? null,
+                'device_id' => $bound['device_id'] ?? $session->pending_device_id,
                 'pin_reset_required' => false,
                 'next_step' => 'done',
             ];
@@ -218,36 +251,50 @@ class ConsumerDeviceStepupService
         ?string $pendingPlatform = null,
         ?string $pendingDeviceLabel = null,
     ): ConsumerDeviceStepupSession {
+        $this->lastCreateEmailOtp = null;
+
         ConsumerDeviceStepupSession::query()
             ->where('consumer_wallet_api_account_id', $account->id)
             ->where('expires_at', '>', now())
             ->delete();
 
-        $firstDevice = $this->trust->isFirstDeviceEmailStepUp($account);
-        if (! $firstDevice) {
+        // Decide mode from the client-supplied device id BEFORE minting a server id.
+        $clientDeviceId = $this->trust->normalizeDeviceId($pendingDeviceId);
+        $mode = $this->trust->stepUpMode($account, $clientDeviceId) ?? 'device_mismatch';
+        $emailOnly = $mode === 'first_device_email';
+        if (! $emailOnly) {
             $account->forceFill(['pin_reset_required' => true])->save();
         }
+
+        // Native apps often omit X-Device-Id; mint a stable id so email trust can complete.
+        // Clients should persist data.device_id from the step-up / verify response and send it back.
+        $normalizedPending = $clientDeviceId ?? ('dev_'.Str::lower(Str::random(40)));
 
         $session = ConsumerDeviceStepupSession::query()->create([
             'session_token' => 'sess_'.Str::random(40),
             'consumer_wallet_api_account_id' => $account->id,
             'phone_e164' => (string) $account->phone_e164,
             'whatsapp_wallet_id' => $wallet->id,
-            'pending_device_id' => $this->trust->normalizeDeviceId($pendingDeviceId),
+            'pending_device_id' => $normalizedPending,
             'pending_platform' => $pendingPlatform,
             'pending_device_label' => $pendingDeviceLabel,
+            'stepup_mode' => $mode,
             'auth_verified_at' => now(),
             'expires_at' => now()->addMinutes(30),
         ]);
 
-        if ($firstDevice) {
-            $this->otp->requestOtp(
+        if ($emailOnly) {
+            $otpResult = $this->otp->requestOtp(
                 (string) $account->phone_e164,
                 'email',
                 null,
                 null,
                 forDeviceTrust: true,
             );
+            $this->lastCreateEmailOtp = [
+                'email_sent' => (bool) ($otpResult['ok'] ?? false),
+                'email_message' => isset($otpResult['message']) ? (string) $otpResult['message'] : null,
+            ];
         }
 
         return $session;
