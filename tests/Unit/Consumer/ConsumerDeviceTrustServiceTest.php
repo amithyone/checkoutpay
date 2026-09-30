@@ -158,4 +158,44 @@ class ConsumerDeviceTrustServiceTest extends TestCase
         $tier2WithBvn = new \App\Models\WhatsappWallet(['tier' => 2, 'kyc_bvn' => '12345678901', 'kyc_nin' => null]);
         $this->assertTrue($service->bvnRequiredForStepUp($tier2WithBvn));
     }
+
+    public function test_mismatch_payload_next_step_follows_bvn_requirement(): void
+    {
+        config([
+            'consumer_wallet.device_trust_enabled' => true,
+            'consumer_wallet.device_stepup_required_on_login' => true,
+        ]);
+
+        $service = $this->app->make(ConsumerDeviceTrustService::class);
+        $trusted = new \App\Models\ConsumerTrustedDevice([
+            'device_id' => 'phone-one',
+            'label' => 'Pixel',
+            'kyc_confirmed_at' => now(),
+        ]);
+        $trusted->setRelation('passkey', null);
+        $account = new ConsumerWalletApiAccount(['id' => 9]);
+        $account->setRelation('trustedDevices', collect([$trusted]));
+
+        $session = new \App\Models\ConsumerDeviceStepupSession([
+            'session_token' => 'sess_next_step',
+            'pending_device_id' => 'phone-two',
+            'stepup_mode' => 'device_mismatch',
+        ]);
+        $session->setRelation('account', $account);
+
+        $tier1 = new \App\Models\WhatsappWallet(['id' => 1, 'tier' => 1, 'phone_e164' => '2348011111111']);
+        $payloadTier1 = $service->stepUpPayload($session, $tier1);
+        $this->assertSame('verify_otp', $payloadTier1['next_step']);
+        $this->assertFalse($payloadTier1['bvn_required']);
+
+        $tier2 = new \App\Models\WhatsappWallet([
+            'id' => 2,
+            'tier' => 2,
+            'phone_e164' => '2348022222222',
+            'kyc_bvn' => '12345678901',
+        ]);
+        $payloadTier2 = $service->stepUpPayload($session, $tier2);
+        $this->assertSame('verify_kyc', $payloadTier2['next_step']);
+        $this->assertTrue($payloadTier2['bvn_required']);
+    }
 }

@@ -263,7 +263,13 @@ class ConsumerDeviceAuthController extends Controller
                 'channels' => $result['channels'] ?? ['whatsapp'],
                 'pin_reset_required' => (bool) ($result['pin_reset_required'] ?? true),
                 'next_step' => $result['next_step'] ?? 'verify_kyc',
+                'bvn_required' => array_key_exists('bvn_required', $result)
+                    ? (bool) $result['bvn_required']
+                    : null,
                 'email_masked' => $result['email_masked'] ?? null,
+                'face_available' => $result['face_available'] ?? null,
+                'face_challenge' => $result['face_challenge'] ?? null,
+                'device_id' => $result['device_id'] ?? null,
                 'push_approval_available' => (bool) ($result['push_approval_available'] ?? false),
                 'push_approval_expires_at' => $result['push_approval_expires_at'] ?? null,
             ], fn ($v) => $v !== null),
