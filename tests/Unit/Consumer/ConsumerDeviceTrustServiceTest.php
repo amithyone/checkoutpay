@@ -144,4 +144,18 @@ class ConsumerDeviceTrustServiceTest extends TestCase
         $this->assertSame(403, $response->getStatusCode());
         $this->assertSame('device_mismatch', $response->getData(true)['code']);
     }
+
+    public function test_tier1_skips_bvn_requirement(): void
+    {
+        $service = $this->app->make(ConsumerDeviceTrustService::class);
+
+        $tier1 = new \App\Models\WhatsappWallet(['tier' => 1, 'kyc_bvn' => null, 'kyc_nin' => null]);
+        $this->assertFalse($service->bvnRequiredForStepUp($tier1));
+
+        $tier2NoBvn = new \App\Models\WhatsappWallet(['tier' => 2, 'kyc_bvn' => null, 'kyc_nin' => null]);
+        $this->assertFalse($service->bvnRequiredForStepUp($tier2NoBvn));
+
+        $tier2WithBvn = new \App\Models\WhatsappWallet(['tier' => 2, 'kyc_bvn' => '12345678901', 'kyc_nin' => null]);
+        $this->assertTrue($service->bvnRequiredForStepUp($tier2WithBvn));
+    }
 }

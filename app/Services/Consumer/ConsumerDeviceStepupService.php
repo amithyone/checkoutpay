@@ -94,7 +94,7 @@ class ConsumerDeviceStepupService
     }
 
     /**
-     * @return array{ok: bool, message?: string, bvn_verified?: bool}
+     * @return array{ok: bool, message?: string, bvn_verified?: bool, bvn_skipped?: bool, next_step?: string}
      */
     public function verifyBvn(string $sessionToken, string $bvn): array
     {
@@ -108,6 +108,22 @@ class ConsumerDeviceStepupService
         }
 
         $wallet = $session->wallet;
+        if ($wallet && ! $this->trust->bvnRequiredForStepUp($wallet)) {
+            // Tier 1 / no BVN on file: ignore whatever they typed — do not save or compare.
+            if ($session->bvn_verified_at === null) {
+                $session->bvn_verified_at = now();
+                $session->save();
+            }
+
+            return [
+                'ok' => true,
+                'bvn_verified' => true,
+                'bvn_skipped' => true,
+                'next_step' => 'verify_otp',
+                'message' => 'BVN is not required for this wallet. Enter the OTP code.',
+            ];
+        }
+
         if (! $wallet || ! $this->pinReset->verifyBvn($wallet, $bvn)) {
             return ['ok' => false, 'message' => 'BVN/NIN does not match our records.'];
         }
@@ -115,7 +131,7 @@ class ConsumerDeviceStepupService
         $session->bvn_verified_at = now();
         $session->save();
 
-        return ['ok' => true, 'bvn_verified' => true];
+        return ['ok' => true, 'bvn_verified' => true, 'next_step' => 'verify_otp'];
     }
 
     /**
@@ -131,7 +147,7 @@ class ConsumerDeviceStepupService
         $firstDevice = $this->trust->isEmailOnlyStepUpSession($session);
         if ($firstDevice) {
             $channel = 'email';
-        } elseif ($session->bvn_verified_at === null) {
+        } elseif ($this->bvnGateBlocksOtp($session)) {
             return ['ok' => false, 'message' => 'Verify BVN/NIN first.'];
         }
 
@@ -170,7 +186,7 @@ class ConsumerDeviceStepupService
         }
 
         $firstDevice = $this->trust->isEmailOnlyStepUpSession($session);
-        if (! $firstDevice && $session->bvn_verified_at === null) {
+        if (! $firstDevice && $this->bvnGateBlocksOtp($session)) {
             return ['ok' => false, 'message' => 'Verify BVN/NIN first.'];
         }
 
@@ -583,9 +599,57 @@ class ConsumerDeviceStepupService
                 'email_sent' => (bool) ($otpResult['ok'] ?? false),
                 'email_message' => isset($otpResult['message']) ? (string) $otpResult['message'] : null,
             ];
+        } elseif (! $this->trust->bvnRequiredForStepUp($wallet)) {
+            // Tier 1 / no BVN on file: skip KYC gate and try to send OTP immediately.
+            $session->bvn_verified_at = now();
+            $session->save();
+
+            try {
+                $otpResult = $this->otp->requestOtp(
+                    (string) $account->phone_e164,
+                    'whatsapp',
+                    null,
+                    null,
+                    forDeviceTrust: false,
+                );
+                if (! ($otpResult['ok'] ?? false) && $wallet->resolveOtpEmail() !== null) {
+                    $otpResult = $this->otp->requestOtp(
+                        (string) $account->phone_e164,
+                        'email',
+                        null,
+                        null,
+                        forDeviceTrust: false,
+                    );
+                }
+                $this->lastCreateEmailOtp = [
+                    'email_sent' => (bool) ($otpResult['ok'] ?? false) && (($otpResult['channel'] ?? '') === 'email'),
+                    'email_message' => isset($otpResult['message']) ? (string) $otpResult['message'] : null,
+                ];
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('consumer_device_stepup: tier1 auto otp failed', [
+                    'error' => $e->getMessage(),
+                    'phone' => (string) $account->phone_e164,
+                ]);
+                $this->lastCreateEmailOtp = [
+                    'email_sent' => false,
+                    'email_message' => 'Request an OTP to continue.',
+                ];
+            }
         }
 
         return $session;
+    }
+
+    /**
+     * True when OTP must wait for BVN (Tier 2+ with BVN/NIN on file, not yet verified on session).
+     */
+    private function bvnGateBlocksOtp(ConsumerDeviceStepupSession $session): bool
+    {
+        if ($session->bvn_verified_at !== null) {
+            return false;
+        }
+
+        return $this->trust->bvnRequiredForStepUp($session->wallet);
     }
 
     private function findActiveSession(string $sessionToken): ?ConsumerDeviceStepupSession

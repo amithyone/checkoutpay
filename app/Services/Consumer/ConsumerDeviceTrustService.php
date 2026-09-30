@@ -105,6 +105,25 @@ class ConsumerDeviceTrustService
     }
 
     /**
+     * Tier 1 (or any wallet with no BVN/NIN on file) cannot KYC-compare — OTP only.
+     */
+    public function bvnRequiredForStepUp(?WhatsappWallet $wallet): bool
+    {
+        if ($wallet === null) {
+            return true;
+        }
+
+        if ($wallet->isTier1()) {
+            return false;
+        }
+
+        $bvn = preg_replace('/\D+/', '', (string) ($wallet->kyc_bvn ?? '')) ?? '';
+        $nin = preg_replace('/\D+/', '', (string) ($wallet->kyc_nin ?? '')) ?? '';
+
+        return strlen($bvn) === 11 || strlen($nin) === 11;
+    }
+
+    /**
      * @param  array{email_sent?: bool|null, email_message?: string|null}|null  $emailOtp
      * @return array{stepup_required: bool, stepup_session: string, stepup_mode: string, other_device_label: string|null, channels: string[], push_approval_available: bool, push_approval_expires_at: string|null, pin_reset_required?: bool, next_step?: string, email_masked?: string|null, device_id?: string|null, email_sent?: bool|null, email_message?: string|null}
      */
@@ -150,19 +169,29 @@ class ConsumerDeviceTrustService
             $faceAvailable = false;
         }
 
-        return array_merge([
+        $bvnRequired = $this->bvnRequiredForStepUp($wallet);
+
+        $payload = array_merge([
             'stepup_required' => true,
             'stepup_session' => $session->session_token,
             'stepup_mode' => 'device_mismatch',
             'other_device_label' => $this->otherDeviceLabel($session->account),
             'channels' => $this->stepUpChannels($wallet),
             'pin_reset_required' => true,
-            'next_step' => 'verify_kyc',
+            'next_step' => $bvnRequired ? 'verify_kyc' : 'verify_otp',
+            'bvn_required' => $bvnRequired,
             'email_masked' => $emailMasked,
             'device_id' => $session->pending_device_id,
             'face_available' => $faceAvailable,
             'face_challenge' => $faceAvailable ? 'liveness' : null,
         ], $pushMeta);
+
+        if ($emailOtp !== null) {
+            $payload['email_sent'] = $emailOtp['email_sent'] ?? null;
+            $payload['email_message'] = $emailOtp['email_message'] ?? null;
+        }
+
+        return $payload;
     }
 
     public function otherDeviceLabel(?ConsumerWalletApiAccount $account): ?string

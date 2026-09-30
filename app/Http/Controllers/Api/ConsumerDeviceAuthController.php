@@ -341,18 +341,23 @@ class ConsumerDeviceAuthController extends Controller
     {
         $request->validate([
             'stepup_session' => 'required|string|max:64',
-            'bvn' => 'required|string|size:11',
+            // Tier 1 may still post a BVN field; we ignore it when nothing is on file to compare.
+            'bvn' => 'nullable|string|max:11',
         ]);
 
         $result = $stepup->verifyBvn(
             (string) $request->input('stepup_session'),
-            (string) $request->input('bvn'),
+            (string) ($request->input('bvn') ?? ''),
         );
 
         return response()->json([
             'success' => $result['ok'],
             'message' => $result['message'] ?? null,
-            'data' => $result['ok'] ? ['bvn_verified' => true] : null,
+            'data' => $result['ok'] ? array_filter([
+                'bvn_verified' => true,
+                'bvn_skipped' => $result['bvn_skipped'] ?? null,
+                'next_step' => $result['next_step'] ?? 'verify_otp',
+            ], fn ($v) => $v !== null) : null,
         ], $result['ok'] ? 200 : 422);
     }
 
