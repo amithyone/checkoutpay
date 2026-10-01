@@ -30,7 +30,7 @@ class ConsumerFaceController extends Controller
     {
         $request->validate([
             'photo' => 'required|file|mimes:jpeg,jpg,png,webp|max:5120',
-            'samples' => 'nullable|array|max:4',
+            'samples' => 'nullable|array|max:8',
             'samples.*' => 'file|mimes:jpeg,jpg,png,webp|max:5120',
             'motion_json' => 'nullable|string|max:512000',
         ]);
