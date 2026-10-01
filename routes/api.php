@@ -162,18 +162,19 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/device/stepup/bvn', [ConsumerDeviceAuthController::class, 'stepupBvn']);
         Route::post('auth/device/stepup/otp/request', [ConsumerDeviceAuthController::class, 'stepupOtpRequest']);
         Route::post('auth/device/stepup/otp/verify', [ConsumerDeviceAuthController::class, 'stepupOtpVerify']);
-        Route::post('auth/device/stepup/face/verify', [ConsumerDeviceAuthController::class, 'stepupFaceVerify'])
-            ->middleware('throttle:20,1');
-        Route::post('auth/device/stepup/face/liveness/session', [ConsumerDeviceAuthController::class, 'stepupFaceLivenessSession'])
-            ->middleware('throttle:20,1');
-        Route::post('auth/device/stepup/face/liveness/video', [ConsumerDeviceAuthController::class, 'stepupFaceLivenessVideo'])
-            ->middleware('throttle:20,1');
         Route::post('auth/device/bind/kyc', [ConsumerDeviceAuthController::class, 'bindKycDevice']);
         Route::post('auth/device/bind/options', [ConsumerDeviceAuthController::class, 'bindOptions']);
         Route::post('auth/device/bind', [ConsumerDeviceAuthController::class, 'bindDevice']);
         // Public warm/prefetch for Choose Bank (same catalog as authenticated route).
         Route::get('banks/suggestions', [ConsumerWalletApiController::class, 'bankSuggestions'])
             ->middleware('throttle:60,1');
+    });
+
+    // CheckFace step-up — own limiter (not OTP 6/min); at least 3 face attempts per minute.
+    Route::prefix('consumer')->middleware(['throttle:consumer_face', 'partner.license'])->group(function () {
+        Route::post('auth/device/stepup/face/verify', [ConsumerDeviceAuthController::class, 'stepupFaceVerify']);
+        Route::post('auth/device/stepup/face/liveness/session', [ConsumerDeviceAuthController::class, 'stepupFaceLivenessSession']);
+        Route::post('auth/device/stepup/face/liveness/video', [ConsumerDeviceAuthController::class, 'stepupFaceLivenessVideo']);
     });
 
     Route::prefix('consumer')->middleware(['auth:sanctum', 'touch.consumer.app.session', 'throttle:consumer_wallet', 'partner.license'])->group(function () {
@@ -227,13 +228,13 @@ Route::prefix('v1')->group(function () {
         Route::post('transfers/fee-quote', [ConsumerWalletApiController::class, 'transferFeeQuote']);
         Route::get('security/face', [ConsumerFaceController::class, 'status']);
         Route::post('security/face/enroll', [ConsumerFaceController::class, 'enroll'])
-            ->middleware('throttle:10,1');
+            ->middleware('throttle:consumer_face');
         Route::post('security/face/verify', [ConsumerFaceController::class, 'verify'])
-            ->middleware('throttle:20,1');
+            ->middleware('throttle:consumer_face');
         Route::post('security/face/liveness/session', [ConsumerFaceController::class, 'livenessSession'])
-            ->middleware('throttle:20,1');
+            ->middleware('throttle:consumer_face');
         Route::post('security/face/liveness/video', [ConsumerFaceController::class, 'livenessVideo'])
-            ->middleware('throttle:20,1');
+            ->middleware('throttle:consumer_face');
         Route::get('transfer-beneficiaries', [ConsumerFaceController::class, 'listBeneficiaries']);
         Route::post('transfer-beneficiaries', [ConsumerFaceController::class, 'storeBeneficiary']);
         Route::delete('transfer-beneficiaries/{id}', [ConsumerFaceController::class, 'destroyBeneficiary'])

@@ -47,4 +47,10 @@ return [
     'motion_json_min_score' => (float) env('CHECKFACE_MOTION_JSON_MIN_SCORE', 0.35),
     'motion_json_flat_peak' => (float) env('CHECKFACE_MOTION_JSON_FLAT_PEAK', 0.02),
     'motion_json_flat_variance' => (float) env('CHECKFACE_MOTION_JSON_FLAT_VARIANCE', 0.00005),
+
+    /**
+     * Max CheckFace API hits per minute per user/device (session + video share this bucket).
+     * Floor enforced in RateLimiter is 3; default 12 allows retries without OTP friction.
+     */
+    'rate_limit_per_minute' => max(3, (int) env('CHECKFACE_RATE_LIMIT_PER_MINUTE', 12)),
 ];

@@ -191,6 +191,60 @@ class ConsumerDeviceStepupFaceTest extends TestCase
         $this->assertNotNull($session->bvn_verified_at);
     }
 
+    public function test_stepup_face_rate_limit_returns_friendly_message(): void
+    {
+        config([
+            'checkface.rate_limit_per_minute' => 3,
+            'cache.default' => 'array',
+        ]);
+
+        [$wallet, $account] = $this->seedTrustedWallet();
+        $wallet->forceFill(['face_enrolled_at' => now()])->save();
+
+        $session = ConsumerDeviceStepupSession::query()->create([
+            'session_token' => 'sess_face_rate_1',
+            'consumer_wallet_api_account_id' => $account->id,
+            'phone_e164' => self::PHONE,
+            'whatsapp_wallet_id' => $wallet->id,
+            'pending_device_id' => 'cn_rate_phone',
+            'stepup_mode' => 'device_mismatch',
+            'auth_verified_at' => now(),
+            'expires_at' => now()->addMinutes(30),
+        ]);
+
+        $this->mock(WalletFaceCheckService::class, function ($face) {
+            $face->shouldReceive('isAvailableForStepUp')->andReturn(true);
+            $face->shouldReceive('startLiveness')->andReturn([
+                'ok' => true,
+                'message' => 'Liveness session created.',
+                'data' => [
+                    'session_id' => 'lv_rate',
+                    'challenges' => ['center'],
+                    'expires_in' => 180,
+                    'capture' => 'video',
+                    'seconds_per_challenge' => 2.4,
+                ],
+            ]);
+        });
+
+        $headers = [
+            'Accept' => 'application/json',
+            'X-Device-Id' => 'cn_rate_phone',
+        ];
+        $payload = ['stepup_session' => $session->session_token];
+
+        for ($i = 0; $i < 3; $i++) {
+            $this->postJson('/api/v1/consumer/auth/device/stepup/face/liveness/session', $payload, $headers)
+                ->assertOk();
+        }
+
+        $this->postJson('/api/v1/consumer/auth/device/stepup/face/liveness/session', $payload, $headers)
+            ->assertStatus(429)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('data.error_code', 'face_rate_limited')
+            ->assertJsonPath('message', 'Too many face checks. Please wait a minute and try again.');
+    }
+
     public function test_stepup_face_liveness_rejects_when_not_enrolled(): void
     {
         [$wallet, $account] = $this->seedTrustedWallet();

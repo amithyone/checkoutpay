@@ -51,6 +51,36 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(6)->by($key);
         });
 
+        /**
+         * CheckFace enroll / verify / liveness (step-up + authenticated).
+         * Separate from OTP bucket so face retries are not blocked by login OTP hits.
+         * Floor: 3/min; default higher so session + video + one retry fit in a minute.
+         */
+        RateLimiter::for('consumer_face', function (Request $request) {
+            $perMinute = max(3, (int) config('checkface.rate_limit_per_minute', 12));
+            $device = (string) ($request->header('X-Device-Id') ?: $request->input('device_id') ?: '');
+            $stepup = (string) $request->input('stepup_session', '');
+            $userId = $request->user()?->id;
+            $bucket = $userId
+                ? 'u:'.$userId
+                : 'ip:'.($request->ip() ?? '0').'|d:'.$device.'|s:'.$stepup;
+
+            return Limit::perMinute($perMinute)
+                ->by('consumer-face:'.sha1($bucket))
+                ->response(function (Request $request, array $headers) {
+                    $retry = isset($headers['Retry-After']) ? (int) $headers['Retry-After'] : 60;
+
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Too many face checks. Please wait a minute and try again.',
+                        'data' => [
+                            'error_code' => 'face_rate_limited',
+                            'retry_after' => $retry,
+                        ],
+                    ], 429, $headers);
+                });
+        });
+
         /** Authenticated consumer app (wallet, history, utility pagination). */
         RateLimiter::for('consumer_wallet', function (Request $request) {
             $perMinute = max(60, (int) config('consumer_wallet.rate_limit_per_minute', 240));
