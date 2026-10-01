@@ -186,6 +186,10 @@ class ConsumerDeviceTrustService
             'face_challenge' => $faceAvailable ? 'liveness' : null,
         ], $pushMeta);
 
+        if ($faceAvailable) {
+            $payload = array_merge($payload, app(StepupFaceBridge::class)->clientHints($session, $wallet));
+        }
+
         if ($emailOtp !== null) {
             $payload['email_sent'] = $emailOtp['email_sent'] ?? null;
             $payload['email_message'] = $emailOtp['email_message'] ?? null;

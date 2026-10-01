@@ -358,6 +358,95 @@ class WalletFaceCheckService
     }
 
     /**
+     * Contabo bridge path: start liveness with CheckFace user id from face_continue_token (no local wallet row required).
+     *
+     * @return array{ok: bool, message: string, data?: array<string, mixed>, http?: int}
+     */
+    public function startLivenessByUserId(string $checkfaceUserId): array
+    {
+        if (! $this->isEnabled()) {
+            return ['ok' => false, 'message' => 'Face check is not available.', 'http' => 503];
+        }
+
+        $userId = trim($checkfaceUserId);
+        if ($userId === '' || ! preg_match('/^w\d+$/', $userId)) {
+            return ['ok' => false, 'message' => 'Invalid face identity.', 'http' => 422];
+        }
+
+        $result = $this->client->createLivenessSession($userId);
+        if (! $result['ok'] || empty($result['data']['session_id'])) {
+            return [
+                'ok' => false,
+                'message' => $result['message'] ?: 'Could not start liveness.',
+                'http' => $result['status'] >= 400 ? $result['status'] : 422,
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'message' => 'Liveness session created.',
+            'data' => [
+                'session_id' => (string) $result['data']['session_id'],
+                'challenges' => $result['data']['challenges'] ?? [],
+                'expires_in' => $result['data']['expires_in'] ?? null,
+                'capture' => $result['data']['capture'] ?? 'video',
+                'seconds_per_challenge' => $result['data']['seconds_per_challenge'] ?? null,
+            ],
+        ];
+    }
+
+    /**
+     * Contabo bridge path: complete liveness for CheckFace user id from face_continue_token.
+     *
+     * @return array{ok: bool, message: string, data?: array<string, mixed>, http?: int}
+     */
+    public function completeLivenessForStepUpByUserId(string $checkfaceUserId, string $sessionId, UploadedFile $clip): array
+    {
+        if (! $this->isEnabled()) {
+            return ['ok' => false, 'message' => 'Face check is not available.', 'http' => 503];
+        }
+
+        $userId = trim($checkfaceUserId);
+        if ($userId === '' || ! preg_match('/^w\d+$/', $userId)) {
+            return ['ok' => false, 'message' => 'Invalid face identity.', 'http' => 422];
+        }
+
+        // userId is already bound inside CheckFace session; keep signature for clarity/logging.
+        unset($userId);
+
+        $result = $this->client->submitLivenessVideo($sessionId, $clip);
+        $passed = (bool) ($result['data']['authenticated'] ?? $result['data']['passed'] ?? false);
+        if (! $result['ok'] || ! $passed) {
+            return [
+                'ok' => false,
+                'message' => $result['message'] ?: 'Liveness check failed. Try again or use BVN.',
+                'http' => $result['status'] >= 400 ? $result['status'] : 422,
+                'data' => array_merge($result['data'] ?? [], ['error_code' => 'liveness_failed']),
+            ];
+        }
+
+        $score = $result['data']['confidence_score']
+            ?? $result['data']['score_latest']
+            ?? $result['data']['liveness_score']
+            ?? $result['data']['liveness_percent']
+            ?? null;
+
+        return [
+            'ok' => true,
+            'message' => 'Liveness passed.',
+            'data' => [
+                'liveness_passed' => true,
+                'liveness_checked' => true,
+                'score' => is_numeric($score) ? (float) $score : null,
+                'liveness_score' => $result['data']['liveness_score'] ?? $result['data']['liveness_percent'] ?? null,
+                'matched_via' => $result['data']['matched_via'] ?? null,
+                'score_latest' => $result['data']['score_latest'] ?? null,
+                'score_anchor' => $result['data']['score_anchor'] ?? null,
+            ],
+        ];
+    }
+
+    /**
      * Whether this outbound transfer needs a fresh face challenge.
      */
     public function requiresFaceCheck(

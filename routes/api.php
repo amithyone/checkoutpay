@@ -345,6 +345,10 @@ Route::prefix('v1')->group(function () {
     Route::post('internal/consumer-chat/reply', [ConsumerChatInternalController::class, 'reply'])
         ->middleware('throttle:30,1');
 
+    // Contabo → Namecheap: finalize Contabo CheckFace liveness into live stepup_token.
+    Route::post('internal/stepup/face-complete', [\App\Http\Controllers\Api\StepupFaceBridgeController::class, 'complete'])
+        ->middleware([\App\Http\Middleware\VerifyStepupFaceBridgeSignature::class, 'throttle:60,1']);
+
     // Contabo → Namecheap merchant webhook egress (HMAC). Namecheap forwards to merchant allowlisted IPs.
     Route::post('internal/webhook-egress', [\App\Http\Controllers\Api\WebhookEgressRelayController::class, 'receive'])
         ->middleware([\App\Http\Middleware\VerifyWebhookEgressRelaySignature::class, 'throttle:120,1']);

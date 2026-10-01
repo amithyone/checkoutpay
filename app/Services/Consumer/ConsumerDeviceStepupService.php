@@ -284,39 +284,46 @@ class ConsumerDeviceStepupService
      *
      * @return array{ok: bool, message?: string, http?: int, error_code?: string, stepup_session?: string, session_id?: string, challenges?: mixed, expires_in?: mixed, capture?: string, seconds_per_challenge?: mixed}
      */
-    public function startFaceLiveness(string $sessionToken): array
+    public function startFaceLiveness(string $sessionToken, ?string $faceContinueToken = null): array
     {
-        $resolved = $this->resolveFaceStepupSession($sessionToken);
+        $resolved = $this->resolveFaceStepupSession($sessionToken, $faceContinueToken);
         if (! ($resolved['ok'] ?? false)) {
             return $resolved;
         }
 
-        /** @var ConsumerDeviceStepupSession $session */
-        $session = $resolved['session'];
-        $wallet = $session->wallet;
-        if (! $wallet) {
-            return ['ok' => false, 'message' => 'Wallet not found.', 'http' => 422];
-        }
-
+        $bridgeClaims = $resolved['bridge_claims'] ?? null;
         $face = app(WalletFaceCheckService::class);
-        if (! $face->isAvailableForStepUp($wallet)) {
-            return [
-                'ok' => false,
-                'message' => 'Face is not enrolled for this wallet. Use BVN instead.',
-                'http' => 422,
-                'error_code' => 'face_not_available',
-                'stepup_session' => $session->session_token,
-            ];
+
+        if (is_array($bridgeClaims)) {
+            $started = $face->startLivenessByUserId((string) ($bridgeClaims['checkface_user_id'] ?? ''));
+            $sessionTokenOut = (string) ($bridgeClaims['stepup_session'] ?? $sessionToken);
+        } else {
+            /** @var ConsumerDeviceStepupSession $session */
+            $session = $resolved['session'];
+            $wallet = $session->wallet;
+            if (! $wallet) {
+                return ['ok' => false, 'message' => 'Wallet not found.', 'http' => 422];
+            }
+            if (! $face->isAvailableForStepUp($wallet)) {
+                return [
+                    'ok' => false,
+                    'message' => 'Face is not enrolled for this wallet. Use BVN instead.',
+                    'http' => 422,
+                    'error_code' => 'face_not_available',
+                    'stepup_session' => $session->session_token,
+                ];
+            }
+            $started = $face->startLiveness($wallet);
+            $sessionTokenOut = $session->session_token;
         }
 
-        $started = $face->startLiveness($wallet);
         if (! ($started['ok'] ?? false)) {
             return [
                 'ok' => false,
                 'message' => $started['message'] ?? 'Could not start liveness.',
                 'http' => (int) ($started['http'] ?? 422),
                 'error_code' => $started['data']['error_code'] ?? 'liveness_start_failed',
-                'stepup_session' => $session->session_token,
+                'stepup_session' => $sessionTokenOut,
             ];
         }
 
@@ -327,10 +334,17 @@ class ConsumerDeviceStepupService
             : 2.4;
         if ($livenessId !== '') {
             \Illuminate\Support\Facades\Cache::put(
-                $this->faceLivenessCacheKey($session->session_token),
+                $this->faceLivenessCacheKey($sessionTokenOut),
                 $livenessId,
                 now()->addSeconds(max(60, $expiresIn)),
             );
+            if (is_array($bridgeClaims)) {
+                \Illuminate\Support\Facades\Cache::put(
+                    $this->faceBridgeClaimsCacheKey($sessionTokenOut),
+                    $bridgeClaims,
+                    now()->addSeconds(max(60, $expiresIn)),
+                );
+            }
         }
 
         $challenges = $this->formatFaceLivenessChallenges(
@@ -340,7 +354,7 @@ class ConsumerDeviceStepupService
 
         return [
             'ok' => true,
-            'stepup_session' => $session->session_token,
+            'stepup_session' => $sessionTokenOut,
             'session_id' => $livenessId,
             'challenges' => $challenges,
             'expires_in' => $expiresIn,
@@ -349,6 +363,7 @@ class ConsumerDeviceStepupService
             'capture' => $started['data']['capture'] ?? 'video',
             'seconds_per_challenge' => $secondsPer,
             'face_challenge' => 'liveness',
+            'face_api_base' => app(StepupFaceBridge::class)->appFaceApiBase(),
         ];
     }
 
@@ -420,27 +435,34 @@ class ConsumerDeviceStepupService
         ?string $platform = null,
         ?string $deviceLabel = null,
         ?string $motionJson = null,
+        ?string $faceContinueToken = null,
     ): array {
-        $resolved = $this->resolveFaceStepupSession($sessionToken);
+        $resolved = $this->resolveFaceStepupSession($sessionToken, $faceContinueToken);
         if (! ($resolved['ok'] ?? false)) {
             return $resolved;
         }
 
-        /** @var ConsumerDeviceStepupSession $session */
-        $session = $resolved['session'];
-        $wallet = $session->wallet;
-        if (! $wallet) {
-            return ['ok' => false, 'message' => 'Wallet not found.', 'http' => 422];
+        $bridgeClaims = $resolved['bridge_claims'] ?? null;
+        if (! is_array($bridgeClaims)) {
+            $bridgeClaims = \Illuminate\Support\Facades\Cache::get($this->faceBridgeClaimsCacheKey($sessionToken));
+            $bridgeClaims = is_array($bridgeClaims) ? $bridgeClaims : null;
         }
 
-        $expected = \Illuminate\Support\Facades\Cache::get($this->faceLivenessCacheKey($session->session_token));
+        $sessionTokenOut = is_array($bridgeClaims)
+            ? (string) ($bridgeClaims['stepup_session'] ?? $sessionToken)
+            : $sessionToken;
+
+        /** @var ConsumerDeviceStepupSession|null $session */
+        $session = $resolved['session'] ?? null;
+
+        $expected = \Illuminate\Support\Facades\Cache::get($this->faceLivenessCacheKey($sessionTokenOut));
         if (! is_string($expected) || $expected === '' || ! hash_equals($expected, $livenessSessionId)) {
             return [
                 'ok' => false,
                 'message' => 'Start a new face liveness session for this step-up first.',
                 'http' => 422,
                 'error_code' => 'liveness_session_mismatch',
-                'stepup_session' => $session->session_token,
+                'stepup_session' => $sessionTokenOut,
             ];
         }
 
@@ -451,23 +473,73 @@ class ConsumerDeviceStepupService
                 'message' => $motion['message'] ?? 'Phone motion did not match guided prompts.',
                 'http' => 422,
                 'error_code' => $motion['error_code'] ?? 'motion_mismatch',
-                'stepup_session' => $session->session_token,
+                'stepup_session' => $sessionTokenOut,
             ];
         }
 
         $face = app(WalletFaceCheckService::class);
-        $matched = $face->completeLivenessForStepUp($wallet, $livenessSessionId, $clip);
+        if (is_array($bridgeClaims) && $session === null) {
+            $matched = $face->completeLivenessForStepUpByUserId(
+                (string) ($bridgeClaims['checkface_user_id'] ?? ''),
+                $livenessSessionId,
+                $clip,
+            );
+        } else {
+            $wallet = $session?->wallet;
+            if (! $wallet) {
+                return ['ok' => false, 'message' => 'Wallet not found.', 'http' => 422];
+            }
+            $matched = $face->completeLivenessForStepUp($wallet, $livenessSessionId, $clip);
+        }
+
         if (! ($matched['ok'] ?? false)) {
             return [
                 'ok' => false,
                 'message' => $matched['message'] ?? 'Liveness check failed. Try again or use BVN.',
                 'http' => (int) ($matched['http'] ?? 422),
                 'error_code' => $matched['data']['error_code'] ?? 'liveness_failed',
-                'stepup_session' => $session->session_token,
+                'stepup_session' => $sessionTokenOut,
             ];
         }
 
-        \Illuminate\Support\Facades\Cache::forget($this->faceLivenessCacheKey($session->session_token));
+        \Illuminate\Support\Facades\Cache::forget($this->faceLivenessCacheKey($sessionTokenOut));
+        \Illuminate\Support\Facades\Cache::forget($this->faceBridgeClaimsCacheKey($sessionTokenOut));
+
+        // Contabo bridge: finalize on Namecheap so stepup_token lives in live session DB.
+        if (is_array($bridgeClaims) && $session === null) {
+            $bridge = app(StepupFaceBridge::class);
+            $proof = $bridge->mintProofToken($sessionTokenOut, [
+                'score' => $matched['data']['score'] ?? null,
+                'liveness_score' => $matched['data']['liveness_score'] ?? null,
+                'checkface_user_id' => $bridgeClaims['checkface_user_id'] ?? null,
+            ]);
+            if ($proof === null) {
+                return ['ok' => false, 'message' => 'Could not mint face proof.', 'http' => 500];
+            }
+            $final = $bridge->finalizeOnLive($sessionTokenOut, $proof);
+            if (! ($final['ok'] ?? false) || ($final['stepup_token'] ?? '') === '') {
+                return [
+                    'ok' => false,
+                    'message' => $final['message'] ?? 'Could not finalize face step-up.',
+                    'http' => 502,
+                    'error_code' => 'face_bridge_finalize_failed',
+                    'stepup_session' => $sessionTokenOut,
+                ];
+            }
+
+            return [
+                'ok' => true,
+                'stepup_mode' => $final['stepup_mode'] ?? 'device_mismatch',
+                'stepup_token' => $final['stepup_token'],
+                'pin_reset_required' => (bool) ($final['pin_reset_required'] ?? true),
+                'next_step' => $final['next_step'] ?? 'bind',
+                'score' => $matched['data']['score'] ?? null,
+                'liveness_score' => $matched['data']['liveness_score'] ?? null,
+                'liveness_passed' => true,
+                'matched_via' => $matched['data']['matched_via'] ?? null,
+                'motion_score' => $motion['score'] ?? null,
+            ];
+        }
 
         $incomingDeviceId = $this->trust->normalizeDeviceId($deviceId);
         if ($incomingDeviceId !== null) {
@@ -503,49 +575,63 @@ class ConsumerDeviceStepupService
     }
 
     /**
-     * @return array{ok: bool, message?: string, http?: int, error_code?: string, stepup_session?: string, session?: ConsumerDeviceStepupSession}
+     * @return array{ok: bool, message?: string, http?: int, error_code?: string, stepup_session?: string, session?: ConsumerDeviceStepupSession, bridge_claims?: array<string, mixed>}
      */
-    private function resolveFaceStepupSession(string $sessionToken): array
+    private function resolveFaceStepupSession(string $sessionToken, ?string $faceContinueToken = null): array
     {
         $session = ConsumerDeviceStepupSession::query()
             ->where('session_token', $sessionToken)
             ->first();
 
-        if ($session === null) {
+        if ($session !== null) {
+            if ($session->isExpired()) {
+                return [
+                    'ok' => false,
+                    'message' => 'Step-up session expired.',
+                    'http' => 410,
+                    'error_code' => 'stepup_session_expired',
+                    'stepup_session' => $session->session_token,
+                ];
+            }
+
+            if ($session->stepup_mode === 'first_device_email' || $this->trust->isEmailOnlyStepUpSession($session)) {
+                return [
+                    'ok' => false,
+                    'message' => 'CheckFace is not used for first-device email trust. Enter the email code.',
+                    'http' => 422,
+                    'error_code' => 'face_not_available',
+                    'stepup_session' => $session->session_token,
+                ];
+            }
+
+            return ['ok' => true, 'session' => $session];
+        }
+
+        // Contabo (no local session row): accept signed face_continue_token from Namecheap login.
+        $claims = app(StepupFaceBridge::class)->verifyContinueToken($faceContinueToken, $sessionToken);
+        if ($claims !== null) {
             return [
-                'ok' => false,
-                'message' => 'Step-up session not found.',
-                'http' => 410,
-                'error_code' => 'stepup_session_invalid',
+                'ok' => true,
+                'bridge_claims' => $claims,
             ];
         }
 
-        if ($session->isExpired()) {
-            return [
-                'ok' => false,
-                'message' => 'Step-up session expired.',
-                'http' => 410,
-                'error_code' => 'stepup_session_expired',
-                'stepup_session' => $session->session_token,
-            ];
-        }
-
-        if ($session->stepup_mode === 'first_device_email' || $this->trust->isEmailOnlyStepUpSession($session)) {
-            return [
-                'ok' => false,
-                'message' => 'CheckFace is not used for first-device email trust. Enter the email code.',
-                'http' => 422,
-                'error_code' => 'face_not_available',
-                'stepup_session' => $session->session_token,
-            ];
-        }
-
-        return ['ok' => true, 'session' => $session];
+        return [
+            'ok' => false,
+            'message' => 'Step-up session not found.',
+            'http' => 410,
+            'error_code' => 'stepup_session_invalid',
+        ];
     }
 
     private function faceLivenessCacheKey(string $sessionToken): string
     {
         return 'consumer_stepup_face_liveness:'.$sessionToken;
+    }
+
+    private function faceBridgeClaimsCacheKey(string $sessionToken): string
+    {
+        return 'consumer_stepup_face_bridge:'.$sessionToken;
     }
 
     public function findSessionByStepupToken(string $token): ?ConsumerDeviceStepupSession

@@ -269,6 +269,8 @@ class ConsumerDeviceAuthController extends Controller
                 'email_masked' => $result['email_masked'] ?? null,
                 'face_available' => $result['face_available'] ?? null,
                 'face_challenge' => $result['face_challenge'] ?? null,
+                'face_api_base' => $result['face_api_base'] ?? null,
+                'face_continue_token' => $result['face_continue_token'] ?? null,
                 'device_id' => $result['device_id'] ?? null,
                 'push_approval_available' => (bool) ($result['push_approval_available'] ?? false),
                 'push_approval_expires_at' => $result['push_approval_expires_at'] ?? null,
@@ -427,9 +429,13 @@ class ConsumerDeviceAuthController extends Controller
     {
         $request->validate([
             'stepup_session' => 'required|string|max:64',
+            'face_continue_token' => 'nullable|string|max:4000',
         ]);
 
-        $result = $stepup->startFaceLiveness((string) $request->input('stepup_session'));
+        $result = $stepup->startFaceLiveness(
+            (string) $request->input('stepup_session'),
+            $request->filled('face_continue_token') ? (string) $request->input('face_continue_token') : null,
+        );
 
         if (! ($result['ok'] ?? false)) {
             $http = (int) ($result['http'] ?? 422);
@@ -447,7 +453,7 @@ class ConsumerDeviceAuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Liveness session created.',
-            'data' => [
+            'data' => array_filter([
                 'stepup_session' => $result['stepup_session'],
                 'session_id' => $result['session_id'],
                 'expires_at' => $result['expires_at'] ?? null,
@@ -457,7 +463,8 @@ class ConsumerDeviceAuthController extends Controller
                 'capture' => $result['capture'] ?? 'video',
                 'seconds_per_challenge' => $result['seconds_per_challenge'] ?? null,
                 'face_challenge' => 'liveness',
-            ],
+                'face_api_base' => $result['face_api_base'] ?? null,
+            ], fn ($v) => $v !== null),
         ]);
     }
 
@@ -468,6 +475,7 @@ class ConsumerDeviceAuthController extends Controller
             'session_id' => 'required|string|max:128',
             'clip' => 'required|file|mimetypes:video/mp4,video/webm,video/quicktime|max:8192',
             'motion_json' => 'nullable|string|max:512000',
+            'face_continue_token' => 'nullable|string|max:4000',
             'device_id' => 'nullable|string|max:128',
         ]);
 
@@ -483,6 +491,7 @@ class ConsumerDeviceAuthController extends Controller
             $ctx['platform'],
             $ctx['device_label'],
             $request->filled('motion_json') ? (string) $request->input('motion_json') : null,
+            $request->filled('face_continue_token') ? (string) $request->input('face_continue_token') : null,
         );
 
         if (! ($result['ok'] ?? false)) {

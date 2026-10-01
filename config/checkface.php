@@ -56,4 +56,23 @@ return [
      * Floor enforced in RateLimiter is 3; default 12 allows retries without OTP friction.
      */
     'rate_limit_per_minute' => max(3, (int) env('CHECKFACE_RATE_LIMIT_PER_MINUTE', 12)),
+
+    /**
+     * Public API host the native app should use for step-up face (Contabo).
+     * Login/OTP stay on check-outpay.com; face session+video go here.
+     */
+    'app_face_api_base' => rtrim((string) env('CHECKFACE_APP_API_BASE', 'https://check-outnow.com'), '/'),
+
+    /**
+     * HMAC bridge between Namecheap (session DB) and Contabo (CheckFace).
+     * Same CHECKFACE_STEPUP_BRIDGE_SECRET on both hosts.
+     */
+    'stepup_bridge_enabled' => filter_var(env('CHECKFACE_STEPUP_BRIDGE_ENABLED', true), FILTER_VALIDATE_BOOL),
+    'stepup_bridge_secret' => (string) env('CHECKFACE_STEPUP_BRIDGE_SECRET', ''),
+    'stepup_bridge_finalize_url' => rtrim((string) env(
+        'CHECKFACE_STEPUP_BRIDGE_FINALIZE_URL',
+        'https://check-outpay.com/api/v1/internal/stepup/face-complete'
+    ), '/'),
+    'stepup_bridge_continue_ttl_seconds' => max(60, (int) env('CHECKFACE_STEPUP_BRIDGE_CONTINUE_TTL', 1800)),
+    'stepup_bridge_proof_ttl_seconds' => max(30, (int) env('CHECKFACE_STEPUP_BRIDGE_PROOF_TTL', 300)),
 ];
