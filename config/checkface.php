@@ -61,7 +61,7 @@ return [
      * Public API host the native app should use for step-up face (Contabo).
      * Login/OTP stay on check-outpay.com; face session+video go here.
      */
-    'app_face_api_base' => rtrim((string) env('CHECKFACE_APP_API_BASE', 'https://check-outnow.com'), '/'),
+    'app_face_api_base' => rtrim((string) env('CHECKFACE_APP_API_BASE', 'https://check-outpay.com'), '/'),
 
     /**
      * HMAC bridge between Namecheap (session DB) and Contabo (CheckFace).
