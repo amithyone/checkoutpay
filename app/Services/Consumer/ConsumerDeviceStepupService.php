@@ -419,6 +419,7 @@ class ConsumerDeviceStepupService
         ?string $deviceId = null,
         ?string $platform = null,
         ?string $deviceLabel = null,
+        ?string $motionJson = null,
     ): array {
         $resolved = $this->resolveFaceStepupSession($sessionToken);
         if (! ($resolved['ok'] ?? false)) {
@@ -439,6 +440,17 @@ class ConsumerDeviceStepupService
                 'message' => 'Start a new face liveness session for this step-up first.',
                 'http' => 422,
                 'error_code' => 'liveness_session_mismatch',
+                'stepup_session' => $session->session_token,
+            ];
+        }
+
+        $motion = app(FaceMotionJsonScorer::class)->evaluate($motionJson, $livenessSessionId);
+        if (! ($motion['ok'] ?? true)) {
+            return [
+                'ok' => false,
+                'message' => $motion['message'] ?? 'Phone motion did not match guided prompts.',
+                'http' => 422,
+                'error_code' => $motion['error_code'] ?? 'motion_mismatch',
                 'stepup_session' => $session->session_token,
             ];
         }
@@ -486,6 +498,7 @@ class ConsumerDeviceStepupService
             'liveness_score' => $matched['data']['liveness_score'] ?? null,
             'liveness_passed' => true,
             'matched_via' => $matched['data']['matched_via'] ?? null,
+            'motion_score' => $motion['score'] ?? null,
         ];
     }
 

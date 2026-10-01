@@ -105,8 +105,11 @@ class EmailTemplateService
         $subject = self::getTemplateSubject($templateKey, $defaultSubject, $data);
         $mail = (new MailMessage)->subject($subject);
 
+        // Laravel 10 MailMessage has no html() — render custom HTML through a Blade wrapper.
         if (self::isCustomTemplate($templateKey)) {
-            return $mail->html(self::renderTemplate($templateKey, $data, $defaultView));
+            return $mail->view('emails.custom-rendered', [
+                'content' => self::renderTemplate($templateKey, $data, $defaultView),
+            ]);
         }
 
         return $mail->view($defaultView, $data);

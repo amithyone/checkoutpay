@@ -38,4 +38,13 @@ return [
 
     /** Secrets file where CHECKFACE_API_TOKEN is written (this host uses `.error`). */
     'secrets_file' => (string) env('CHECKFACE_SECRETS_FILE', base_path('.error')),
+
+    /**
+     * Client IMU timeline (motion_json) anti-spoof — soft by default (log only).
+     * Set CHECKFACE_MOTION_JSON_HARD_FAIL=true to reject with error_code motion_mismatch.
+     */
+    'motion_json_hard_fail' => filter_var(env('CHECKFACE_MOTION_JSON_HARD_FAIL', false), FILTER_VALIDATE_BOOL),
+    'motion_json_min_score' => (float) env('CHECKFACE_MOTION_JSON_MIN_SCORE', 0.35),
+    'motion_json_flat_peak' => (float) env('CHECKFACE_MOTION_JSON_FLAT_PEAK', 0.02),
+    'motion_json_flat_variance' => (float) env('CHECKFACE_MOTION_JSON_FLAT_VARIANCE', 0.00005),
 ];

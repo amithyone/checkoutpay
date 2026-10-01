@@ -52,10 +52,17 @@ class LoginController extends Controller
             }
 
             // Send login notification (only if 2FA is not enabled, as 2FA login will send notification after verification)
-            $business->notify(new LoginNotification(
-                $request->ip(),
-                $request->userAgent() ?? 'Unknown'
-            ));
+            try {
+                $business->notify(new LoginNotification(
+                    $request->ip(),
+                    $request->userAgent() ?? 'Unknown'
+                ));
+            } catch (\Throwable $e) {
+                \Log::warning('business_login_notification_failed', [
+                    'business_id' => $business->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
 
             $request->session()->regenerate();
 

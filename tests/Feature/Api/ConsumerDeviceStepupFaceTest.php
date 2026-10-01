@@ -153,10 +153,29 @@ class ConsumerDeviceStepupFaceTest extends TestCase
 
         $clip = UploadedFile::fake()->create('clip.mp4', 200, 'video/mp4');
 
+        $motion = json_encode([
+            'protocol_version' => 1,
+            'available' => true,
+            'sample_hz' => 20,
+            'started_at_ms' => 0,
+            'ended_at_ms' => 1000,
+            'session_id' => 'lv_test_abc',
+            'challenges' => [
+                ['id' => 'left', 'prompt' => 'Look left', 'start_ms' => 200, 'end_ms' => 800],
+            ],
+            'samples' => [
+                ['t_ms' => 0, 'gx' => 0.01, 'gy' => 0.0, 'gz' => 0.0, 'ax' => 0.1, 'ay' => 9.7, 'az' => 0.2],
+                ['t_ms' => 400, 'gx' => 0.8, 'gy' => 0.2, 'gz' => 0.1, 'ax' => 0.2, 'ay' => 9.5, 'az' => 0.3],
+                ['t_ms' => 800, 'gx' => 0.3, 'gy' => 0.1, 'gz' => 0.0, 'ax' => 0.1, 'ay' => 9.6, 'az' => 0.2],
+                ['t_ms' => 1000, 'gx' => 0.05, 'gy' => 0.0, 'gz' => 0.0, 'ax' => 0.1, 'ay' => 9.7, 'az' => 0.2],
+            ],
+        ]);
+
         $this->post('/api/v1/consumer/auth/device/stepup/face/liveness/video', [
             'stepup_session' => $session->session_token,
             'session_id' => 'lv_test_abc',
             'clip' => $clip,
+            'motion_json' => $motion,
         ], [
             'Accept' => 'application/json',
             'X-Device-Id' => 'cn_new_phone',

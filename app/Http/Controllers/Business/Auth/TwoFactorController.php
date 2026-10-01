@@ -49,10 +49,17 @@ class TwoFactorController extends Controller
         $request->session()->regenerate();
 
         // Send login notification after successful 2FA verification
-        $business->notify(new LoginNotification(
-            $request->ip(),
-            $request->userAgent() ?? 'Unknown'
-        ));
+        try {
+            $business->notify(new LoginNotification(
+                $request->ip(),
+                $request->userAgent() ?? 'Unknown'
+            ));
+        } catch (\Throwable $e) {
+            \Log::warning('business_login_notification_failed', [
+                'business_id' => $business->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return redirect()->intended(route('business.dashboard'))
             ->with('success', 'Login successful!');

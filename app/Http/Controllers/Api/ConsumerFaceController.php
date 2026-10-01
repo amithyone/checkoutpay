@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ConsumerWalletApiAccount;
 use App\Models\WhatsappWallet;
 use App\Models\WhatsappWalletTransferBeneficiary;
+use App\Services\Consumer\FaceMotionJsonScorer;
 use App\Services\Consumer\WalletFaceCheckService;
 use App\Services\Whatsapp\PhoneNormalizer;
 use Illuminate\Http\JsonResponse;
@@ -31,6 +32,7 @@ class ConsumerFaceController extends Controller
             'photo' => 'required|file|mimes:jpeg,jpg,png,webp|max:5120',
             'samples' => 'nullable|array|max:4',
             'samples.*' => 'file|mimes:jpeg,jpg,png,webp|max:5120',
+            'motion_json' => 'nullable|string|max:512000',
         ]);
 
         $wallet = $this->walletFor($request);
@@ -39,7 +41,22 @@ class ConsumerFaceController extends Controller
             $samples = $samples ? [$samples] : [];
         }
 
+        $motion = app(FaceMotionJsonScorer::class)->evaluate(
+            $request->filled('motion_json') ? (string) $request->input('motion_json') : null,
+        );
+        if (! ($motion['ok'] ?? true)) {
+            return response()->json([
+                'success' => false,
+                'message' => $motion['message'] ?? 'Phone motion check failed.',
+                'data' => ['error_code' => $motion['error_code'] ?? 'motion_mismatch'],
+                'error_code' => $motion['error_code'] ?? 'motion_mismatch',
+            ], 422);
+        }
+
         $result = $this->face->enroll($wallet, $request->file('photo'), array_values($samples));
+        if ($result['ok'] && $motion['score'] !== null) {
+            $result['data'] = array_merge($result['data'] ?? [], ['motion_score' => $motion['score']]);
+        }
 
         return response()->json([
             'success' => $result['ok'],
@@ -57,9 +74,22 @@ class ConsumerFaceController extends Controller
             'bank_code' => 'nullable|string|max:20',
             'account_number' => 'nullable|regex:/^\d{10}$/',
             'to_phone' => 'nullable|string|min:10|max:20',
+            'motion_json' => 'nullable|string|max:512000',
         ]);
 
         $wallet = $this->walletFor($request);
+        $motion = app(FaceMotionJsonScorer::class)->evaluate(
+            $request->filled('motion_json') ? (string) $request->input('motion_json') : null,
+        );
+        if (! ($motion['ok'] ?? true)) {
+            return response()->json([
+                'success' => false,
+                'message' => $motion['message'] ?? 'Phone motion check failed.',
+                'data' => ['error_code' => $motion['error_code'] ?? 'motion_mismatch'],
+                'error_code' => $motion['error_code'] ?? 'motion_mismatch',
+            ], 422);
+        }
+
         $result = $this->face->verifySelfie(
             $wallet,
             $request->file('selfie'),
@@ -69,6 +99,9 @@ class ConsumerFaceController extends Controller
             $request->filled('to_phone') ? (string) $request->input('to_phone') : null,
             $request->filled('amount') ? (float) $request->input('amount') : null,
         );
+        if ($result['ok'] && $motion['score'] !== null) {
+            $result['data'] = array_merge($result['data'] ?? [], ['motion_score' => $motion['score']]);
+        }
 
         return response()->json([
             'success' => $result['ok'],
@@ -96,6 +129,7 @@ class ConsumerFaceController extends Controller
         $request->validate([
             'session_id' => 'required|string|max:128',
             'clip' => 'required|file|mimetypes:video/mp4,video/webm,video/quicktime|max:8192',
+            'motion_json' => 'nullable|string|max:512000',
             'kind' => 'nullable|string|in:bank,p2p',
             'amount' => 'nullable|numeric|min:1',
             'bank_code' => 'nullable|string|max:20',
@@ -103,10 +137,24 @@ class ConsumerFaceController extends Controller
             'to_phone' => 'nullable|string|min:10|max:20',
         ]);
 
+        $sessionId = (string) $request->input('session_id');
+        $motion = app(FaceMotionJsonScorer::class)->evaluate(
+            $request->filled('motion_json') ? (string) $request->input('motion_json') : null,
+            $sessionId,
+        );
+        if (! ($motion['ok'] ?? true)) {
+            return response()->json([
+                'success' => false,
+                'message' => $motion['message'] ?? 'Phone motion check failed.',
+                'data' => ['error_code' => $motion['error_code'] ?? 'motion_mismatch'],
+                'error_code' => $motion['error_code'] ?? 'motion_mismatch',
+            ], 422);
+        }
+
         $wallet = $this->walletFor($request);
         $result = $this->face->completeLiveness(
             $wallet,
-            (string) $request->input('session_id'),
+            $sessionId,
             $request->file('clip'),
             (string) $request->input('kind', 'bank'),
             $request->filled('account_number') ? (string) $request->input('account_number') : null,
@@ -114,6 +162,9 @@ class ConsumerFaceController extends Controller
             $request->filled('to_phone') ? (string) $request->input('to_phone') : null,
             $request->filled('amount') ? (float) $request->input('amount') : null,
         );
+        if ($result['ok'] && $motion['score'] !== null) {
+            $result['data'] = array_merge($result['data'] ?? [], ['motion_score' => $motion['score']]);
+        }
 
         return response()->json([
             'success' => $result['ok'],

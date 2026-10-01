@@ -467,6 +467,7 @@ class ConsumerDeviceAuthController extends Controller
             'stepup_session' => 'required|string|max:64',
             'session_id' => 'required|string|max:128',
             'clip' => 'required|file|mimetypes:video/mp4,video/webm,video/quicktime|max:8192',
+            'motion_json' => 'nullable|string|max:512000',
             'device_id' => 'nullable|string|max:128',
         ]);
 
@@ -481,6 +482,7 @@ class ConsumerDeviceAuthController extends Controller
             $deviceId,
             $ctx['platform'],
             $ctx['device_label'],
+            $request->filled('motion_json') ? (string) $request->input('motion_json') : null,
         );
 
         if (! ($result['ok'] ?? false)) {
@@ -499,7 +501,7 @@ class ConsumerDeviceAuthController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Face matched. Secure this device.',
-            'data' => [
+            'data' => array_filter([
                 'stepup_mode' => $result['stepup_mode'] ?? 'device_mismatch',
                 'stepup_token' => $result['stepup_token'],
                 'next_step' => $result['next_step'] ?? 'bind',
@@ -508,7 +510,8 @@ class ConsumerDeviceAuthController extends Controller
                 'liveness_score' => $result['liveness_score'] ?? null,
                 'liveness_passed' => true,
                 'matched_via' => $result['matched_via'] ?? null,
-            ],
+                'motion_score' => $result['motion_score'] ?? null,
+            ], fn ($v) => $v !== null),
         ]);
     }
 

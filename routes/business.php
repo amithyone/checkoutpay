@@ -28,7 +28,8 @@ Route::prefix('dashboard')->name('business.')->group(function () {
     // Password reset routes
     Route::get('/password/reset', [\App\Http\Controllers\Business\Auth\ForgotPasswordController::class, 'showLinkRequestForm'])->name('password.request');
     Route::post('/password/email', [\App\Http\Controllers\Business\Auth\ForgotPasswordController::class, 'sendResetLinkEmail'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:5,1')
+        ->name('password.email');
     Route::get('/password/reset/{token}', [\App\Http\Controllers\Business\Auth\ResetPasswordController::class, 'showResetForm'])->name('password.reset');
     Route::post('/password/reset', [\App\Http\Controllers\Business\Auth\ResetPasswordController::class, 'reset'])
         ->middleware('throttle:5,1');
