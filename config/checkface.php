@@ -10,8 +10,11 @@ return [
     /** Bearer token shared with CheckFace (tenant cf_live_… key or server master token). */
     'api_token' => (string) env('CHECKFACE_API_TOKEN', ''),
 
-    /** HTTP timeout seconds for enroll/verify/liveness calls. */
+    /** HTTP timeout seconds for enroll/verify calls. Video uses video_timeout_seconds. */
     'timeout_seconds' => max(5, (int) env('CHECKFACE_TIMEOUT_SECONDS', 45)),
+
+    /** Liveness video can exceed 45s on cold or remote hosts (Namecheap → Contabo). */
+    'video_timeout_seconds' => max(45, (int) env('CHECKFACE_VIDEO_TIMEOUT_SECONDS', 90)),
 
     /** Amount (NGN) at/above which unfamiliar recipients require a fresh face check. */
     'amount_threshold_ngn' => (float) env('CHECKFACE_AMOUNT_THRESHOLD_NGN', 30000),

@@ -75,7 +75,7 @@ class CheckfaceClient
         return $this->multipartPost('/liveness/video', [
             ['name' => 'session_id', 'contents' => $sessionId],
             $this->filePart('clip', $clip),
-        ]);
+        ], (int) config('checkface.video_timeout_seconds', 90));
     }
 
     /**
@@ -99,10 +99,10 @@ class CheckfaceClient
      * @param  list<array<string, mixed>>  $multipart
      * @return array{ok: bool, status: int, data: array<string, mixed>, message: string}
      */
-    private function multipartPost(string $path, array $multipart): array
+    private function multipartPost(string $path, array $multipart, ?int $timeoutSeconds = null): array
     {
         try {
-            $response = $this->http()->asMultipart()->post($this->url($path), $multipart);
+            $response = $this->http($timeoutSeconds)->asMultipart()->post($this->url($path), $multipart);
         } catch (\Throwable $e) {
             Log::warning('checkface.post_failed', ['path' => $path, 'error' => $e->getMessage()]);
 
@@ -112,10 +112,12 @@ class CheckfaceClient
         return $this->normalizeResponse($response->status(), $response->json());
     }
 
-    private function http(): PendingRequest
+    private function http(?int $timeoutSeconds = null): PendingRequest
     {
+        $timeout = $timeoutSeconds ?? (int) config('checkface.timeout_seconds', 45);
+
         return Http::withToken((string) config('checkface.api_token'))
-            ->timeout((int) config('checkface.timeout_seconds', 45))
+            ->timeout($timeout)
             ->acceptJson();
     }
 
